@@ -1,0 +1,3 @@
+display_name: AI Code Inspection
+short_description: 日常前后端代码检查
+default_prompt: 使用本 Skill 检查已修改的前后端代码；先报告问题，只有开发者输入“继续”后才修复同一步问题；修复后执行验证，记录 runtime 状态，并保留 release/deploy 边界。

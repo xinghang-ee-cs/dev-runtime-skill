@@ -1,0 +1,5 @@
+interface:
+  display_name: "Long Task Orchestrator"
+  short_description: "Run dev, validation, and defect patches."
+  description: "Trigger long-task-orchestrator after planning handoff to implement, refactor, migrate data, write and run automated tests, record vitest/jest/integration/api-test/playwright results, and produce Long Testing Handoff before ready_for_local_test; or after confirmed testing/user defect feedback to patch to ready_for_local_retest. Do not use it for manual testing, real-device testing, server/cloud acceptance, final acceptance, or release approval."
+  default_prompt: "Use $long-task-orchestrator after planning handoff or confirmed testing feedback to complete implementation or patch automation handoff without entering acceptance."

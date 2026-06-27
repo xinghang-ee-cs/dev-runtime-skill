@@ -1,0 +1,5 @@
+interface:
+  display_name: "Testing Layer Runtime"
+  short_description: "Manage test lifecycle after long handoff."
+  description: "Trigger testing-layer-runtime for 某期测试治理、long testing handoff 继承、自动化结果复用、test-execution-order、人工测试、真实设备测试、服务器验证、外部能力验证、最终验收、测试回写、测试进度、测试证据, and release handoff. Do not use it to re-run long-owned vitest/jest/integration/api-test/playwright automation unless an allowed reuse exception applies."
+  default_prompt: "Use $testing-layer-runtime for 某期测试治理、long testing handoff 继承、自动化结果复用、test-execution-order、人工测试、真实设备测试、服务器验证、外部能力验证、最终验收、测试回写、测试进度、测试证据, and release handoff. 使用 testing-layer-runtime 时，必须先读取 testing-handoff.md 或 long-runtime-testing-summary.md，继承 long 已通过自动化结果并记录 reused_from_long；不要重复执行 long 已通过的 vitest/jest/integration/api-test/playwright。"
