@@ -126,7 +126,7 @@ Priority 不等于 Severity。
 - P0 回滚策略已记录
 - P0 遗留项为 0
 
-该 Gate 由 testing-layer-runtime 或 release gate 在验收阶段执行；planning-layer-runtime 只定义 P0 归属和验收口径。
+该 Gate 由后续测试与验收承接方在验收阶段执行；planning-layer-runtime 只定义 P0 归属、验收口径、自动化等级、真实环境要求和预期证据要求。
 
 ### P1 Gate
 
@@ -156,8 +156,8 @@ Priority 不等于 Severity。
 - P1 在 P0 清零后执行。
 - P2 在不影响 P0/P1 的前提下执行。
 - 同一任务不得同时标记多个 Priority。
-- 测试执行顺序不由 planning-layer-runtime 定义。
-- 测试依赖、阻塞关系和执行顺序由 testing-layer-runtime 的 `test-execution-order.md` 管理。
+- 测试执行调度、命令、数据构造、证据保存、失败重试方式不由 planning-layer-runtime 定义。
+- planning-layer-runtime 只定义测试设计中的业务顺序、依赖关系、自动化等级、真实环境要求和预期证明对象；实际如何执行由后续测试与验收承接方决定。
 
 ## 5. Validation Rules
 
@@ -180,7 +180,7 @@ Priority 不等于 Severity。
 Priority 必须贯穿：
 
 ```text
-01 -> 04 -> 10 -> 11 -> 12 -> 13 -> 15
+01 -> 04 -> 10 -> 11 -> 12 -> 13 -> 13 确认后派生的 14 / 15
 ```
 
 引用规则：
@@ -192,8 +192,9 @@ Priority 必须贯穿：
 | 10-外部能力与集成治理.md | 将 Priority 映射到外部能力、Evidence Gate、降级策略和 Runtime Gate |
 | 11-测试方案与验收用例.md | 将 Priority 映射到测试范围、验收对象和上线门禁 |
 | 12-风险、依赖与待确认项.md | 将 Priority 关联风险、依赖和阻塞项 |
-| 13-开发任务拆分与落地清单.md | 将 Priority 映射到开发任务、开发依赖和需覆盖验收项 |
-| 15-验收结果与复盘.md | 按 Priority 汇总验收结果、遗留项和复盘结论 |
+| 13-开发任务合同与落地清单.md | 将 Priority 映射到开发任务、开发依赖和需覆盖验收项 |
+| 14-开发执行与联调变更记录.md | 预置按 Priority 追踪的执行事实填写位置，不记录实际完成结论 |
+| 15-验收结果与复盘.md | 预置按 Priority 汇总验收事实、遗留项和复盘的位置，不记录实际验收或发布结论 |
 
 规则：
 

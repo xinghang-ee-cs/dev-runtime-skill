@@ -1,6 +1,6 @@
 # 前后端全流程开发
 
-一套 AI 编程助手的技能集合，把软件开发拆成「规划 → 实现 → 测试」三个阶段，每个阶段由一个专门的 Skill 负责。你只需要说"开始开发"，AI 就会按流程走完核心生命周期。
+一套项目中立的 AI 编程助手技能集合，把软件开发拆成「规划 → 实现 → 测试」三个阶段，并提供提交前代码检查。你只需要说"开始开发"，AI 就会按流程走完核心生命周期。
 
 完整、连贯、不跳步。
 
@@ -8,7 +8,7 @@
 
 从"做一个功能"到"上线"中间有很多步骤：需求对齐、写代码、跑测试、安全检查……很容易漏掉或者顺序搞乱，尤其用 AI 写代码的时候——它很会写，但不太会"想着整个流程走"。
 
-这套技能把核心开发生命周期固化成 **3 个独立又衔接的 Skill**，像流水线一样依次执行：
+这套技能把核心开发生命周期固化成 **3 个独立又衔接的 Runtime Skill**，并额外提供一个独立代码检查 Skill，像流水线一样依次执行：
 
 ```
 聊需求、出规划  →  写代码、跑自动化测试  →  人工验收、设备验证
@@ -17,7 +17,7 @@
   规划层运行时         长任务编排器           测试层运行时
 ```
 
-每个 Skill 只在自己该出场的时候触发，不越界、不重复。
+每个 Skill 只在自己该出场的时候触发，不越界、不重复。仓库内的运行时模板已经去项目化，不绑定任何具体业务、客户、人员、远端平台或技术栈。
 
 ---
 
@@ -31,6 +31,7 @@
 - 然后和你聊需求、范围、数据模型、权限、UI、验收标准
 - 最后产出结构化的规划文档（存到 `docs/计划安排/` 下面）
 - 只定义"要什么"，不涉及"怎么实现"
+- `runtime-user-profile.md` 是空模板，首次落地到具体项目时再按该项目上下文填写
 
 ### 2. 长任务编排器 `long-task-orchestrator`
 
@@ -49,6 +50,7 @@
 - 继承编排器跑过的自动化测试结果（不复跑）
 - 规划测试顺序，引导你一步步做人工操作
 - 覆盖真实设备验证、云端环境验证、外部能力验证
+- 只整理发布/安全门禁移交材料；如项目另有 release/security gate 或专门 Skill，由项目自行接入
 
 ### 4. AI 代码检查 `ai-code-inspection`
 
@@ -57,6 +59,7 @@
 - 命名不规范、代码异味、分层乱了、缺测试、注释过期
 - 分 7 个 Step 逐项检查，发现问题可以自动修复
 - 适合每次提交前跑一遍，不上线也能用
+- `project-environment-profile.md` 是环境档案模板，必须先按目标仓库真实结构填写，不能从别的项目复制技术栈事实
 
 ---
 
@@ -82,12 +85,14 @@
 - 希望 AI 不只是"写代码"，而是按完整流程走
 - 需要结构化规划文档、可追溯的测试记录
 - 项目较复杂（前后端分离、有数据库、有外部平台集成）
+- 需要把同一套开发流程复制到不同项目，但不希望 Skill 内携带原项目真实信息
 
 ## 不适用场景
 
 - 只需要 AI 帮忙写几行代码，不需要完整流程
 - 超大型企业级项目（这套 Skill 按小团队效率设计）
 - 不需要规划文档、只想直接开干的场景
+- 希望 Skill 自带某个具体项目的技术栈、账号、部署环境或业务知识的场景
 
 ## 支持哪些 AI 编程工具
 
@@ -102,15 +107,29 @@
 
 1. 把 `skills/` 目录复制到你的项目根目录
 2. 在你的 AI 编程工具的配置文件中添加技能引用
-3. 说"开始开发"即可触发规划层
+3. 按目标项目实际情况填写或维护必要模板：
+   - `skills/ai-code-inspection/project-environment-profile.md`
+   - `skills/planning-layer-runtime/runtime-user-profile.md`（如需要长期用户偏好）
+4. 说"开始开发"即可触发规划层
 
 详见各 Skill 目录下的 `SKILL.md` 了解详细规则。
+
+## 去项目化边界
+
+本仓库只保存通用流程规则、格式模板和中性示例。提交前应避免把以下内容写入 Skill：
+
+- 真实人员姓名、邮箱、账号、token、密钥或内部身份。
+- 具体客户、业务系统、仓库路径、服务器地址或生产环境信息。
+- 从某个项目复制来的技术栈结论、CI/CD 结论、数据库迁移命令或运维事实。
+- 某个项目专属的测试用例编号、页面名称、业务对象、审批流或维护后台示例。
+
+如果需要在具体项目中使用这些 Skill，把项目事实写在目标项目自己的规划文档、runtime 输出或环境档案里，不要回写到这个通用 Skill 仓库。
 
 ---
 
 ## English Summary
 
-**fullstack-dev-runtime** is a collection of AI coding assistant skills that turn ad-hoc AI coding sessions into a disciplined, phase-gated development lifecycle — from planning to tested implementation.
+**fullstack-dev-runtime** is a project-neutral collection of AI coding assistant skills that turn ad-hoc AI coding sessions into a disciplined, phase-gated development lifecycle, from planning to tested implementation.
 
 ### The Pipeline
 
@@ -128,7 +147,7 @@ Planning → Implementation → Testing
 |---|---|
 | `planning-layer-runtime` | Conversational planning — turns vague ideas into structured specs (requirements, data model, permissions, UI, acceptance criteria) |
 | `long-task-orchestrator` | Autonomous implementation — reads the plan, writes code, runs automated tests, and hands off at `ready_for_local_test` |
-| `testing-layer-runtime` | Test lifecycle management — inherits automated results, orchestrates manual/device/server verification |
+| `testing-layer-runtime` | Test lifecycle management — inherits automated results, orchestrates manual/device/server verification, and prepares release/security handoff |
 | `ai-code-inspection` | Quick code health check — catches naming issues, architecture drift, dead code, and missing tests in a structured 7-step pass |
 
 ### Why it exists
@@ -141,4 +160,4 @@ Written against the **Claude Code Skill specification** (`SKILL.md` + `reference
 
 ---
 
-这套技能是从真实项目的开发流程中打磨出来的，但 Skill 本身不绑定具体业务，可以复用于任何项目。
+这套技能是从真实项目的开发流程中打磨出来的，但 Skill 本身不绑定具体业务、技术栈或运行环境，可以复用于任何项目。

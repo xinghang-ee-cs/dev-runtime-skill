@@ -45,6 +45,22 @@ Recovery Runtime 只允许：
 
 以下情况触发 Recovery：
 
+- PROJECT-CURRENT-BASELINE_CHANGED
+- FLOW-CONTRACT_CHANGED
+- JOURNEY-OBJECT-MAP_CHANGED
+- SCENARIO-CONTRACT_CHANGED
+- MODULE-BOUNDARY_CHANGED
+- GLOBAL-STYLE_CHANGED
+- DESIGN-ASSET_CHANGED
+- STATE-DATA-FACT_CHANGED
+- API-CONTRACT_CHANGED
+- PERM-SCOPE-DATA-DOMAIN_CHANGED
+- ARCH-DECISION_CHANGED
+- CAPABILITY-DECISION_CHANGED
+- TEST-DESIGN_CHANGED
+- RISK-DEP-OPEN_CHANGED
+- TASK-CONTRACT_CHANGED
+- ACCEPTANCE-GATE_CHANGED
 - 上游 SoT 修改
 - 权限边界修改
 - 状态机修改
@@ -91,7 +107,7 @@ blocking:
 - 下游文档失效
 - Validation 失效
 - Acceptance 失效
-- Task Runtime 失效
+- 任务承接准备失效
 - Capability Validation 失效
 
 示例：
@@ -105,11 +121,132 @@ blocking:
 -> 15 reopen
 ```
 
+新增传播规则：
+
+```text
+PROJECT-CURRENT-BASELINE_CHANGED
+-> 当前 Planning Context invalid
+-> 00 invalid
+-> 01 invalid
+-> 02 invalid
+-> 相关下游文档按依赖关系 invalid
+
+FLOW-CONTRACT_CHANGED
+-> 02 invalid
+-> 03 invalid
+-> 04 invalid
+-> 05/06/07/08/11/13 按依赖关系 reopen
+
+JOURNEY-OBJECT-MAP_CHANGED
+-> 03 invalid
+-> 06 invalid
+-> 07 invalid
+-> 08 invalid
+-> 11 invalid
+-> 13 invalid
+
+FLOW changed
+-> related SCN invalid
+-> related MODULE coverage reopen
+-> PAGE / UI-MOD / UX-SCN review reopen
+-> related prompts and assets marked review_pending or superseded
+
+SCN changed
+-> related MODULE coverage reopen
+-> related PAGE / UI-MOD / UX-SCN reopen
+
+MODULE boundary changed
+-> related PAGE / UI-MOD / UX-SCN reopen
+
+global style changed
+-> related PROMPT-PAGE / PROMPT-MODULE / PROMPT-UX reopen
+-> visual assets marked review_pending
+
+FLOW / DOMAIN 变化
+-> 06 invalid
+-> 07 invalid
+-> 08 invalid
+-> 11 reopen
+-> 13 reopen
+
+STATE / DATA FACT 变化
+-> 07 invalid
+-> 08 invalid
+-> 11 reopen
+-> 13 reopen
+
+API Contract 变化
+-> 08 invalid
+-> 11 reopen
+-> 13 reopen
+
+PERM / Scope / Data Domain 变化
+-> 07 contract review required
+-> 11 reopen
+-> 13 reopen
+
+ARCH 决策变化
+-> 关联 CAP review required
+-> 关联 TEST reopen
+-> 13 reopen
+
+CAP 选型或关键前提变化
+-> 关联 ARCH review required
+-> 关联 TEST reopen
+-> 12 风险 reopen
+-> 13 reopen
+
+TEST 设计变化
+-> 13 测试任务 reopen
+-> 后续测试与验收承接准备需要重新审查
+-> 15 相关验收结果 reopen
+
+FLOW / STATE / API / PERM 变化
+-> 09 review required
+-> 关联 CAP review required
+-> 11 reopen
+-> 13 reopen
+-> 15 相关验收结果 reopen
+
+RISK / DEP / OPEN 变化
+-> 相关 TASK 需要重新审查
+-> 相关 14 预置执行项需要重新审查
+-> 相关 15 预置验收项需要重新审查
+
+TASK 合同变化
+-> 14 对应预置执行项失效
+-> 15 对应预置验收项失效
+-> 尚未填写真实事实的 14、15 标记 framework_rebuild_required
+-> 未填写实际事实的部分按新 TASK 合同重建
+-> 已由后续阶段写入的实际事实不得被 planning recovery 自动删除、覆盖或伪造
+-> Handoff 需要在 Execution and Acceptance Framework Derivation Gate 通过后基于真实路径重新生成
+
+验收标准、风险关闭条件或发布门禁变化
+-> 15 对应预置验收项失效
+-> 必须更新 15 框架后才能继续使用
+```
+
 禁止：
 
 ```text
 局部偷偷修复
 ```
+
+规则：
+
+- 不得继续沿用旧 task、旧测试映射或旧 handoff。
+- 必须重新读取当前有效 SoT，再继续后续文档。
+- Recovery 必须复用已有 Runtime Event Log 与现有事件类型。
+- 禁止新增日志目录、独立事件系统或独立 Recovery SoT。
+- 视觉资产变化若不改变业务动作、场景入口、异常恢复、资格或流程终态，不得反向修改 01/02。
+- 视觉资产变化若导致主操作、进入条件、异常处理、旧入口处理或用户路径变化，必须回到 03；若影响合法业务旅程，则继续回到 01/02。
+- 不得继续沿用旧接口兼容结论。
+- 06/07/08 恢复时必须先读取当前有效 SoT，再恢复后续文档。
+- 不得继续沿用旧测试映射、旧任务拆分、旧能力结论或旧架构绑定。
+- 09/10/11 恢复时必须先读取当前有效 SoT，再继续下游文档或运行时。
+- 12/13/14/15 恢复时只处理 planning skill 内部的框架失效与重审标记，不定义其他 skill 的恢复行为。
+- 14、15 未填写实际事实的预置项可以标记为 `framework_rebuild_required` 并按新合同重建；已经由后续阶段填写的事实不得由 planning recovery 自动删除、覆盖、伪造或回退。
+- Recovery 不得出现“先有 14、15 才能确认 13”的恢复路径；14、15 只在 13 已确认后派生或重建未填写的预置项。
 
 ## 6. 恢复恢复门禁（Recovery Resume Gate）
 

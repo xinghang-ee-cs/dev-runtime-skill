@@ -7,7 +7,7 @@ Planning Layer Runtime 支持两种模式：
 | 模式 | 输入 | 输出 | 禁止 |
 | --- | --- | --- | --- |
 | Planning Conversation Mode | 自然语言、模糊需求、阶段规划启动语句 | Planning Context | 直接生成最终文档 |
-| Planning Document Mode | 完整 Planning Context | 单份正式 SoT 文档草案 | 跳过文档职责边界、一次生成多份文档 |
+| Planning Document Mode | 完整 Planning Context | 单份正式 SoT 文档草案；13 确认后可派生 14/15 框架对 | 跳过文档职责边界、在 13 确认前一次生成多份文档 |
 
 进入规则：
 
@@ -17,15 +17,31 @@ Planning Layer Runtime 支持两种模式：
 
 ## 2. 规划启动上下文加载（Planning Bootstrap Context Load）
 
+### 2.1 Execution Boundary Kernel
+
+每轮用户输入的处理流程：
+
+```text
+用户输入
+  │
+  ▼
+Execution Boundary Kernel（09）
+  │
+  ├── execution_intent → 自然语义转向
+  └── planning_intent  → 继续以下流程
+```
+
+详细规则见 `references/09-execution-intent-guard.md`。
+
 Planning Conversation Mode 启动前，按需读取 `.plan/`。
 
 读取顺序：
 
 ```text
 .plan/planning-preferences.yaml
--> .plan/user-profile.yaml
--> .plan/project-profile.yaml
--> .plan/context-index.yaml
+→ .plan/user-profile.yaml
+→ .plan/project-profile.yaml
+→ .plan/context-index.yaml
 ```
 
 规则：
@@ -36,8 +52,10 @@ Planning Conversation Mode 启动前，按需读取 `.plan/`。
 - 读取 `.plan/` 后，不得跳过 User Discovery Sufficiency Gate。
 - `.plan` 只用于启动辅助，不是正式业务事实。
 - `.plan` 不替代 Planning Context。
+- `.plan/project-profile.yaml` 只允许保存 `project_name`、`project_type`、`project_current_baseline_path`。
+- 正式当前事实只来自 `docs/项目治理/PROJECT-CURRENT-BASELINE.md`、发布确认、验收记录、执行记录或用户明确确认。
 
-### All-Phase User Context First Rule
+### 2.2 All-Phase User Context First Rule
 
 任何期次启动都必须先执行 User Context Gate。
 
@@ -52,34 +70,93 @@ Planning Conversation Mode 启动前，按需读取 `.plan/`。
 
 规则：
 
-- 不因用户说“开始开发”就直接问业务建模问题。
-- 不因用户说“第一期/第二期”就直接问范围、用户、验收。
+- 不因用户说"开始开发"就直接问业务建模问题。
+- 不因用户说"第一期/第二期"就直接问范围、用户、验收。
 - 先确认当前使用者上下文。
 - 已有高置信用户画像时复用。
 - 未知或冲突时，用聊天方式识别。
 - 用户有明显不满、困惑、着急或强烈纠正时，先做情绪承接，再继续首轮推进。
 
+### 2.3 Project Current State Gate
+
+所有期次启动在 User Context Gate 之后必须执行 Project Current State Gate。
+
+流程：
+
+```text
+User Context Gate
+→ Project Current State Gate
+→ Business Discovery
+→ Planning Conversation
+→ Discovery Sufficiency Gate
+→ Planning Completion Gate
+→ Planning Document Mode
+```
+
+读取：
+
+```text
+docs/项目治理/PROJECT-CURRENT-BASELINE.md
+```
+
+第一期从 0 开始时允许创建该文件，但必须明确：
+
+- 当前没有已发布版本。
+- 当前没有既有正式流程。
+- 当前没有可继承的生产业务事实。
+- 当前初始事实来自用户确认。
+
+后续期或已有项目首次使用本 skill 时必须确认：
+
+- 当前生产中实际运行什么。
+- 当前已开发但未发布什么。
+- 当前已验收但未发布什么。
+- 当前有哪些旧入口、旧对象、旧状态、旧审批或旧流程。
+- 本期目标是新增、替换、阻断、迁移还是清理。
+
+Gate 检查项：
+
+```text
+project_current_baseline_available
+project_current_state_classified
+production_state_distinguished_from_delivery_state
+existing_legacy_assets_identified_or_explicitly_unknown
+phase_change_target_reconciled_with_current_state
+```
+
+规则：
+
+- 基线缺失、过期、来源冲突或无法确认时，不得进入 00 正式草案。
+- 允许先通过自然对话重建基线，但必须区分已确认事实、待核实事实和未知事实。
+- 不得把上一期 00–13 的计划内容当成当前已实现事实。
+- 不得把已验收未发布写成生产已生效。
+- 不得用已有旧代码绕过业务规划结论。
+
 ## 3. 对话生命周期（Conversation Lifecycle）
+
+### 3.1 对话阶段（Layer 1 可见）
 
 默认阶段：
 
 ```text
-目标确认
--> 范围确认
--> 业务域确认
--> 当前视角确认
--> 权限确认
--> 数据可见性确认
--> 用户流程确认
--> 功能边界确认
--> 数据模型确认
--> UI确认
--> 接口契约确认
--> 架构确认
--> 外部能力确认
--> 测试方案确认
--> 风险确认
--> 开发任务确认
+当前状态确认
+→ 目标确认
+→ 范围确认
+→ 业务域确认
+→ 当前视角确认
+→ 权限确认
+→ 数据可见性确认
+→ 用户流程确认
+→ 功能边界确认
+→ 数据模型确认
+→ UI确认
+→ 接口契约确认
+→ 架构确认
+→ 外部能力确认
+→ 测试方案确认
+→ 风险确认
+→ 开发任务合同确认
+→ 执行与验收框架派生检查
 ```
 
 规则：
@@ -92,7 +169,7 @@ Planning Conversation Mode 启动前，按需读取 `.plan/`。
 - 问题必须贴近操作、角色、流程和结果。
 - 阶段不是问卷；不得要求用户按阶段字段回答。
 
-## 3.1 用户发现访谈（User Discovery Interview）
+### 3.2 用户发现访谈（User Discovery Interview）
 
 当用户从自然语言需求开始时，Planning Conversation Mode 必须按需加载 `00-planning-user-discovery.md`。
 
@@ -123,8 +200,8 @@ discovered_business_facts
 
 禁止：
 
-- 已经确认“谁在使用”后，再次提问“用户角色是谁”。
-- 已经确认“当前工作流程”后，再次提问“用户流程是什么”。
+- 已经确认"谁在使用"后，再次提问"用户角色是谁"。
+- 已经确认"当前工作流程"后，再次提问"用户流程是什么"。
 
 除非：
 
@@ -133,9 +210,7 @@ discovered_business_facts
 
 ## 4. 对话轮次输出（Conversation Round Output）
 
-内部状态与用户态分离。
-
-内部轮次状态（Internal Round State）：
+### 4.1 内部状态（不可见）
 
 ```text
 当前阶段：
@@ -145,7 +220,7 @@ discovered_business_facts
 下一步：
 ```
 
-用户可见回复（User-facing Reply）：
+### 4.2 用户可见回复（Layer 1）
 
 ```text
 自然复述：
@@ -153,15 +228,15 @@ discovered_business_facts
 一个推进问题：
 ```
 
-规则：
+### 4.3 输出规则
 
-- Internal Round State 仅用于日志、恢复、上下文管理。
-- User-facing Reply 才是给用户看的内容。
+- 内部轮次状态仅用于日志、恢复、上下文管理。
+- 用户可见回复才是给用户看的内容。
 - 用户态回复必须像正常协作对话。
-- Internal Round State 的字段不能外显。
+- 内部轮次状态的字段不能外显。
 - 业务建模槽位不能原样外显。
 - 情绪承接是用户态回复的一部分，不是可选项。
-- 用户态问题优先确认“协作方式”，而不是要求用户选择身份分类。
+- 用户态问题优先确认"协作方式"，而不是要求用户选择身份分类。
 - 角色、职位、决策权由 AI 从后续聊天中逐步归纳，不得首轮强行收集。
 - 当前情绪只用于本轮承接，不进入 Planning Context，不进入 `.plan`，不进入正式 SoT。
 - 用户侧不要求按格式回复。
@@ -171,9 +246,10 @@ discovered_business_facts
 - 只有同一上下文且用户可以轻松一次性回答时，才允许 2 到 3 个问题。
 - 不得把 1 到 3 个问题执行成固定三问模板。
 - 面向非专业用户时，不使用 RBAC、ABAC、状态机、接口契约、权限矩阵等专业术语。
-- 不输出最终 SoT 正文。
+- 仅在 Planning Conversation Mode 的用户态回复中，不输出 Formal SoT 正文；Planning Document Mode 按第 10 节生成正式文档。
+- 不输出代码、shell 命令、文件树、工程搭建步骤或任何执行层内容。
 
-首轮示例：
+### 4.4 首轮示例
 
 用户：
 
@@ -186,7 +262,7 @@ discovered_business_facts
 ```text
 可以。我先不急着问功能细节，先确认我该按什么方式配合你。
 
-这次你是想让我偏“帮你定第一期范围”，还是偏“把已有材料整理成开发任务”？
+这次你是想让我偏"帮你定第一期范围"，还是偏"把已有材料整理成开发任务"？
 ```
 
 如果用户画像已知为项目负责人，合格回复：
@@ -200,8 +276,10 @@ discovered_business_facts
 如果用户明显不满，合格回复：
 
 ```text
-对，不能一上来就问“谁用、完成什么”，那不是正常对话。我先重新接住：你现在是要我帮你把这一期范围收住，还是已经有材料让我整理成开发计划？
+对，不能一上来就问"谁用、完成什么"，那不是正常对话。我先重新接住：你现在是要我帮你把这一期范围收住，还是已经有材料让我整理成开发计划？
 ```
+
+如果用户要求直接写代码，按 Execution Boundary Kernel（09）进行语义转向，不暴露系统机制。
 
 ## 5. 业务语言输入处理
 
@@ -213,9 +291,9 @@ discovered_business_facts
 - `07` 只接收已发现事实，并把可用事实补入 Planning Context。
 - 正式 SoT 文档仍必须使用专业表达和来源引用。
 
-## 5.1 UI/交互前置确认
+### 5.1 UI/交互前置确认
 
-当需求涉及用户界面、页面、表单、列表、地图、工作台、移动端、小程序、飞书或 PC 操作时，必须确认 UI/交互高风险项。
+当需求涉及用户界面、页面、表单、列表、地图、工作台、移动端、小程序、企业协作平台或 PC 操作时，必须确认 UI/交互高风险项。
 
 UI 高风险项：
 
@@ -241,6 +319,89 @@ UI 高风险项：
 
 - UI 访谈方法沿用 `00-planning-user-discovery.md`。
 - `07` 只记录 UI 高风险项、待确认项和阻塞范围。
+
+### 5.2 03/04/05 逐文档确认重点
+
+以下问题只作为内部确认方向，不得把完整 checklist 扔给用户；默认每轮只问一个最关键问题。
+
+03 生成前使用业务语言确认：
+
+- 用户从哪里进入？
+- 什么条件下能做下一步？
+- 用户遇到失败时会看到什么、能怎么办？
+- 取消或失败后回哪里？
+- 哪些旧入口用户仍可能访问？
+
+04 生成前使用业务语言确认：
+
+- 这条流程必须依赖哪些能力才能走通？
+- 哪些能力只是协作，不应承担主责任？
+- 哪些旧能力绝不能再参与？
+- 缺少哪个能力时必须阻断？
+
+05 生成前使用业务语言确认：
+
+- 本期最优先要先看到哪些页面？
+- 使用什么端、什么语言、什么视觉气质？
+- 是否已有品牌、Figma、截图或参考图？
+- 哪些页面或异常状态必须通过图明确表达？
+- 哪些局部变化需要单独做模块图？
+- 哪些交互现有页面图无法表达，需要后续补 UX 图？
+
+05 设计确认记录复用既有 `UI_CONFIRMATION` 事件，不新增设计日志、出图日志或 UX Runtime。
+
+### 5.3 06/07/08 逐文档确认重点
+
+以下问题只作为内部确认方向，不得把完整 checklist 扔给用户；默认每轮只问一个最关键问题。
+
+06 生成前使用业务语言确认：
+
+- 哪些业务事实证明用户可以继续下一步？
+- 什么事件会改变业务事实或状态？
+- 哪些状态需要长期保存，哪些只是页面上的临时状态？
+- 旧审批、旧申请或旧状态最多能做什么，绝不能变成什么新状态？
+- 测试、预发布、生产等数据域是否必须隔离？
+
+07 生成前使用业务语言确认：
+
+- 前端需要读取什么，提交什么？
+- 后端成功后必须返回什么，失败时必须拒绝什么？
+- 哪些写操作可能重复点或多人同时提交？
+- 哪些旧审批字段、旧状态或旧接口必须被挡在新流程外？
+- 页面刷新后需要依赖哪个最新业务事实或决策视图？
+
+08 生成前使用业务语言确认：
+
+- 谁能对哪个资源做这个动作？
+- 允许范围是自己的任务、负责资源、管理项目、当前租户还是历史只读？
+- 哪些情况是未登录、无资格、越界、状态不满足、旧流程来源、数据域错误或外部能力失败？
+- 工作人员只能协助诊断和恢复到哪一步，不能替谁完成业务动作？
+- 历史记录最多允许谁以只读方式查看？
+
+### 5.4 09/10/11 逐文档确认重点
+
+以下问题只作为内部确认方向，不得把完整 checklist 扔给用户；默认每轮只问一个最关键问题。
+
+09 生成前使用业务语言确认：
+
+- 现有系统哪些能力可以保留？
+- 哪些旧流程或旧逻辑绝不能再参与？
+- 这次变化要从哪里切换到新流程？
+- 出现问题时应该回退到什么可接受状态？
+
+10 生成前使用业务语言确认：
+
+- 这项能力是否真的必须依赖外部服务？
+- 候选方案有哪些？
+- 选择时最在意兼容性、成本、稳定性、国内可用性还是合规？
+- 能力不可用会阻断哪件核心业务？
+
+11 生成前使用业务语言确认：
+
+- 用户必须按怎样的顺序完成这条业务？
+- 哪些错误、越权、旧路径或异常绝不能通过？
+- 哪些结果必须自动化证明？
+- 哪些必须在真机或真实环境确认？
 
 ## 6. 风险确认模式
 
@@ -310,12 +471,15 @@ UI 高风险项：
 Conversation Mode 最终输出 Planning Context：
 
 ```text
+当前项目状态：
 目标：
 范围：
 角色：
 权限：
 数据：
 流程：
+FLOW：
+旧流程/历史对象边界：
 功能：
 UI/交互：
 能力：
@@ -331,42 +495,60 @@ UI/交互：
 - Planning Context 是 Document Mode 的输入。
 - Planning Context 不替代正式 SoT 文档。
 - 待确认项必须保留来源和影响范围。
+- 当前项目状态必须区分生产当前、已开发未发布、已验收未发布和计划目标。
+- FLOW 只记录 Planning Conversation 已确认或待确认的业务旅程，不替代 01 的正式 Flow Contract。
 
-## 9.1 Planning Handoff Package
+### 9.1 Planning Handoff Package
 
-Planning Context 状态为 `COMPLETE` 后，Planning Runtime 必须生成 Handoff Package。
+Planning Context 状态为 `COMPLETE` 后，只能形成：
+
+- 文档装配计划。
+- 涉及文档范围。
+- 尚待实际生成的职责清单。
+
+此时不得生成正式 `assembled_documents`、正式路径或正式 `handoff_role_mapping`。
+
+正式 Handoff Package 的唯一生成链路：
+
+```text
+Planning Context COMPLETE
+-> 进入 Planning Document Mode
+-> 按动态装配规则实际生成并确认所需正式文档
+-> 12 已确认
+-> 13 被用户确认并回写“状态：已确认”
+-> 自动生成 14、15 框架对
+-> Execution and Acceptance Framework Derivation Gate 通过
+-> 汇总实际已生成的 assembled_documents
+-> 基于实际路径生成唯一正式 Handoff Package
+-> Planning Handoff Complete
+```
 
 用途：
 
 ```text
 Planning Runtime
--> Long Runtime
--> Execution Runtime
--> Acceptance Runtime
+→ 后续执行承接方
+→ 后续测试与验收承接方
 ```
 
 Handoff Package 格式：
 
 ```yaml
 handoff_role_mapping:
-
-Capability Governance:
-  path:
-
-Test and Acceptance Plan:
-  path:
-
-Risk, Dependency, and Open Questions:
-  path:
-
-Development Landing Checklist:
-  path:
-
-Execution and Integration Record:
-  path:
-
-Acceptance and Retrospective Record:
-  path:
+  - role: Capability Governance
+    path: <真实已生成路径>
+  - role: Test and Acceptance Plan
+    path: <真实已生成路径>
+  - role: Risk, Dependency, and Open Questions
+    path: <真实已生成路径>
+  - role: Development Landing Checklist
+    path: <真实已生成路径>
+  - role: Execution and Integration Record
+    path: <真实已生成路径>
+    framework_status: planned_and_created
+  - role: Acceptance and Retrospective Record
+    path: <真实已生成路径>
+    framework_status: planned_and_created
 ```
 
 规则：
@@ -375,10 +557,17 @@ Acceptance and Retrospective Record:
 - 不使用固定编号。
 - 必须使用实际路径。
 - 必须来自本次 Planning Runtime 的正式输出。
-- Long Runtime 禁止通过编号猜测文件。
-- 未生成 Handoff Package 时，不允许进入 Long Runtime。
+- 上述 YAML 只表达允许的职责名；实际 Handoff 只能列出本期真实已生成且适用的 role。
+- Handoff 不得包含尚未生成的文档、空占位路径、假设路径或未适用职责。
+- 只有本期存在并已生成 13 时，Handoff 才可包含 `Development Landing Checklist`、`Execution and Integration Record`、`Acceptance and Retrospective Record`。
+- 只有 14、15 自动派生完成且 Execution and Acceptance Framework Derivation Gate 通过后，才可以写入 `framework_status: planned_and_created`。
+- `Execution and Integration Record.framework_status: planned_and_created` 只表示 14 已由 planning skill 创建执行记录框架和待填写位置，不代表实际执行事实。
+- `Acceptance and Retrospective Record.framework_status: planned_and_created` 只表示 15 已由 planning skill 创建验收与复盘框架和待填写位置，不代表实际验收或发布事实。
+- Handoff 只定义 planning skill 的输出事实，不定义或修改任何其他 skill 的内部职责、运行方式或文件维护逻辑。
+- 后续承接方禁止通过编号猜测文件。
+- 未生成 Handoff Package 时，不得将 planning 标记为完成交接。
 
-Document Assembly 完成后，必须输出：
+正式文档真实生成后，才能加入：
 
 ```yaml
 assembled_documents:
@@ -408,8 +597,11 @@ Document Assembly 原则：
 - 禁止默认生成全量文档。
 - S/M 级需求只允许生成必要文档。
 - L 级需求允许完整文档链。
-- `assembled_documents` 必须进入 Planning Context。
-- `handoff_role_mapping` 必须基于 `assembled_documents` 生成。
+- 只要装配 13，就必须同时装配并确认 11、12，以及所有被 TASK 引用的上游 SoT。
+- 15 不得作为可独立装配的孤立文档；只能由已确认的 13 连同 14 一起自动派生。
+- `assembled_documents` 只能包含已经真实生成的文档路径，不得伪造路径。
+- `handoff_role_mapping` 只能在所有实际装配文档完成后生成，且必须只使用真实路径。
+- Planning Context COMPLETE 阶段只能记录装配计划，不得写入正式 `assembled_documents` 或正式 `handoff_role_mapping`。
 
 低熵原则：
 
@@ -424,6 +616,7 @@ Document Assembly 原则：
 
 - Planning Context 状态为 COMPLETE。
 - Planning Completion Gate 已通过。
+- Project Current State Gate 已通过。
 - 高风险项已确认或已登记待确认项。
 
 执行规则：
@@ -433,150 +626,26 @@ Document Assembly 原则：
 - 涉及 Priority 时，按 `05-planning-priority-system.md` 执行。
 - 涉及格式、ID、状态、测试范围或下游验证结果引用时，按 `04-planning-format-spec.md` 执行。
 - 正式文档不得口语化。
-- 每次只生成一份正式文档草案。
-- 当前文档未确认前，不允许生成下一份文档。
-- 用户确认后，才允许进入下一份文档。
-- 每份正式文档草案生成前，必须先执行 Per-Document Collaborative Confirmation Gate。
-- 禁止用全局 Discovery 替代逐文档确认。
-- 禁止用生成后解释替代生成前确认。
-- 禁止用生成前确认替代生成后解释。
+- 每次只生成一份正式文档草案。例外：13 确认并回写后，14、15 作为框架对自动派生，不触发“每次只能生成一份正式文档”的限制。
+- 逐文档生成、用户态总结、确认、状态回写、进入下一份文档的完整生命周期，以 `../SKILL.md` 的"文档确认规则"、"Per-Document Collaborative Confirmation Gate" 和 "Role-Based Document Explanation Gate" 为唯一规则来源。
+- 本文件只保留 Planning Conversation 到 Planning Document Mode 的入口条件和边界，不重复维护逐文档生命周期规则。
+- 13 确认并回写 `状态: 已确认` 后，Planning Document Mode 必须自动生成 14 和 15 的正式框架，并运行 Execution and Acceptance Framework Derivation Gate；14、15 只预置后续事实填写位置，不填写任何实际执行、验证、验收、真实环境或发布结论。
+- 14、15 不需要分别进行生成前协作确认，也不需要把独立用户确认作为 Planning 完成前提。
+- 自动生成后，只向用户输出简洁说明：已生成执行记录框架与验收框架，当前只预置待填事实位置，不代表开发完成、测试通过、可发布或已发布。
 
-### 10.1 Per-Document Draft Lifecycle
+### 10.1 Per-Document Draft Lifecycle Reference
 
 Planning Document Mode 每次只处理一份文档。
 
-每份文档必须按以下顺序执行：
+完整步骤、生成前协作确认、生成后人话总结、确认绑定、状态回写和进入下一文档规则，不在本文件重复定义。
 
-1. Select Document
-   根据 `assembled_documents` 选择下一份待生成文档。
-2. Pre-Draft Explanation
-   用当前使用者能理解的话说明这份文档要解决什么问题、为什么现在要确认、它会影响后续什么。
-3. Per-Document Collaborative Confirmation
-   只确认该文档最关键、最容易偏差、最影响返工的点。默认只问 1 个主问题；同一上下文且容易回答时，才允许 2 到 3 个问题。
-4. Formal Document Draft
-   生成正式 SoT 文档草案。使用专业结构，不口语化，不把用户态解释写进正文。
-5. Role-Based Document Explanation
-   按当前使用者岗位/身份解释文档内容。
-6. User Confirmation
-   用户确认、修改或要求解释。
-7. Conversation Continuity Gate
-   明确告诉用户当前完成了什么、还差什么、现在该确认什么、可以怎么回复，以及回复后进入哪份文档或阶段。
+使用本文件执行 Planning Conversation Runtime 时：
 
-Per-Document Collaborative Confirmation 的 decision 只允许：
+- 进入 Planning Document Mode 前，仍必须先满足本文件的 Planning Completion Gate。
+- 进入 Planning Document Mode 后，逐文档生命周期立即切换到 `../SKILL.md` 的对应规则。
+- 若本文件和 `../SKILL.md` 对逐文档生命周期存在冲突，以 `../SKILL.md` 为准，并应回收本文件中的重复规则。
 
-```text
-continue_conversation
-generate_document
-blocked_by_missing_info
-```
-
-决策规则：
-
-- `continue_conversation`：还有该文档必须确认的信息，继续聊天补齐。
-- `generate_document`：该文档关键点已确认，可以生成正式草案。
-- `blocked_by_missing_info`：缺少关键事实，不能生成当前文档，必须说明最小阻塞问题。
-
-禁止：
-
-- `Planning Context COMPLETE` 后直接连续生成多份正式文档。
-- 只靠前期总访谈直接生成所有细节文档。
-- 不经逐文档协作确认，直接生成正式文档。
-- 把逐文档确认问题做成完整问卷。
-- 让用户按专业字段回答。
-- 把 AI 推断直接写成 `confirmed`。
-- 用生成前确认替代 Role-Based Document Explanation Gate。
-- 没有用户确认就进入下一份文档。
-
-Per-Document Collaborative Confirmation Gate 发生在正式文档生成前。
-Role-Based Document Explanation Gate 发生在正式文档生成后。
-二者不可互相替代。
-
-前者解决：
-
-- 生成前有没有聊清楚。
-- AI 是否在自行补细节。
-
-后者解决：
-
-- 生成后使用者能不能听懂。
-- 使用者是否知道确认什么和下一步怎么做。
-
-### 10.2 Role-Based Document Explanation Gate
-
-每生成一份正式 SoT 文档草案后，必须执行 Role-Based Document Explanation Gate。
-
-输出结构：
-
-```text
-一句话解释：
-锁定了什么：
-会影响什么：
-现在重点看什么：
-可以不用细看什么：
-错了会返工的点：
-可以怎么回复：
-下一步：
-```
-
-字段规则：
-
-- `一句话解释`：用当前使用者能听懂的话说明这份文档在做什么。
-- `锁定了什么`：只解释和当前使用者有关的关键业务事实。
-- `会影响什么`：说明后续会影响开发、页面、接口、数据、测试、验收或风险中的哪些部分。
-- `现在重点看什么`：给出 2 到 5 个当前使用者必须确认的点。
-- `可以不用细看什么`：告诉使用者哪些专业 ID、引用、格式、技术细节可以不用逐字看。
-- `错了会返工的点`：说明最可能导致返工的 1 到 3 个点。
-- `可以怎么回复`：给出自然回复方式，例如“确认，继续下一份”“范围不对，少了……”“这个先不做”“这里我不确定，你帮我再解释一下”。
-- `下一步`：说明确认后进入哪一份文档或哪一阶段，以及为什么。
-
-规则：
-
-- 必须根据 `.plan/user-profile.yaml` 和 User Context Gate 的结果调整解释方式。
-- 面向非专业使用者时，不要求其阅读完整专业文档。
-- 岗位化解释不替代正式 SoT。
-- 岗位化解释不进入 Handoff、Capability Registry 或正式文档正文。
-- Role-Based Document Explanation Gate 不得替代生成前的 Per-Document Collaborative Confirmation Gate。
-- Per-Document Collaborative Confirmation Gate 不得替代生成后的 Role-Based Document Explanation Gate。
-
-#### User-Facing ID Translation Rule
-
-规则：
-
-- 正式 SoT 文档中必须保留 `REQ`、`FLOW`、`DOMAIN`、`MODULE`、`CAP`、`PAGE`、`STATE`、`API`、`PERM`、`TASK`、`RISK`、`TEST` 等 ID。
-- 用户态解释中不得把 ID 作为主要确认对象。
-- 用户态不得直接问“REQ-001 是否准确？”“API-001 是否没问题？”“CAP-MAP-001 是否确认？”“TASK-001 是否可以执行？”。
-- 用户态必须把 ID 对应的具体内容翻译出来，让使用者确认内容本身。
-- 如果确实需要展示 ID，只能作为补充引用放在具体内容后面，不得单独出现。
-- 面向非技术使用者时，默认不展示 ID。
-- 面向开发实现使用者时，可以展示 ID，但必须同时展示该 ID 对应的自然语言内容。
-
-错误示例：
-
-```text
-REQ-001 这个核心目标是否够准确。
-```
-
-正确示例：
-
-```text
-第一期的核心目标是不是：上传一张 UI 图后，系统能识别常见组件，并在自研 canvas 里生成一张静态原型。文档里这个目标会被编号为 REQ-001，方便后续开发和测试追踪。
-```
-
-更推荐的非技术用户写法：
-
-```text
-第一期的核心目标是不是只先做到：一张 UI 图进去，系统能生成一张静态 canvas 原型。你不用管文档里的编号，重点确认这个目标对不对。
-```
-
-禁止：
-
-- 让用户确认裸 ID。
-- 让用户通过 ID 判断业务内容。
-- 在“你现在重点确认什么”里只列 ID。
-- 在“可以怎么回复”里要求用户引用 ID。
-- 用 ID 替代具体业务描述。
-
-### 10.3 Conversation Continuity Gate
+### 10.2 Conversation Continuity Gate
 
 每一轮用户态回复结束前，必须执行 Conversation Continuity Gate。
 
@@ -590,66 +659,12 @@ REQ-001 这个核心目标是否够准确。
 
 禁止：
 
-- 只以“请确认”结尾。
-- 只以“已完成”结尾。
-- 只以“等待用户回复”结尾。
+- 只以"请确认"结尾。
+- 只以"已完成"结尾。
+- 只以"等待用户回复"结尾。
 - 不说明下一步动作。
 - 不说明用户应该确认什么。
 - 不说明确认后进入哪里。
-
-### 10.4 逐文档协作确认重点
-
-以下内容只作为内部引导方向，不得原样全部抛给用户。每次只选择当前文档最关键的 1 到 3 个点自然提问。
-
-| 文档 | 确认方向 | 面向非专业用户的问法方向 |
-| --- | --- | --- |
-| 00-需求背景与目标 | 为什么做、解决什么问题、成功是什么样子 | 这件事最想改变什么 |
-| 01-需求范围与验收标准 | 本期做什么、不做什么、什么算完成 | 这一期最希望先看到哪一块能跑起来 |
-| 02-业务域模型 | 核心业务对象、对象关系、归属和生命周期 | 系统里最重要的东西有哪些，它们之间是什么关系 |
-| 03-用户场景与交互流程 | 谁在什么场景下做什么、异常时怎么办 | 真实一天里，用户会从哪一步开始，到哪一步结束 |
-| 04-功能拆解与边界说明 | 模块边界、负责什么、不负责什么、依赖什么 | 哪些功能是一组，哪些先不管 |
-| 05-前端页面与 UI 交互设计 | 页面、入口、按钮、跳转、空/错/加载状态、视觉方向 | 用户打开后先看到什么，点哪里，下一步发生什么 |
-| 06-数据模型与状态流转 | 关键数据、状态变化、历史兼容、测试数据治理 | 这件事从开始到结束会经历哪些明显阶段，哪些记录不能丢 |
-| 07-接口设计与前后端契约 | 页面/模块之间需要传什么、错误怎么反馈、权限怎么校验 | 这个结果需要同步给谁或哪个页面 |
-| 08-权限与异常边界说明 | 谁能看、谁能改、谁能决定、越权怎么办 | 哪些人只能看，哪些人可以改，哪些事情必须有人拍板 |
-| 09-架构设计与关键决策 | 复用策略、模块边界、关键技术取舍和例外 | 只解释影响成本、稳定性、未来扩展的取舍，不要求确认技术细节 |
-| 10-外部能力与集成治理 | 外部平台/SDK/API/AI 服务、官方来源和真实验证要求 | 哪些能力必须接真实平台，哪些可以先做演示替代 |
-| 11-测试方案与验收用例 | 只确认测什么，不确认怎么测 | 哪些结果必须证明是对的，哪些出错不能上线 |
-| 12-风险、依赖与待确认项 | 最大风险、谁来确认、确认不了会影响什么 | 哪些地方如果不确定，后面最容易返工或卡住 |
-| 13-开发任务拆分与落地清单 | 任务顺序、依赖、P0/P1/P2、能否交给执行 skill | 先做哪几件最关键，哪些可以后面做 |
-
-### 10.5 正式文档生成后的用户确认输出
-
-```text
-当前文档草案
-用户能理解的确认解释
-最需要确认的 2 到 5 个业务点
-可不用细看的专业细节
-错误会导致返工的点
-风险/冲突
-用户确认状态
-是否允许进入下一文档：否
-```
-
-确认状态：
-
-```text
-待确认
-已确认
-需修改
-```
-
-规则：
-
-- 不得只说“请阅读文档并确认”。
-- 必须说明：这份文档做了什么、锁定了哪些业务事实、会影响后续哪些开发。
-- `00`、`01`、`03`、`04`、`05`：用业务语言解释较完整。
-- `06`、`07`、`08`、`09`：说明它对数据库、接口、权限、页面或架构开发意味着什么。
-- `10`、`11`、`12`、`13`：重点解释风险、测试、落地任务、阻塞项和后续执行边界。
-- 专业细节不要求用户逐字确认，业务事实和返工风险必须确认。
-- `用户确认状态` 为 `已确认` 后，下一轮才可进入下一文档。
-- 用户要求修改时，只修正当前文档，不生成后续文档。
-- 逐文档确认不得替代 Planning Completion Gate。
 
 ## 11. Planning Completion Gate
 
@@ -663,16 +678,37 @@ Planning Conversation Mode 结束前必须执行：
 - `07` 必须在 Planning Completion Gate 前调用该 Gate。
 - Gate 未通过时，不得进入 Planning Document Mode。
 
+### Project Current State Check
+
+检查：
+
+```text
+project_current_baseline_available
+project_current_state_classified
+production_state_distinguished_from_delivery_state
+existing_legacy_assets_identified_or_explicitly_unknown
+phase_change_target_reconciled_with_current_state
+```
+
+规则：
+
+- 任一高风险项缺失时，Planning Context = INCOMPLETE。
+- 不得进入 Planning Document Mode。
+- 不得确认 00、01、02。
+
 ### Context Completeness Check
 
 检查：
 
+- 当前项目状态
 - 目标
 - 范围
 - 角色
 - 权限
 - 数据
 - 流程
+- FLOW
+- 旧流程/历史对象边界
 - 功能
 - UI/交互
 - 能力
@@ -743,11 +779,287 @@ Planning Conversation Mode 结束前必须执行：
 - 未确认关键实体
 - 未确认关键角色
 - 未确认关键权限
+- 未确认当前生产状态与交付状态边界
+- 未确认旧入口、旧对象、旧状态、旧审批或旧流程处理方式
 - 未确认 UI/交互高风险项且存在 UI 依赖开发任务
 
 存在时：
 
 不得结束规划。
+
+--------------------------------------------------
+
+### Flow Completeness Gate
+
+检查：
+
+- 每个 P0 REQ 已映射到 FLOW。
+- 每条 FLOW 有合法入口。
+- 每条 FLOW 有必要前置。
+- 每条 FLOW 有成功终态。
+- 每条 FLOW 有异常或阻断结果。
+- 每条 FLOW 有禁止跳步 / 非法路径。
+- 每个高风险流程已完成场景复述与用户确认。
+- 每条 FLOW 已关联后续 TEST-ID 或明确待测试映射。
+
+不满足时：
+
+```text
+Planning Context = INCOMPLETE
+```
+
+不得进入 Planning Document Mode。
+
+--------------------------------------------------
+
+### Journey-Object Consistency Gate
+
+检查：
+
+- 每条 FLOW 的前置对象存在。
+- 每一步产生或改变的对象存在。
+- 每个关键动作都有合法角色资格关系。
+- 每个关键终态都有业务事实支撑。
+- 每个旧流程或旧对象的处理状态明确。
+- 每条反向验收都有对应禁止关系。
+- 不存在旧对象驱动目标新流程的隐式关系。
+
+规则：
+
+- 不满足时，02 不得确认。
+- 涉及 01 旅程定义缺失时，01 必须回退修正。
+- 在 Planning Conversation Mode 中发现缺失时，Planning Context = INCOMPLETE。
+
+--------------------------------------------------
+
+### Scenario Consistency Gate
+
+检查：
+
+- 每个 P0 FLOW 至少有一个 SCN。
+- 每个 SCN 只引用既有 FLOW。
+- 每个 SCN 的进入条件不弱于 FLOW 前置。
+- 每个关键异常有恢复、退出或人工协助路径。
+- 03 未新增主业务旅程。
+- 03 未改变 FLOW 的合法入口、终态或禁止路径。
+
+规则：
+
+- 不满足时，03 不得确认。
+- 涉及 FLOW、对象关系、资格、前置、终态或禁止路径缺失时，必须标记上游 write-back required，并回到 01 或 02 修正。
+
+--------------------------------------------------
+
+### Module Coverage Gate
+
+检查：
+
+- 每个 P0 FLOW 有主模块。
+- 每个关键 SCN 有承接模块。
+- 每个模块有输入事实、输出能力、非责任和隔离边界。
+- 旧流程隔离模块明确保护哪些 FLOW。
+- 不存在模块循环依赖或模糊复用。
+
+规则：
+
+- 不满足时，04 不得确认。
+- 旧审批、旧入口、旧状态、旧对象不得以“视情况复用”方式存在。
+
+--------------------------------------------------
+
+### UI/UX Design Readiness Gate
+
+检查：
+
+- 每个 P0 SCN 已映射 PAGE。
+- 每个 PAGE 有合法进入条件和 UI STATE。
+- 每个 UI STATE 有唯一主操作。
+- 全局风格提示词已准备。
+- P0 页面提示词已准备。
+- 关键模块图需求已识别。
+- UX 是否可由现有 UI 图覆盖已明确。
+- 需要出图但尚未收到资产的项已标记，不得伪造已确认。
+
+规则：
+
+- 不满足时，05 的交互合同不得确认。
+- 涉及该页面的 UI 依赖开发任务不得生成或进入可执行状态。
+- 不依赖 UI 的后续规划文档不应被无故阻塞。
+
+--------------------------------------------------
+
+### State Integrity Gate
+
+检查：
+
+- 每个 P0 FLOW 都有前置业务事实、触发事件、成功事实与阻断事实。
+- 每个关键状态均有唯一来源、分类、允许迁移、非法迁移与迁移守卫。
+- 交互暂态、派生动作状态、持久业务状态、异常状态、旧流程边界状态、数据域状态已区分。
+- 前端、路由、本地缓存、旧审批、旧入口不得成为业务状态来源。
+- 旧对象与旧状态均有明确不可映射目标。
+
+规则：
+
+- 不满足时，06 不得确认。
+- 涉及 FLOW、DOMAIN、SCN、MODULE 前置缺失时，必须标记上游 write-back required，并回到 01 或 02 修正。
+
+--------------------------------------------------
+
+### API Contract Gate
+
+检查：
+
+- 每个 P0 FLOW 至少有 QUERY、COMMAND、DECISION_VIEW 或 LEGACY_BOUNDARY 合同承接。
+- 每个 COMMAND 都引用 06 的业务事件、前置事实和迁移守卫。
+- 每个 COMMAND 都有幂等和并发语义。
+- 每个 API 都声明访问上下文、业务资格和错误恢复方向。
+- 旧审批字段、旧审批状态、旧审批接口无法进入新 COMMAND 的输入、判断或返回。
+- 每个 API 都有正向与反向 TEST 映射。
+
+规则：
+
+- 不满足时，07 不得确认。
+- 07 不得把 08 作为正式上游 SoT。
+
+--------------------------------------------------
+
+### Permission Decision Gate
+
+检查：
+
+- 每个关键 COMMAND 都有 PERM-ID。
+- 每个 PERM 都明确动作、资源、允许主体、允许范围、资格、状态前置和数据域前置。
+- 权限拒绝、范围拒绝、状态阻断、旧流程阻断、数据域阻断、外部能力阻断已区分。
+- 工作人员协助能力没有越权。
+- 历史对象只读边界已明确。
+- 每个关键 PERM 均有自动化测试映射。
+
+规则：
+
+- 不满足时，08 不得确认。
+- 前端隐藏、禁用或不展示按钮不得视为权限实现。
+
+--------------------------------------------------
+
+### Architecture Binding Gate
+
+检查：
+
+- 每条 P0 FLOW 都有逻辑架构承接位置。
+- 每个 Canonical API Contract 都有 Architecture Binding。
+- 每项旧资产都明确允许复用什么技术基础，以及禁止复用什么业务语义。
+- 旧审批、旧入口、旧状态无法进入新 Command、新 State 或新 Decision View。
+- 外部能力未完成 10 选型时，不得伪装为具体 Provider 已确认。
+- 架构风险只移交 12，不在 09 重复定义正式 RISK。
+
+规则：
+
+- 不满足时，09 不得确认。
+- 09 启动前必须读取并引用 PROJECT-CURRENT-BASELINE。
+
+--------------------------------------------------
+
+### Capability Decision Gate
+
+检查：
+
+- 每项外部能力都有 CAP-ID。
+- 每个 CAP 都关联 FLOW、MODULE、ARCH、TEST 和 RISK。
+- 每个 CAP 都明确候选方案、选型状态、选择理由、官方事实和关键前提。
+- 官方事实、权限、鉴权、版本、配额、计费、目标端兼容性未确认时，必须标记阻断范围。
+- 页面可打开、JSSDK ready、Mock 成功、代码存在，均不得视为真实能力成功。
+- 未完成 Capability Development-Entry Evidence Gate 的 CAP，不得进入相关开发任务。
+- planning 阶段不得标记 `real_environment_verified` 或 `release_ready`。
+
+规则：
+
+- 不满足时，10 不得确认。
+- 10 已确认不等于 Provider 已接入、已真机验证或已上线。
+
+--------------------------------------------------
+
+### Test Design Gate
+
+检查：
+
+- 每条 P0 FLOW 都有正向业务流程测试。
+- 每条 P0 FLOW 都有前置阻断、状态、接口、权限、旧流程和回归测试。
+- 涉及外部能力的 FLOW 都有真实环境能力测试。
+- 涉及页面和交互的 FLOW 都有 UI 行为或 UX 测试。
+- 每条测试都明确自动化等级。
+- 11 中的测试顺序与 01 FLOW 顺序一致。
+- 11 不记录实际测试结果。
+
+规则：
+
+- 不满足时，11 不得确认。
+- 11 不得定义测试代码、命令、fixture 脚本、执行调度或实际证据内容。
+
+--------------------------------------------------
+
+### Risk / Dependency / Open Item Gate
+
+检查：
+
+- 每个正式 RISK 已归并为唯一风险。
+- 每个 BLOCKER 有阻断阶段、处理策略与关闭条件。
+- 每个 DEP 有验证来源和最晚解除阶段。
+- 每个 OPEN 有回写目标和确认主体。
+- 关键 OPEN 未关闭时，相关任务不得进入 13。
+- 12 不重复定义已确认业务规则、状态、接口、权限或 UI 事实。
+
+规则：
+
+- 不满足时，12 不得确认。
+- 01–11 只能移交风险信号、风险移交项、阻断提示或待确认问题，不得创建重复正式 RISK-ID。
+
+--------------------------------------------------
+
+### Task Contract Gate
+
+检查：
+
+- 每条 P0 FLOW 至少有一个主 TASK。
+- 每个 TASK 可追溯到 FLOW / STATE / API / PERM / ARCH / TEST。
+- 关键 OPEN 已关闭。
+- 每个 CAP 任务只引用已确认的选型与门禁。
+- 每个旧流程隔离要求均被至少一个 TASK 承接。
+- 每个 TASK 有 Ready Gate、完成合同和回写目标。
+- TASK 不引用不存在、未装配或未确认的 FLOW / STATE / API / PERM / ARCH / CAP / TEST 结论。
+
+规则：
+
+- 不满足时，13 不得确认。
+- Task Contract Gate 只校验 13 自身及其上游 01–12；14、15 的预先存在不得作为 13 确认前置。
+- 候选文件路径不等于已确认实现事实。
+- TASK 不得使用“按实现时决定”“可选 A / B / C”“视情况复用”“后续再看”。
+
+--------------------------------------------------
+
+### Execution and Acceptance Framework Derivation Gate
+
+检查：
+
+- 13 状态已确认。
+- 14 已按 TASK 预置 `EXEC-<TASK-ID>` 空白执行项。
+- 14 已继承 TASK 的目标、完成合同、预期 TEST、RISK / DEP / CAP 阻断与偏差回写位置。
+- 14 只包含框架和待填写位置。
+- 每条 P0 FLOW 都有预置验收项、风险关闭条件和发布影响。
+- 15 已包含 TEST-ID、CAP 真实环境要求、RISK 关闭条件、DEP 解除条件、发布门禁和基线更新条件。
+- 14、15 只使用已确认 01–13 的引用。
+- 14、15 没有任何实际执行、测试、真实环境、验收、发布或基线更新事实。
+- 14、15 的框架生成状态、框架完整性和实际事实状态符合统一状态模型：`generated` / `complete` / `not_required` / `not_started`。
+- `assembled_documents` 只包含已经真实生成的路径。
+- Handoff 尚未生成，或会在本 Gate 通过后基于实际路径重新生成。
+- 所有 EXEC、TEST、CAP、发布与基线事实初始只能是 `not_started` 或空白待填。
+- 14 未填写实际代码改动、实际文件修改、自动化测试通过、接口已联调、真实外部能力可用、真机验证完成、最终验收通过、可发布或已发布。
+- 15 未填写通过、失败、已验收、真实环境已通过、可发布、已发布、生产已更新或 PROJECT-CURRENT-BASELINE 已更新。
+
+规则：
+
+- 14、15 不得反向定义业务、状态、接口、权限或测试标准。
+- 14、15 不需要独立用户确认作为 Planning 完成前提。
+- Gate 通过后的唯一允许动作是：生成实际 `assembled_documents`，生成唯一正式 Handoff Package，标记 Planning Handoff Complete。
 
 --------------------------------------------------
 
@@ -780,6 +1092,7 @@ Runtime Event Log 属于 Project Runtime Evidence。
 - 阶段推进
 - 风险发现
 - 冲突发现
+- Project Current State Gate 结果
 - Completion Gate 结果
 - Capability 识别
 - Blocking Trigger
@@ -996,14 +1309,6 @@ audit-log.md
 audit-summary.md
 ```
 
-统一命名约定：
-
-```text
-Planning: planning-runtime/
-Execution: execution-runtime/
-Testing: testing-runtime/
-```
-
 当前 Skill 仅实现：
 
 ```text
@@ -1012,9 +1317,8 @@ planning-runtime/
 
 规则：
 
-- `execution-runtime/` 由 Execution Skill 创建。
-- `testing-runtime/` 由 Testing Skill 创建。
-- 禁止提前实现其他 Skill 的 evidence 目录。
+- 本 skill 不定义其他 skill 的运行时目录、日志结构、证据保存位置或实际回写机制。
+- 禁止提前实现其他 skill 的 evidence 目录。
 - 禁止新增 `recovery-runtime/`。
 - 禁止新增 `governance-runtime/`。
 - 禁止新增 `entropy-runtime/`。
@@ -1278,7 +1582,7 @@ Summary 生成时机：
 
 - Planning Completion Gate 通过后。
 - Planning Document Mode 完成后。
-- Planning Complete 后。
+- Planning Handoff Complete 后。
 
 Summary 内容：
 
@@ -1336,14 +1640,22 @@ conflict_count:
 missing_sections:
 ```
 
-Planning 完成后必须追加：
+Planning Handoff Complete 后必须追加：
 
 ```yaml
 event_seq:
 event_type: PLANNING_COMPLETE
 decision:
 generated_documents:
+handoff_status:
 summary_generated:
 blocking:
 next_action:
 ```
+
+事件语义：
+
+- `Planning Context COMPLETE` 只表示访谈和上下文已完成。
+- `Planning Document Assembly Complete` 表示实际装配文档已生成并确认。
+- `Planning Handoff Complete` 表示正式 Handoff Package 已按真实路径生成。
+- `PLANNING_COMPLETE` 只能在 Planning Handoff Complete 后追加。

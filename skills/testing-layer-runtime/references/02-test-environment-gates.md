@@ -1,5 +1,16 @@
 # Test Environment Gates
 
+## 环境切换 Writeback Gate
+
+在不同测试环境之间切换时（如从本地人工测试切换到服务器验证），必须满足以下条件后方可切换：
+
+1. 当前环境中所有测试项的 `writeback_status = updated`。
+2. 当前环境中无 `in_progress` 或 `interrupted_pending_reconcile` 的测试项。
+3. `test-runtime-state.md` 已更新 `current_phase`、`current_environment`、`current_item`、`next_executable_item`。
+4. `test-execution-events.md` 已记录环境切换事件。
+
+不允许在仍有未回写完成的测试项时切换环境。
+
 ## 1. 自动化结果继承
 
 目标：
@@ -23,7 +34,7 @@ Testing Runtime 禁止默认重新执行上述测试。
 继承要求：
 
 - `automated_passed` + evidence exists + handoff verified -> `reused_from_long`。
-- `automated_failed` -> `blocked`，不得以人工测试覆盖。
+- `automated_failed` -> 对应自动化 case 的 `status: failed`，依赖该项的后续测试标记为 `blocked_by_dependency`；不得以人工测试覆盖。
 - `automated_skipped` -> 判断为 `manual_required`、`server_required`、`release_required` 或 `coverage_gap`。
 - `coverage` 只能证明覆盖范围，不能单独证明验收通过。
 
@@ -42,8 +53,8 @@ rerun_reason:
 requested_by:
 scope:
 command:
-result:
-evidence:
+result_summary:
+evidence_refs:
 ```
 
 ## 2. 本地人工与真实设备测试
@@ -112,7 +123,7 @@ evidence:
 - 汇总 `reused_from_long` 自动化结果。
 - 汇总人工、真实设备、外部能力和服务器验证结果。
 - 标出 P0/P1 未覆盖项、证据不足项、服务器待确认项和已知风险。
-- 明确要求切换到 `ai-release-security-gate`。
+- 明确要求切换到项目定义的发布/安全门禁；若项目未提供专门流程或 skill，只输出 release handoff package。
 - 测试入口、测试快捷操作、测试专用接口删除只在最终上线/发布门禁中处理，不进入某一期独立测试矩阵。
 
 禁止：

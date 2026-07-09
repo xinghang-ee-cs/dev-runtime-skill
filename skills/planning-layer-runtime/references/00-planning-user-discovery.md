@@ -7,6 +7,7 @@
 - User Discovery Runtime
 - User Discovery Interview
 - Adaptive Interview
+- Project Current State Discovery
 - Business Discovery
 - Business Translation
 - First Principles Interview
@@ -230,6 +231,44 @@ metadata:
 - 设计体验视角优先确认页面行为、交互结果和流程体验。
 - 面向非技术身份时，不直接提问 RBAC、状态机、数据模型、API 契约或架构模式。
 
+## 3.1 Project Current State Discovery
+
+期次启动时，业务发现前必须先确认项目当前真实状态。
+
+来源优先级：
+
+```text
+docs/项目治理/PROJECT-CURRENT-BASELINE.md
+-> 实际发布确认
+-> 验收记录
+-> 执行记录
+-> 用户明确确认
+```
+
+必须区分：
+
+- 当前生产中实际运行什么。
+- 当前已开发但未发布什么。
+- 当前已验收但未发布什么。
+- 当前有哪些旧入口、旧对象、旧状态、旧审批或旧流程。
+- 本期目标是新增、替换、阻断、迁移还是清理。
+
+若基线缺失、过期、来源冲突或无法确认，允许先通过自然对话重建基线，但输出必须区分：
+
+```text
+已确认事实
+待核实事实
+未知事实
+```
+
+第一期从 0 开始时也不得跳过当前状态确认；必须明确当前没有已发布版本、没有既有正式流程、没有可继承的生产业务事实，且初始事实来自用户确认。
+
+禁止：
+
+- 把上一期 00–13 中"计划要做什么"当成"项目现在已经实现什么"。
+- 把已验收未发布写成生产已生效。
+- 通过已有旧代码、旧接口或旧页面绕过业务规划结论。
+
 ## 4. Discovery Lifecycle
 
 目标：
@@ -237,6 +276,14 @@ metadata:
 ```text
 Planning Conversation Mode 的目标不是让用户填写问题表，
 而是帮助用户把尚未清晰表达的业务想法说出来。
+```
+
+期次启动顺序：
+
+```text
+User Context Gate
+-> Project Current State Gate
+-> Business Discovery
 ```
 
 访谈顺序只作为内部线索：
@@ -279,6 +326,7 @@ User Discovery Runtime 完成后必须输出：
 user_profile:
 
 discovered_business_facts:
+  current_project_state:
   users:
   goals:
   current_workflow:
@@ -390,6 +438,11 @@ Planning Conversation Mode
 进入 Planning Document Mode 前，AI 内部必须确认：
 
 ```text
+当前生产中实际运行什么
+已开发但未发布什么
+已验收但未发布什么
+旧入口、旧对象、旧状态、旧审批或旧流程是什么
+本期目标与当前状态的关系是什么
 角色是谁
 谁发起
 谁审核
@@ -399,6 +452,7 @@ Planning Conversation Mode
 状态如何变化
 异常情况如何处理
 是否复用旧流程
+是否替换、阻断、迁移或清理旧流程
 是否涉及外部能力
 是否涉及权限变化
 是否涉及数据库结构或破坏性变更

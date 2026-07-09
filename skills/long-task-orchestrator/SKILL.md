@@ -192,7 +192,7 @@ Capability Governance
 
 若任务涉及外部能力、SDK、OpenAPI、MCP、AI Provider、基础设施依赖或第三方平台，则必须同时读取 planning handoff 指定的 `Capability Governance` 文档，并确认 Capability Registry 与 Evidence Gate 已通过。
 
-涉及 JSAPI、RecorderManager、定位、摄像头、推送、小程序能力、飞书能力、微信能力或平台能力时，Runtime 必须同时检查 Capability Evidence Gate 与 Capability Binding Gate。两者均通过后，才允许进入 implementation。
+涉及 JSAPI、RecorderManager、定位、摄像头、推送、小程序能力、企业协作平台能力、开放平台能力或其他平台能力时，Runtime 必须同时检查 Capability Evidence Gate 与 Capability Binding Gate。两者均通过后，才允许进入 implementation。
 
 ```text
 planning_confirmed_development_landing_checklist

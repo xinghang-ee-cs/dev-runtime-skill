@@ -10,7 +10,8 @@ Capability Governance Layer 用于在 Planning 阶段识别、确认和治理外
 - 功能由能力组合形成。
 - 外部能力不得默认由 AI 本地伪实现。
 - 外部能力不得凭经验、历史记忆、旧示例或非官方教程直接接入。
-- 涉及真实外部调用的能力，必须先完成 Evidence Gate，再生成开发任务。
+- 涉及真实外部调用的能力，必须先完成 Capability Development-Entry Evidence Gate，再生成开发任务。
+- Development-Entry Evidence Gate 只验证官方事实、选型前提和可进入开发的条件，不要求 Adapter、真实调用、代码证据、真实设备验证或真实环境结果已经存在。
 
 ## 2. Capability 定义
 
@@ -34,16 +35,59 @@ Capability 表示完成某项功能所依赖的能力来源。
 + 人工能力
 ```
 
+### 2.1 10 外部能力选型与接入决策边界
+
+`10-外部能力选型与接入决策.md` 是外部能力的选型与接入决策合同。若项目保留旧文件路径 `10-外部能力与集成治理.md`，正文标题和职责必须使用“外部能力选型与接入决策”。
+
+10 负责决定：
+
+- 是否需要某项外部能力。
+- 选什么 Provider 或能力来源。
+- 为什么选。
+- 能力边界、关键限制、官方事实、接入前提与开发前门槛。
+- 未满足什么就不得进入开发或发布。
+
+10 不负责：
+
+- Adapter 文件位置。
+- SDK 初始化代码。
+- 具体调用代码。
+- 环境配置命名或具体变量名。
+- 接口字段实现。
+- 数据库实现。
+- 开发任务拆分。
+- 实际接入过程。
+- 实际测试结果。
+- 上线结论。
+
+依赖方向：
+
+```text
+09 先定义 CAPABILITY PORT / ARCHITECTURE REQUIREMENT / ADAPTER BOUNDARY
+-> 10 再决定具体外部能力选型与接入前提
+-> 11 设计验证该能力结论的测试
+-> 13 才能生成满足门槛的开发任务
+```
+
+规则：
+
+- 09 不得替 10 确认具体 Provider。
+- 10 的选型改变、无法满足或要求改变 09 架构边界时，必须触发相关 ARCH 决策 review。
+- 文档确认状态、CAP 选型状态和 CAP 真实就绪状态必须分开。
+- 10 已确认不等于能力已接入、已真实验证或可上线。
+- 页面可打开、JSSDK ready、Mock 成功、代码存在，不得视为真实能力成功。
+- Capability Registry 只记录选型与前提事实；Capability Realization Requirement 与 Capability Acceptance Requirement 只能作为后续执行/验收需要证明的要求，不得让 10 写入 Adapter 代码、具体实现文件、实际接入结果或最终验收结论。
+
 ## 3. Capability 分类
 
-| 类型 | 说明 | 是否触发 Evidence Gate |
+| 类型 | 说明 | 是否触发 Development-Entry Evidence Gate |
 | --- | --- | --- |
 | Internal Capability | 项目内已有或可本地实现的能力 | 否，按常规规划治理 |
 | External SaaS Capability | 第三方 SaaS 或开放平台能力 | 是 |
 | AI Capability | 大模型、语音、OCR、Agent、视觉等 AI 服务 | 是 |
 | SDK Capability | 官方或第三方 SDK 接入能力 | 是 |
 | MCP Capability | MCP Server 暴露的工具或资源能力 | 是 |
-| Platform Capability | 微信开放平台、微信小程序、飞书开放平台、企业微信、Shopify、Salesforce、钉钉开放平台等平台生态能力 | 是 |
+| Platform Capability | 小程序平台、企业协作平台、CRM 平台、开放平台、低代码平台等平台生态能力 | 是 |
 | Infrastructure Capability | 对象存储、消息队列、推送、地图、支付、CDN 等基础设施能力 | 按外部依赖判断 |
 | Human Capability | 人工审核、运营、客服、线下确认等人工能力 | 否，但必须定义介入边界 |
 
@@ -62,13 +106,11 @@ Capability 表示完成某项功能所依赖的能力来源。
 - 文件预览
 - 电子签章
 - 外部审批
-- 微信开放平台
-- 微信小程序
-- 飞书开放平台
-- 企业微信
-- Shopify
-- Salesforce
-- 钉钉开放平台
+- 小程序平台
+- 企业协作平台
+- CRM 平台
+- 开放平台
+- 低代码平台
 
 ## 4. Capability Discovery
 
@@ -100,14 +142,14 @@ Capability 表示完成某项功能所依赖的能力来源。
 候选官方来源：
 发现时间：
 发现方式：
-确认状态：待确认
+CAP 选型状态：candidate
 ```
 
 规则：
 
 - Capability Discovery 不等于 Capability Confirmation。
 - Discovery 结果只能作为候选信息。
-- Discovery 完成后，必须进入 Capability Registry 与 Evidence Gate。
+- Discovery 完成后，必须进入 Capability Decision Card、Capability Registry 与 Capability Development-Entry Evidence Gate。
 
 禁止：
 
@@ -165,7 +207,7 @@ MCP：
 额度限制：
 限流策略：
 计费规则：
-环境变量：
+环境配置要求：
 回调要求：
 网络要求：
 最小能力确认要求：
@@ -174,19 +216,55 @@ MCP：
 人工介入策略：
 SoT来源：
 负责人：
-确认状态：
+CAP 选型状态：
 ```
 
-确认状态：
+环境配置要求只允许描述：
+
+- 密钥 / Token / App 凭证类型。
+- 权限或 Scope 前提。
+- 网络、回调、域名、白名单、运行环境要求。
+- 安全与保密约束。
+- 是否需要配置项。
+
+禁止记录：
+
+- 实际环境变量名称。
+- 配置文件路径。
+- 代码读取方式。
+- SDK 初始化代码。
+- 部署命令。
+
+10 正式状态模型：
 
 ```text
-未识别
-待确认
-已确认
-已验证
-阻塞
-废弃
+文档确认状态：
+草案 / 已确认
+
+CAP 选型状态：
+identified
+candidate
+confirmed
+rejected
+superseded
+deprecated
+
+CAP 真实就绪状态：
+not_ready
+official_sot_verified
+preconditions_ready
+real_environment_verified
+release_ready
+blocked
 ```
+
+旧治理材料中的“已验证”只能作为历史证据描述，不得替代 `real_environment_verified` 或 `release_ready`。
+
+阶段限制：
+
+- planning 阶段允许写入：`identified`、`candidate`、`confirmed`、`official_sot_verified`、`preconditions_ready`、`blocked`。
+- planning 阶段禁止写入：`real_environment_verified`、`release_ready`。
+- 只有后续真实执行与验收事实已经产生，并按其所属承接方完成验证后，才可能使用 `real_environment_verified` 或 `release_ready`。
 
 ## 7. 官方 SoT 优先级
 
@@ -215,19 +293,22 @@ SoT来源：
 - 官方文档必须记录访问日期、文档版本和官方文档最后更新时间；若官方未提供版本或更新时间，必须显式标注 `官方未提供`。
 - SDK、API、OpenAPI、MCP 必须记录版本或确认无版本号。
 
-## 8. External Capability Evidence Gate
+## 8. Capability Development-Entry Evidence Gate
 
 凡能力分类为 External Capability、SDK Capability、OpenAPI Capability、MCP Capability、AI Capability、Platform Capability 或等价外部真实能力时，必须完成：
 
-- 官方文档确认
-- SDK 确认
-- 版本确认
-- 鉴权确认
-- 请求结构确认
-- 响应结构确认
-- 错误码确认
-- 额度、限流、计费确认
-- 最小真实调用验证
+- 官方 Provider / 官方文档来源已确认。
+- SDK、API、OpenAPI、MCP 或 Provider 版本事实已确认。
+- 适用端、运行环境与兼容性已确认。
+- 鉴权模式、权限 / Scope、网络要求已确认。
+- 额度、限流、计费、合规约束已确认。
+- 请求、响应、错误与限制的官方合同已确认。
+- 能力边界与不支持范围已确认。
+- 失败影响和降级原则已确认。
+- 架构承接边界已确认。
+- 11 中的真实环境验证要求已设计。
+- 12 中的关键 RISK / DEP / OPEN 已收口。
+- 不存在阻断该 TASK 的关键 OPEN。
 
 否则：
 
@@ -235,19 +316,23 @@ SoT来源：
 禁止生成开发任务。
 ```
 
-最小真实调用验证必须说明：
+Development-Entry Evidence Gate 不得要求：
 
-```markdown
-验证环境：
-验证命令或操作：
-请求样例来源：
-响应证据：
-失败证据：
-验证结论：
-验证日期：
+```text
+实际 Adapter 已存在
+实际 runtime binding 已存在
+实际 SDK 调用已发生
+代码证据已存在
+真实设备验证已通过
+真实 API 请求已完成
+执行命令、操作步骤、响应截图或失败截图已存在
+实际测试结果已产生
+实际验收结论已产生
 ```
 
-## 9. Capability Binding
+Development-Entry Evidence Gate 通过后，允许生成 13 TASK。
+
+## 9. Capability Realization and Acceptance Requirements
 
 Capability 不允许抽象存在。
 
@@ -255,81 +340,81 @@ Capability 不允许抽象存在。
 
 例如，OAuth、UA 识别、容器识别、页面打开、JSSDK ready 只能证明环境或入口可用，不能证明平台 JSAPI、runtime adapter、RecorderManager、定位、摄像头、推送等真实能力已接入。
 
-每个 Capability 必须绑定：
+以下属于后续执行和验收要证明的事实，不得作为生成 TASK 前置：
 
-- runtime
-- adapter
-- sdk api
-- permission
-- fallback
-- test
-- acceptance
-- code evidence
+- Adapter 已实现。
+- runtime binding 已实现。
+- SDK API 已真实调用。
+- 权限处理已实现。
+- fallback 已实现。
+- 真实环境验证完成。
+- 真实设备验证完成。
+- 代码证据存在。
+- 错误、超时、限流和降级行为已验证。
+- CAP 已达到 `real_environment_verified` 或 `release_ready`。
 
-否则 Capability 不得标记为：
+planning-layer-runtime 可以定义：
 
-- 已完成
-- 已验证
+- 这些事实未来需要被证明。
+- 它们关联哪个 CAP / FLOW / TASK / TEST。
+- 应满足什么验收标准。
+- 需要何种真实环境要求。
+- 应在 14、15 中预置哪些待填事实位置。
 
-Capability Binding Matrix：
+planning-layer-runtime 不得定义：
 
-```yaml
-CAP-XXX-001:
-  runtime:
-    - xxx-runtime
-  adapter:
-    - xxx-adapter.ts
-  sdk_api:
-    - sdk.api
-  permission:
-    - location
-    - microphone
-  validation:
-    - sdk-ready
-    - permission-granted
-    - real-device-success
-  acceptance:
-    - TEST-XXX-001
-  fallback:
-    - browser-fallback
-  code_evidence:
-    - import sdk
-    - adapter implementation
-    - runtime binding
-    - api invocation
-```
+- 如何写 Adapter。
+- Adapter 放在哪个文件。
+- 如何初始化 SDK。
+- 如何调用 SDK。
+- 具体环境变量名。
+- 测试命令。
+- 测试数据。
+- 测试调度。
+- 证据保存目录。
+- 实际回写机制。
+- 其他 skill 如何执行或验收。
 
-Platform Capability 必须定义：
+Capability Realization Requirement 可以记录：
 
-- runtime adapter
-- platform adapter
-- sdk binding
-- permission binding
+- Adapter 需要实现什么能力。
+- SDK API 需要真实调用什么官方能力。
+- 权限处理需要覆盖什么 Scope 或授权前提。
+- fallback 需要覆盖哪些能力失败路径。
+- 错误、超时、限流和降级需要证明什么结果。
 
-禁止仅验证以下内容就判定平台能力完成：
+Capability Acceptance Requirement 可以记录：
 
-- OAuth
-- UA
-- 容器识别
-- 页面打开
-- JSSDK ready
+- CAP-ID。
+- FLOW / TASK / TEST。
+- 真实环境要求。
+- 真实设备要求。
+- 预期证据类型。
+- 14 Execution Fact Placeholder。
+- 15 Acceptance Fact Placeholder。
 
-## 10. Capability Binding Gate
+## 10. Capability Realization Requirement
 
-必须验证：
+下列内容保留为后续实现与验收必须证明的要求，不得写为生成 TASK 前的 BLOCKER：
 
-- adapter 存在
-- runtime binding 存在
-- sdk api 真实调用存在
-- permission binding 存在
-- fallback 存在
-- test binding 存在
-- acceptance binding 存在
+- adapter 存在。
+- runtime binding 存在。
+- sdk api 真实调用存在。
+- permission binding 存在。
+- fallback 存在。
+- test binding 存在。
+- acceptance binding 存在。
+- code evidence 已存在。
 
-任一缺失：
+这些要求只能进入：
 
 ```text
-BLOCKER
+Capability Realization Requirement
+Capability Acceptance Requirement
+TASK Completion Contract
+TEST Requirement
+14 Execution Fact Placeholder
+15 Acceptance Fact Placeholder
 ```
 
 ## 11. Capability Revalidation
@@ -343,7 +428,7 @@ BLOCKER
 - Provider 切换
 - 官方文档重大更新
 
-触发后，必须重新执行 Evidence Gate，并重新确认：
+触发后，必须重新执行 Capability Development-Entry Evidence Gate，并重新确认：
 
 - SDK 版本
 - API 版本
@@ -351,16 +436,18 @@ BLOCKER
 - 请求结构
 - 响应结构
 - 错误码
-- 最小真实调用验证
+- 额度、限流、计费、合规和能力边界
+- 11 的真实环境验证要求
+- 12 的 RISK / DEP / OPEN 收口
 
 规则：
 
-- Revalidation 完成前，不得将能力状态标记为 `已验证`。
+- Revalidation 完成前，不得将能力状态标记为 `real_environment_verified` 或 `release_ready`。
 - Revalidation 未完成时，相关开发任务不得以旧能力确认结果作为通过依据。
 
-## 12. Code Evidence Gate
+## 12. Capability Code Evidence Requirement
 
-Capability 声称已完成时，必须存在：
+Capability 声称达到 `real_environment_verified` 或 `release_ready` 时，后续执行与验收事实必须证明：
 
 - adapter 实现
 - runtime binding
@@ -370,33 +457,30 @@ Capability 声称已完成时，必须存在：
 - fallback handling
 - test evidence
 
-否则不得：
+planning 阶段只能把这些写成：
 
-- 关闭 P0
-- 标记 capability 为已验证
-- 输出“功能完成”
-- 进入验收通过
-
-代码自检阶段必须验证：
-
-- capability api 是否真实存在
-- adapter 是否真实实现
-- sdk api 是否真实调用
-- fallback 是否真实实现
+```text
+Capability Realization Requirement
+Capability Acceptance Requirement
+TASK Completion Contract
+TEST Requirement
+14 Execution Fact Placeholder
+15 Acceptance Fact Placeholder
+```
 
 示例：
 
 ```ts
-type FeishuJsApiName =
+type PlatformJsApiName =
   | "getSystemInfo"
 ```
 
-上述代码只证明 `getSystemInfo` 被类型声明覆盖，不证明飞书定位能力或飞书录音能力完成。
+上述代码只证明 `getSystemInfo` 被类型声明覆盖，不证明平台定位能力或平台录音能力完成。
 
-若未发现定位 JSAPI、RecorderManager、对应 adapter、runtime binding 和真实调用证据，必须判定：
+若定位 JSAPI、RecorderManager、对应 adapter、runtime binding 和真实调用证据尚未产生，planning 阶段只能标记为：
 
 ```text
-BLOCKER
+待后续实现与验收证明
 ```
 
 ## 13. AI 禁止规则
@@ -423,7 +507,7 @@ Mock 允许范围：
 - 必须指向真实 Capability Registry。
 - 不得作为验收通过依据。
 
-## 14. Runtime Gate
+## 14. Capability Development-Entry Gate
 
 | 条件 | 风险等级 |
 | --- | --- |
@@ -432,18 +516,12 @@ Mock 允许范围：
 | 鉴权方式不明确 | BLOCKER |
 | 请求或响应结构未确认 | BLOCKER |
 | 官方 SoT 不存在 | BLOCKER |
-| 最小真实调用未验证 | BLOCKER |
-| Capability 未完成 Binding | BLOCKER |
-| Capability Binding Gate 未通过 | BLOCKER |
-| adapter 不存在 | BLOCKER |
-| runtime binding 不存在 | BLOCKER |
-| sdk api 未真实调用 | BLOCKER |
-| permission binding 不存在 | BLOCKER |
-| Code Evidence Gate 未通过 | BLOCKER |
+| 架构承接边界未确认 | BLOCKER |
+| 11 未设计真实环境验证要求 | BLOCKER |
+| 12 未收口关键 RISK / DEP / OPEN | BLOCKER |
+| 存在阻断该 TASK 的关键 OPEN | BLOCKER |
 | 额度、限流、计费未确认 | HIGH |
 | 降级策略未定义 | HIGH |
-| fallback 不存在 | HIGH |
-| acceptance 未拆分 | HIGH |
 | 人工介入边界未定义 | MEDIUM |
 
 BLOCKER 未解除前：
@@ -451,6 +529,19 @@ BLOCKER 未解除前：
 - 不得生成开发任务。
 - 不得进入代码实现。
 - 不得写成已确认事实。
+
+下列内容不是生成 TASK 前的 BLOCKER，只能作为后续实现与验收要求：
+
+- adapter 不存在。
+- runtime binding 不存在。
+- sdk api 未真实调用。
+- permission binding 不存在。
+- fallback 不存在。
+- test binding 不存在。
+- acceptance binding 不存在。
+- code evidence 尚未产生。
+- 真实设备验证尚未完成。
+- 真实环境验证尚未完成。
 
 ## 15. 文档装配规则
 
@@ -463,7 +554,7 @@ BLOCKER 未解除前：
 | 需求特征 | 必须加载文档 |
 | --- | --- |
 | UI、页面、交互 | `05-前端页面与UI交互设计.md` |
-| External Capability、SDK、OpenAPI、MCP、AI Provider | `10-外部能力与集成治理.md` |
+| External Capability、SDK、OpenAPI、MCP、AI Provider | `10-外部能力选型与接入决策.md`（可兼容旧路径 `10-外部能力与集成治理.md`） |
 | Permission、角色、数据可见性、越权 | `08-权限与异常边界说明.md` |
 | 数据模型、状态机、兼容迁移 | `06-数据模型与状态流转.md` |
 | 接口、前后端契约、错误码 | `07-接口设计与前后端契约.md` |
@@ -472,11 +563,14 @@ BLOCKER 未解除前：
 
 规则：
 
-- L 级跨模块变更仍可完整走 00-15。
+- L 级跨模块变更仍可完整走 00-13，并在 13 确认后自动派生 14、15。
 - S/M 级变更只加载必要文档。
 - 未触发的文档不强制生成。
 - 文档装配结论必须写入 `涉及文档`。
-- handoff 给执行 skill 时必须输出 `handoff_role -> actual_path`，禁止下游按编号猜测。
+- handoff 给后续承接方时必须输出 `handoff_role -> actual_path`，禁止下游按编号猜测。
+- 只要本期需要生成 13 TASK，就必须同时装配并确认 11、12，以及 TASK 引用的全部上游 SoT。
+- 15 不得作为可独立装配的孤立文档；只能由已确认的 13 连同 14 一起自动派生。
+- `assembled_documents` 与 `handoff_role_mapping` 只能包含实际已生成的文档和角色，不得为了“看起来完整”伪造路径或角色。
 
 handoff 角色：
 
@@ -497,7 +591,7 @@ Acceptance and Retrospective Record
 - 官方文档
 - SDK 版本
 - API 版本
-- 最小能力确认要求
+- Capability Development-Entry Evidence Gate
 - 降级策略
 
 否则：
@@ -506,6 +600,16 @@ Acceptance and Retrospective Record
 不得进入执行。
 ```
 
+能力相关任务进入 13 前还必须满足：
+
+- 相关 CAP 已完成 10 的选型确认和 Capability Development-Entry Evidence Gate。
+- 相关 RISK / DEP / OPEN 已进入 12，且阻断该任务的 OPEN 已关闭。
+- 11 已定义验证该能力结论的 TEST，且 12 已定义相关风险、依赖或待决策事项。
+- 任务引用的 FLOW / STATE / API / PERM / ARCH / CAP / TEST 均已装配且确认。
+- 任务必须按 13 的 Task Contract Format 生成，不得以能力待办、环境适配或平台兼容性描述替代。
+- 候选文件路径、adapter 名称或 SDK 线索不得写成已确认实现事实。
+- 实际 Adapter、真实 SDK 调用、代码证据、真机结果和真实环境结果不得作为生成 TASK 的前置。
+
 任务格式补充：
 
 ```markdown
@@ -513,20 +617,20 @@ Acceptance and Retrospective Record
 官方 SoT：
 SDK版本：
 API版本：
-Evidence Gate：
-最小能力确认要求：
+Capability Development-Entry Evidence Gate：
+Capability Realization Requirement：
+Capability Acceptance Requirement：
 降级策略：
-Runtime Gate：
 ```
 
 涉及 Platform Capability 时，必须拆分：
 
-- runtime adapter
-- platform adapter
-- sdk binding
-- permission handling
-- fallback
-- capability acceptance
+- Capability Realization Requirement
+- Capability Acceptance Requirement
+- TASK Completion Contract
+- TEST Requirement
+- 14 Execution Fact Placeholder
+- 15 Acceptance Fact Placeholder
 
 禁止使用以下模糊任务替代真实 Capability：
 
@@ -543,46 +647,43 @@ Runtime Gate：
 正确示例：
 
 ```text
-TASK-FEISHU-JSSDK-READY
-TASK-FEISHU-LOCATION-ADAPTER
-TASK-FEISHU-RECORDER-ADAPTER
-TASK-FEISHU-PERMISSION-BINDING
-TASK-FEISHU-FALLBACK
+TASK-FEISHU-CAPABILITY-REALIZATION-CONTRACT
+TASK-FEISHU-LOCATION-REQUIREMENT
+TASK-FEISHU-RECORDER-REQUIREMENT
+TASK-FEISHU-PERMISSION-REQUIREMENT
+TASK-FEISHU-FALLBACK-REQUIREMENT
 ```
 
-真实设备验证不得作为 long 开发任务；应进入 `11-测试方案与验收用例.md` 的测试范围条目，并由 testing-layer-runtime 接管。
+真实设备验证不得作为开发实现任务；应进入 `11-测试方案与验收用例.md` 的测试范围条目，并由后续测试与验收承接方承接。
 
 ## 17. Capability Acceptance Scope 规则
 
 外部能力验收范围必须覆盖：
 
-- SDK 初始化对象
-- 鉴权结果对象
-- 最小真实调用对象
-- 错误码处理对象
-- 超时处理对象
-- 限流处理对象
-- 日志追踪对象
-- 降级策略对象
-- 网络失败恢复对象
-- adapter binding 对象
-- runtime binding 对象
-- sdk api 调用对象
-- permission binding 对象
-- fallback 对象
-- testing handoff 对象
-- acceptance 对象
+- SDK 初始化证明要求
+- 鉴权结果证明要求
+- 最小真实调用证明要求
+- 错误码处理证明要求
+- 超时处理证明要求
+- 限流处理证明要求
+- 日志追踪证明要求
+- 降级策略证明要求
+- 网络失败恢复证明要求
+- adapter binding 证明要求
+- runtime binding 证明要求
+- sdk api 调用证明要求
+- permission binding 证明要求
+- fallback 证明要求
+- 14 Execution Fact Placeholder
+- 15 Acceptance Fact Placeholder
 
 涉及 Capability 的 P0 测试范围必须生成结构化测试范围条目，并绑定：
 
 - CAP-ID
-- runtime
-- adapter
-- sdk api
-- permission
-- fallback
+- Capability Realization Requirement
+- Capability Acceptance Requirement
 - real device required
-- acceptance
+- TEST Requirement
 
 Capability Acceptance Matrix 不能替代结构化测试范围条目。
 结构化测试范围条目也不能替代 Capability Acceptance Matrix。
@@ -610,34 +711,35 @@ Capability Acceptance Matrix：
 ```markdown
 Capability：
 Acceptance Item：
-Runtime：
-Adapter：
-SDK API：
-Permission：
-Fallback：
+Capability Realization Requirement：
+SDK API Requirement：
+Permission Requirement：
+Fallback Requirement：
 Real Device Required：
 Acceptance Scope：
 ```
 
 ## 18. 文档职责边界
 
-`10-外部能力与集成治理.md` 负责：
+`10-外部能力选型与接入决策.md` 负责：
 
-- 外部能力来源
-- SDK 治理
-- OpenAPI 治理
-- MCP 治理
-- 官方 SoT 治理
-- Capability Registry
-- Capability Binding Matrix
-- Capability Binding Gate
-- Code Evidence Gate
-- Capability Acceptance Matrix
-- 外部能力接入限制
-- 降级策略
-- Mock 治理
-- 真实能力验证
-- Runtime Gate
+- 是否需要某项外部能力。
+- CAP-ID。
+- 能力服务的 FLOW / MODULE / SCN。
+- 候选能力来源。
+- 最终选型或候选状态。
+- 选型理由。
+- 官方事实来源。
+- SDK / API / Provider 版本事实。
+- 适用端与运行环境要求。
+- 鉴权、权限、Scope、网络、额度、限流、计费、合规约束。
+- 能力边界与不支持范围。
+- 能力不可用时影响哪些业务路径。
+- 进入开发前的 Capability Development-Entry Evidence Gate。
+- 进入发布前的真实能力验证要求。
+- 关联 ARCH / TEST / RISK。
+
+`10` 可引用 Capability Registry、Capability Realization Requirement、Capability Acceptance Requirement、TASK Completion Contract、TEST Requirement、14 Execution Fact Placeholder 或 15 Acceptance Fact Placeholder 作为后续证明要求，但这些不能把 `10` 变成 SDK 实施文档、测试执行日志或上线验收记录。
 
 禁止定义：
 
@@ -647,3 +749,15 @@ Acceptance Scope：
 - 数据库实现
 - 页面逻辑
 - 业务流程
+- Adapter 文件位置
+- SDK 初始化代码
+- 具体调用代码
+- 环境变量命名或具体变量名
+- 配置文件路径
+- 代码读取方式
+- 部署命令
+- 接口字段实现
+- 开发任务拆分
+- 实际接入过程
+- 实际测试结果
+- 上线结论
