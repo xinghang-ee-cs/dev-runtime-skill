@@ -1,163 +1,161 @@
-# 前后端全流程开发
+# AI Development Runtime Skills
 
-一套项目中立的 AI 编程助手技能集合，把软件开发拆成「规划 → 实现 → 测试」三个阶段，并提供提交前代码检查。你只需要说"开始开发"，AI 就会按流程走完核心生命周期。
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-完整、连贯、不跳步。
+A project-neutral set of Codex skills for planning, implementation, testing, and everyday code inspection.
 
-## 拿了这套东西能干嘛
+Three skills form a controlled delivery pipeline:
 
-从"做一个功能"到"上线"中间有很多步骤：需求对齐、写代码、跑测试、安全检查……很容易漏掉或者顺序搞乱，尤其用 AI 写代码的时候——它很会写，但不太会"想着整个流程走"。
-
-这套技能把核心开发生命周期固化成 **3 个独立又衔接的 Runtime Skill**，并额外提供一个独立代码检查 Skill，像流水线一样依次执行：
-
-```
-聊需求、出规划  →  写代码、跑自动化测试  →  人工验收、设备验证
-       │                    │                    │
-       ▼                    ▼                    ▼
-  规划层运行时         长任务编排器           测试层运行时
+```text
+Planning -> Implementation and automated validation -> Manual and environment testing
 ```
 
-每个 Skill 只在自己该出场的时候触发，不越界、不重复。仓库内的运行时模板已经去项目化，不绑定任何具体业务、客户、人员、远端平台或技术栈。
+`ai-code-inspection` is an independent review workflow that can be used before a commit or whenever the current changes need a focused check.
 
----
+This repository does not include a production release or security-approval skill. `testing-layer-runtime` prepares the handoff, but the target project's own release and security process must make the final decision.
 
-## 四个核心 Skill 分别做什么
+## Included Skills
 
-### 1. 规划层运行时 `planning-layer-runtime`
+| Skill | Use it when | Do not use it for |
+|---|---|---|
+| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | A feature still needs discovery, scope decisions, architecture choices, acceptance criteria, or planning documents before implementation. | Writing code, running tests, or recording actual test results. |
+| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | A confirmed planning handoff is ready for implementation and the work contains at least four implementation units, or confirmed test feedback needs a structured patch. | Manual testing, real-device testing, server acceptance, final acceptance, or release approval. |
+| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | Long-task implementation has reached `ready_for_local_test` and the project needs manual, device, cloud, external-capability, or final acceptance testing. | Re-running passed long-task automation by default, changing business code, or approving a production release. |
+| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | Modified frontend or backend code needs a practical seven-step review for naming, quality, architecture, tests, docs, comments, and commit readiness. | Release readiness, production gates, or enterprise security approval. |
 
-**一句话：帮你把"想做什么"聊清楚、写成文档。**
+## How the Workflow Fits Together
 
-- 你说"开始第一期开发"，它会先确认你是谁、你关心什么
-- 然后和你聊需求、范围、数据模型、权限、UI、验收标准
-- 最后产出结构化的规划文档（存到 `docs/计划安排/` 下面）
-- 只定义"要什么"，不涉及"怎么实现"
-- `runtime-user-profile.md` 是空模板，首次落地到具体项目时再按该项目上下文填写
-
-### 2. 长任务编排器 `long-task-orchestrator`
-
-**一句话：根据规划文档，把代码写完、测试跑完。**
-
-- 读取规划文档，拆解成一个个开发任务
-- 按顺序实现代码、写数据迁移、写自动化测试
-- 跑 vitest、jest、integration 等自动化测试
-- 做完后输出 `ready_for_local_test` 信号，交接给测试层
-- 如果测试发现 bug，还能回来修（patch runtime）
-
-### 3. 测试层运行时 `testing-layer-runtime`
-
-**一句话：接管测试，引导你完成人工验证。**
-
-- 继承编排器跑过的自动化测试结果（不复跑）
-- 规划测试顺序，引导你一步步做人工操作
-- 覆盖真实设备验证、云端环境验证、外部能力验证
-- 只整理发布/安全门禁移交材料；如项目另有 release/security gate 或专门 Skill，由项目自行接入
-
-### 4. AI 代码检查 `ai-code-inspection`
-
-**一句话：日常快速扫一遍代码，找找有没有明显问题。**
-
-- 命名不规范、代码异味、分层乱了、缺测试、注释过期
-- 分 7 个 Step 逐项检查，发现问题可以自动修复
-- 适合每次提交前跑一遍，不上线也能用
-- `project-environment-profile.md` 是环境档案模板，必须先按目标仓库真实结构填写，不能从别的项目复制技术栈事实
-
----
-
-## 整体流程
-
-```
-你: "开始第一期开发"
-  → 规划层: 聊需求 → 出规划文档
-
-你: "继续"
-  → 编排器: 读规划 → 写代码 → 跑自动化测试 → ready_for_local_test
-
-你: "继续"
-  → 测试层: 继承自动化结果 → 引导人工验证 → 服务器验证
-
-随时可用:
-  → 代码检查: 扫一遍代码有没有问题
+```text
+planning-layer-runtime
+  -> confirmed planning handoff
+  -> long-task-orchestrator
+  -> ready_for_local_test + automated-test evidence
+  -> testing-layer-runtime
+  -> release/security handoff
+  -> target project's release process
 ```
 
-## 适用场景
+The handoff states matter:
 
-- 用 AI 编程助手（Claude Code、Codex、Cline 等）做开发的个人或小团队
-- 希望 AI 不只是"写代码"，而是按完整流程走
-- 需要结构化规划文档、可追溯的测试记录
-- 项目较复杂（前后端分离、有数据库、有外部平台集成）
-- 需要把同一套开发流程复制到不同项目，但不希望 Skill 内携带原项目真实信息
+- `ready_for_local_test` means implementation and the required automated validation are complete and recorded. It does not mean manual acceptance or release approval has passed.
+- Testing inherits valid automated results from the long-task handoff and records them as `reused_from_long`. It does not repeat them just to produce a new pass result.
+- Planning defines what must be proved. Long-task execution writes code and runs automation. Testing manages human and environment evidence.
+- Code inspection reports findings first. When it finds a fixable issue, a separate `continue` authorizes that step's repair and validation.
 
-## 不适用场景
+## Deploy to a Codex Project
 
-- 只需要 AI 帮忙写几行代码，不需要完整流程
-- 超大型企业级项目（这套 Skill 按小团队效率设计）
-- 不需要规划文档、只想直接开干的场景
-- 希望 Skill 自带某个具体项目的技术栈、账号、部署环境或业务知识的场景
+### 1. Copy the skills
 
-## 支持哪些 AI 编程工具
+Copy the complete `skills/` directory into the root of the target repository. Keep every skill's `SKILL.md`, `references/`, `agents/`, and template files together.
 
-这套技能基于 **Claude Code 的 Skill 规范**编写（`SKILL.md` + `references/` 结构）。
+The target layout should look like this:
 
-- **Claude Code**：原生支持，直接放入 `skills/` 目录即可
-- **其他支持自定义 Skill 的 AI 编程工具**：只要工具支持加载 Markdown 格式的技能描述，就可以适配。核心是 `SKILL.md` 中的规则文本，不依赖任何 Claude 私有 API
-
-如果你的工具不支持 Skill 机制，可以把每个 Skill 的 `SKILL.md` 当作系统提示词（system prompt）直接喂给 AI，效果相同。
-
-## 快速开始
-
-1. 把 `skills/` 目录复制到你的项目根目录
-2. 在你的 AI 编程工具的配置文件中添加技能引用
-3. 按目标项目实际情况填写或维护必要模板：
-   - `skills/ai-code-inspection/project-environment-profile.md`
-   - `skills/planning-layer-runtime/runtime-user-profile.md`（如需要长期用户偏好）
-4. 说"开始开发"即可触发规划层
-
-详见各 Skill 目录下的 `SKILL.md` 了解详细规则。
-
-## 去项目化边界
-
-本仓库只保存通用流程规则、格式模板和中性示例。提交前应避免把以下内容写入 Skill：
-
-- 真实人员姓名、邮箱、账号、token、密钥或内部身份。
-- 具体客户、业务系统、仓库路径、服务器地址或生产环境信息。
-- 从某个项目复制来的技术栈结论、CI/CD 结论、数据库迁移命令或运维事实。
-- 某个项目专属的测试用例编号、页面名称、业务对象、审批流或维护后台示例。
-
-如果需要在具体项目中使用这些 Skill，把项目事实写在目标项目自己的规划文档、runtime 输出或环境档案里，不要回写到这个通用 Skill 仓库。
-
----
-
-## English Summary
-
-**fullstack-dev-runtime** is a project-neutral collection of AI coding assistant skills that turn ad-hoc AI coding sessions into a disciplined, phase-gated development lifecycle, from planning to tested implementation.
-
-### The Pipeline
-
-```
-Planning → Implementation → Testing
-    │           │               │
-    ▼           ▼               ▼
-  Planning   Long-Task      Testing
-  Layer      Orchestrator   Layer
+```text
+your-project/
+  AGENTS.md
+  skills/
+    ai-code-inspection/
+    planning-layer-runtime/
+    long-task-orchestrator/
+    testing-layer-runtime/
 ```
 
-### Four Core Skills
+### 2. Add the project-specific facts
 
-| Skill | Role |
-|---|---|
-| `planning-layer-runtime` | Conversational planning — turns vague ideas into structured specs (requirements, data model, permissions, UI, acceptance criteria) |
-| `long-task-orchestrator` | Autonomous implementation — reads the plan, writes code, runs automated tests, and hands off at `ready_for_local_test` |
-| `testing-layer-runtime` | Test lifecycle management — inherits automated results, orchestrates manual/device/server verification, and prepares release/security handoff |
-| `ai-code-inspection` | Quick code health check — catches naming issues, architecture drift, dead code, and missing tests in a structured 7-step pass |
+Before running `ai-code-inspection`, fill in `skills/ai-code-inspection/project-environment-profile.md` from the target repository's real framework, package manager, database, commands, and CI setup.
 
-### Why it exists
+Do not copy environment facts from another project. The planning skill creates the target project's minimal `.plan/` bootstrap files when needed; its current user profile is `.plan/user-profile.yaml`, not the legacy `runtime-user-profile.md` template.
 
-AI coding assistants are great at writing code but bad at "remembering the full process." This skill set enforces the discipline that gets a feature from idea to tested code: plan first, implement with tests, then validate with humans.
+### 3. Create `AGENTS.md`
 
-### Compatibility
+Create `AGENTS.md` in the target repository root. This is the durable project instruction file Codex uses to understand local rules. Copying the skill folders alone is not enough for this portable layout: `AGENTS.md` should tell Codex exactly which local skill owns each kind of work.
 
-Written against the **Claude Code Skill specification** (`SKILL.md` + `references/`). Works natively in Claude Code. Any AI coding tool that loads Markdown skill descriptions can use it — the core logic lives in plain-text rules, no vendor-specific APIs required.
+Use this as a starting point:
 
----
+```markdown
+# Codex Project Instructions
 
-这套技能是从真实项目的开发流程中打磨出来的，但 Skill 本身不绑定具体业务、技术栈或运行环境，可以复用于任何项目。
+## Local Runtime Skills
+
+Before acting, decide whether the task matches one of the local skills below. When it matches, read that skill's complete `SKILL.md` first and follow the references it routes for the current task.
+
+- `skills/planning-layer-runtime/SKILL.md`
+  - Use for requirement discovery, scope and architecture decisions, acceptance design, and planning documents before implementation.
+  - Do not write code, execute tests, or record actual test results in this skill.
+
+- `skills/long-task-orchestrator/SKILL.md`
+  - Use after a confirmed planning handoff for a complete feature or module with at least four implementation units, or for a confirmed testing patch.
+  - Own implementation, migrations, automated test code, automated execution, evidence, and the handoff up to `ready_for_local_test` or `ready_for_local_retest`.
+  - Do not perform manual acceptance, real-device testing, server acceptance, or release approval.
+
+- `skills/testing-layer-runtime/SKILL.md`
+  - Use after the long-task handoff for manual testing, real-device testing, cloud or server verification, external-capability verification, final acceptance, and release handoff.
+  - Reuse valid long-task automation evidence. Do not rerun passed automation unless the skill's exception rules allow it.
+  - Do not change business code or approve a production release.
+
+- `skills/ai-code-inspection/SKILL.md`
+  - Use for everyday review of modified frontend or backend code and commit preparation.
+  - Report findings before fixing them. A separate user `continue` is required for the current step's repair.
+  - Do not use it as a release, production, or enterprise security gate.
+
+## Workflow Boundaries
+
+- Normal delivery order: planning -> long-task implementation -> testing -> the project's release/security process.
+- Use one owning skill at a time unless the active skill explicitly hands work to another skill.
+- `ready_for_local_test` is a development handoff, not final acceptance or release approval.
+- Keep project facts, credentials, server details, and runtime evidence in the target project's own files. Do not write them back into generic skill rules.
+- Preserve unrelated working-tree changes. Do not stage, commit, push, deploy, or run destructive operations unless the user explicitly asks.
+```
+
+Add the target project's own commands, environment source of truth, Git rules, and release process below this block. Those facts belong in the target project's `AGENTS.md` or project documentation, not in this shared repository.
+
+### 4. Start Codex from the target repository
+
+Open the target repository in Codex and make the requested phase explicit. For example:
+
+```text
+Use planning-layer-runtime to plan this feature before implementation.
+Use long-task-orchestrator to implement the confirmed handoff.
+Use testing-layer-runtime to take over the current phase testing.
+Use ai-code-inspection to review the current Git changes only.
+```
+
+Natural-language requests also work when `AGENTS.md` routes them clearly, but Codex must still respect each skill's entry gates. A single "start development" message does not automatically bypass planning confirmation, implementation preflight, or testing handoff requirements.
+
+### 5. Check the installation
+
+Confirm that these files exist in the target repository:
+
+```text
+AGENTS.md
+skills/ai-code-inspection/SKILL.md
+skills/planning-layer-runtime/SKILL.md
+skills/long-task-orchestrator/SKILL.md
+skills/testing-layer-runtime/SKILL.md
+```
+
+Then ask Codex to explain which skill it would use for a sample task and why. This catches missing paths or unclear `AGENTS.md` routing before real work starts.
+
+## Good Fit
+
+- Individuals or small teams using Codex for multi-step software work.
+- Projects that need structured planning, traceable implementation, and human acceptance evidence.
+- Features with frontend, backend, database, device, cloud, or external-platform dependencies.
+- Teams that want to reuse one workflow without leaking one project's private facts into another.
+
+For a tiny edit that needs no planning or formal test lifecycle, use normal Codex instructions instead of forcing the full pipeline.
+
+## Project-Neutrality Rules
+
+This repository stores generic procedures, templates, and neutral examples only. Do not add:
+
+- Real names, email addresses, accounts, tokens, keys, or internal identities.
+- Customer names, private repository paths, server addresses, or production environment details.
+- A specific project's technology conclusions, CI/CD commands, migration commands, or operations facts.
+- Project-only test IDs, page names, business objects, or approval flows.
+
+Put those facts in the target project's planning documents, runtime output, environment profile, or `AGENTS.md`.
+
+## Compatibility
+
+This repository is maintained for Codex and includes `agents/openai.yaml` metadata alongside each `SKILL.md`. Other coding agents may be able to reuse the Markdown instructions, but their discovery and execution behavior is tool-specific and is not guaranteed by this repository.
