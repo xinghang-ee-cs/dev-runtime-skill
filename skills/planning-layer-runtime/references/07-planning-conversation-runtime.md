@@ -15,6 +15,123 @@ Planning Layer Runtime 支持两种模式：
 - Planning Context 完整后，才允许进入 Planning Document Mode。
 - 用户直接要求生成文档但上下文不完整时，先进入 Planning Conversation Mode。
 
+### 1.1 Planning Intent Subtype and Planning Exploration Guard
+
+`references/09-execution-intent-guard.md` 只负责将输入判定为 `planning_intent` 或 `execution_intent`。当结果为 `planning_intent` 时，本运行时必须在 Planning Layer 内部使用以下子类路由；这不改变 Execution Boundary Kernel：
+
+| 子类 | 适用情形 | 首要动作 |
+| --- | --- | --- |
+| `discovery_start` | 用户刚提出“创建计划”“开始规划”“梳理流程”“做一期规划”等自然语言方向 | 进入业务探索 |
+| `context_reconstruction` | 需要恢复或核实已有项目、规划上下文或当前事实 | 重建并核实当前上下文 |
+| `document_generation` | 用户要求生成文档，且完整 Planning Context 与既有 Gate 已实际满足 | 进入 Planning Document Mode |
+| `document_review` | 用户要求审查或修订已有规划内容 | 读取并审查对应内容 |
+
+规则：
+
+- 自然语言“创建计划”“开始规划”“梳理流程”“做一期规划”默认是 `discovery_start`，不是 `document_generation`。
+- 只有完整 Planning Context、Project Current State Gate、Discovery Sufficiency Gate 与 Planning Completion Gate 已实际满足时，才允许进入 `document_generation`。
+- `context_reconstruction` 与 `document_review` 不得假设当前业务事实仍然有效；发现下列关键事实缺失或冲突时，必须回到 `discovery_start`。
+
+Planning Exploration Guard 在每个 `discovery_start` 首轮，以及每次准备从探索转向收敛前建立完整不确定性地图；最低确认范围按 1.2 Exploration Scope Adaptation Rule 裁剪：
+
+```text
+当前业务流程
+当前系统状态
+当前用户角色/协作视角
+当前痛点
+本期真实目标
+涉及角色
+数据来源
+现有流程是否已经运行
+```
+
+当前内部复杂度判断适用范围内的任一项仍未知时：
+
+- 必须保持 Planning Conversation Mode，继续由 `00-planning-user-discovery.md` 进行发现。
+- 允许复述当前理解、说明未知项、提出一个探索问题，或把推测明确标为“暂时假设”。
+- 禁止生成正式规划文档、命名第 X 期、定义期次名称或本期目标标题、给出完整范围收口、列出模块/文档/功能范围，或创建看似正式的规划入口说明。
+- 不得把用户提到的方向直接改写为已确认的期次主题；它只能是等待核实的业务线索。
+- 必须同时遵守 User Context Gate Parallel Discovery Rule、Discovery Priority Rule 和 Solution Deferral Rule。
+
+仅当当前内部复杂度判断适用范围内的事实均已通过用户确认、项目当前事实核实，或明确为“不涉及/不存在”的已确认事实时，才允许结束探索保护。探索保护通过后仍必须继续执行既有 Discovery Sufficiency Gate 与 Planning Completion Gate；它不新增 Runtime、日志、SoT、恢复来源或独立状态机。
+
+### 1.2 Exploration Scope Adaptation Rule
+
+Planning Exploration Guard 的最低确认范围必须根据变更规模调整。Guard 的目的不是收集所有信息，而是消除会改变规划方向的关键不确定性。
+
+判断原则：
+
+- 简单需求不应触发完整业务探索。
+- 复杂业务变化不得因为已有部分上下文而跳过探索。
+- 若内部复杂度尚未确认，先按当前输入做临时内部判断；一旦发现影响范围扩大，立即提升探索范围。
+- 内部复杂度判断沿用 `references/02-planning-change-levels.md` 和 1.3 Internal Complexity Decision Rule，本规则只调整 Planning Conversation 的探索最低范围。
+
+S 级变更目标是确认局部影响。至少确认：
+
+```text
+当前行为是什么
+用户为什么需要调整
+影响哪个范围
+验收结果是什么
+```
+
+S 级不要求完整业务流程探索，不要求重新访谈全部角色、全部数据来源或整个系统状态；除非局部修改暴露出跨流程、跨角色、数据状态或验收口径风险。
+
+M 级变更目标是确认业务链路影响。需要确认：
+
+```text
+当前流程
+涉及角色
+影响范围
+数据变化
+验收目标
+```
+
+M 级可以聚焦受影响链路，不要求无关业务域的完整探索；但不得跳过会改变流程、角色、数据或验收结论的未知项。
+
+L 级变更目标是完整业务规划。执行完整探索：
+
+```text
+当前业务流程
+当前系统状态
+用户角色
+痛点
+真实目标
+涉及角色
+数据来源
+已有流程运行状态
+旧流程边界
+```
+
+L 级不得因用户先给出部分目标、候选模块或已有材料而直接进入范围收口或文档生成。
+
+### 1.3 Internal Complexity Decision Rule
+
+变更复杂度判断属于 Planning Runtime 内部决策。
+
+判断依据：
+
+- 是否影响业务流程。
+- 是否新增或修改 FLOW。
+- 是否影响角色权限。
+- 是否影响数据对象。
+- 是否影响状态迁移。
+- 是否影响 API 契约。
+- 是否影响 UI 主流程。
+- 是否涉及外部能力。
+- 是否影响测试与验收边界。
+
+规则：
+
+- S/M/L 不向用户展示。
+- 不要求用户选择 S/M/L。
+- 不要求用户判断需求规模。
+- 用户只提供业务事实、当前问题和目标。
+- Runtime 根据事实变化动态调整探索深度。
+- 初始复杂度判断只是临时内部假设，不是最终结论。
+- Discovery 过程中如果发现影响范围扩大，自动提升探索深度。
+- 不得因为初始判断为 S 或 M，而跳过后续发现。
+
 ## 2. 规划启动上下文加载（Planning Bootstrap Context Load）
 
 ### 2.1 Execution Boundary Kernel
@@ -28,7 +145,7 @@ Planning Layer Runtime 支持两种模式：
 Execution Boundary Kernel（09）
   │
   ├── execution_intent → 自然语义转向
-  └── planning_intent  → 继续以下流程
+  └── planning_intent  → Planning Intent Subtype（本文件 1.1）→ 继续以下流程
 ```
 
 详细规则见 `references/09-execution-intent-guard.md`。
@@ -49,15 +166,16 @@ Planning Conversation Mode 启动前，按需读取 `.plan/`。
 - 只读取当前任务需要的 `.plan` 文件。
 - 遵守最小上下文原则。
 - 如果 `.plan/` 不存在，允许创建最小模板，但这不代表 Planning Context 已完成。
+- `.plan` 初始化是内部启动行为；在 Planning Conversation Mode 的首轮用户回复中，不得把已创建的文件、路径或初始化状态作为主体，除非用户明确要求查看它。
 - 读取 `.plan/` 后，不得跳过 User Discovery Sufficiency Gate。
 - `.plan` 只用于启动辅助，不是正式业务事实。
 - `.plan` 不替代 Planning Context。
 - `.plan/project-profile.yaml` 只允许保存 `project_name`、`project_type`、`project_current_baseline_path`。
 - 正式当前事实只来自 `docs/项目治理/PROJECT-CURRENT-BASELINE.md`、发布确认、验收记录、执行记录或用户明确确认。
 
-### 2.2 All-Phase User Context First Rule
+### 2.2 User Context Gate Parallel Discovery Rule
 
-任何期次启动都必须先执行 User Context Gate。
+任何期次启动都必须先检查 User Context Gate，但 User Context Gate 不得成为阻断业务探索的问卷入口。
 
 适用：
 
@@ -70,23 +188,26 @@ Planning Conversation Mode 启动前，按需读取 `.plan/`。
 
 规则：
 
-- 不因用户说"开始开发"就直接问业务建模问题。
-- 不因用户说"第一期/第二期"就直接问范围、用户、验收。
-- 先确认当前使用者上下文。
+- User Context Gate 用于辅助理解沟通方式，不是 Business Discovery 的前置阻塞。
+- 不因用户说"开始开发"就直接问范围、角色、权限或验收。
+- 不因用户说"第一期/第二期"就直接问完整规划字段。
+- 先检查并复用当前使用者上下文。
 - 已有高置信用户画像时复用。
-- 未知或冲突时，用聊天方式识别。
+- 未知或冲突时，用聊天方式识别；若当前输入已经包含明确业务目标或业务问题，识别过程必须与 Business Discovery 并行推进。
+- 如果用户已经通过表达体现业务负责人视角、系统建设目标、当前问题背景或决策范围，不得为了补齐 user-profile 字段强制追问身份。
+- 用户角色、职位、决策权允许通过后续对话自然归纳；只有缺失信息会改变规划方向、范围、授权边界或验收结果时，才主动追问。
+- 不得首轮要求用户填写身份信息。
 - 用户有明显不满、困惑、着急或强烈纠正时，先做情绪承接，再继续首轮推进。
 
 ### 2.3 Project Current State Gate
 
-所有期次启动在 User Context Gate 之后必须执行 Project Current State Gate。
+所有期次启动都必须执行 Project Current State Gate；它在进入正式 00 草案或 Planning Document Mode 前必须通过。
 
 流程：
 
 ```text
-User Context Gate
-→ Project Current State Gate
-→ Business Discovery
+User Context Gate（读取 / 复用 / 自然识别；不阻塞业务探索）
+→ Project Current State Gate + Business Discovery（按当前最大不确定性并行推进）
 → Planning Conversation
 → Discovery Sufficiency Gate
 → Planning Completion Gate
@@ -139,7 +260,8 @@ phase_change_target_reconciled_with_current_state
 默认阶段：
 
 ```text
-当前状态确认
+探索定位（自然理解、关键未知、一个推进问题）
+→ 当前状态确认
 → 目标确认
 → 范围确认
 → 业务域确认
@@ -164,10 +286,13 @@ phase_change_target_reconciled_with_current_state
 - 允许跳过不涉及阶段。
 - 跳过必须说明依据。
 - 禁止无依据跳阶段。
+- 当前状态、实际流程、用户视角、痛点、真实目标、涉及角色、数据来源或既有流程运行状态尚未确认时，不得推进到范围确认，也不得自行产出期次名称、主题或范围收口。
 - 每轮只推进当前必要阶段。
 - 每轮优先只问 1 个主问题；同一上下文且用户可轻松一次性回答时，才允许 2 到 3 个问题。
 - 问题必须贴近操作、角色、流程和结果。
 - 阶段不是问卷；不得要求用户按阶段字段回答。
+- 不得为了补齐 Planning Context 模板而主动遍历所有阶段或字段。
+- 问题优先级由 Discovery Priority Rule 决定。
 
 ### 3.2 用户发现访谈（User Discovery Interview）
 
@@ -178,7 +303,68 @@ phase_change_target_reconciled_with_current_state
 - User Discovery 的访谈方法、业务事实发现、专业词翻译和 Discovery Sufficiency Gate 详细规则由 `00` 负责。
 - `07` 只负责在正确阶段调用该 Runtime，并接收其输出。
 - Discovery Sufficiency Gate 通过前，不得进入 Planning Document Mode。
-- User Discovery Runtime 的入口必须先完成 User Context Gate，不得跳过到业务发现。
+- User Discovery Runtime 必须读取或检查 User Context Gate；若用户输入已包含明确业务目标或业务问题，不得等待 User Context Gate 字段补齐后才开始业务发现。
+
+### 3.3 Discovery Priority Rule
+
+Discovery 阶段的目标不是快速补齐 Planning Context 字段，而是优先理解用户当前表达中的最大业务不确定性。
+
+问题必须来源于：
+
+```text
+当前用户提出的问题
+当前业务目标
+当前阻塞点
+当前影响规划方向的不确定因素
+```
+
+规则：
+
+- 不得为了填充 Planning Context 模板主动遍历所有字段。
+- 不得连续询问角色、权限、数据、状态、模块、页面、接口等字段清单。
+- 只有某个缺失信息会改变规划方向、范围、授权边界或验收结果时，才主动追问。
+- 当用户已经给出业务问题时，首轮问题应围绕真实流程、当前卡点或结果影响，而不是身份标签或专业字段。
+- 每轮只问当前最能改变下一步判断的一个自然问题。
+
+示例：
+
+```text
+用户：想优化维保流程。
+
+正确：现在一次维保任务通常怎么走？
+
+错误：请描述角色、权限、数据模型、状态、接口。
+```
+
+### 3.4 Solution Deferral Rule
+
+在 Planning Exploration Guard 生效期间，默认目标是理解问题，而不是设计解决方案。
+
+禁止主动输出：
+
+```text
+产品方案列表
+模块拆分
+功能架构
+页面设计
+技术方案
+系统改造方向
+```
+
+除非用户明确要求：
+
+```text
+你帮我设计方案
+有哪些解决方式
+帮我分析技术路线
+```
+
+规则：
+
+- Discovery 阶段问题优先于方案。
+- AI 可以提出澄清问题，但不得替用户提前决定未来系统形态。
+- 用户未要求方案时，用户态回复只做当前理解、未知项和一个关键问题。
+- 用户要求方案时，也只能输出候选方案，并明确其依赖哪些尚未确认的业务事实；不得把候选方案写成已确认范围、模块或任务。
 
 ## 发现复用规则（Discovery Reuse Rule）
 
@@ -223,8 +409,8 @@ discovered_business_facts
 ### 4.2 用户可见回复（Layer 1）
 
 ```text
-自然复述：
-当前判断：
+自然理解：
+当前未知：
 一个推进问题：
 ```
 
@@ -233,10 +419,12 @@ discovered_business_facts
 - 内部轮次状态仅用于日志、恢复、上下文管理。
 - 用户可见回复才是给用户看的内容。
 - 用户态回复必须像正常协作对话。
+- Planning Exploration Guard 生效时，用户态回复必须按“自然理解 -> 当前未知 -> 一个推进问题”组织；不得把内部启动、候选范围或文档装配说明当作对话主体。
 - 内部轮次状态的字段不能外显。
 - 业务建模槽位不能原样外显。
 - 情绪承接是用户态回复的一部分，不是可选项。
-- 用户态问题优先确认"协作方式"，而不是要求用户选择身份分类。
+- 当用户还没有给出明确业务问题时，用户态问题优先确认协作方式，而不是要求用户选择身份分类。
+- 当用户已经给出明确业务目标或业务问题时，用户态问题优先确认 Discovery Priority Rule 指向的最大业务不确定性。
 - 角色、职位、决策权由 AI 从后续聊天中逐步归纳，不得首轮强行收集。
 - 当前情绪只用于本轮承接，不进入 Planning Context，不进入 `.plan`，不进入正式 SoT。
 - 用户侧不要求按格式回复。
@@ -248,6 +436,13 @@ discovered_business_facts
 - 面向非专业用户时，不使用 RBAC、ABAC、状态机、接口契约、权限矩阵等专业术语。
 - 仅在 Planning Conversation Mode 的用户态回复中，不输出 Formal SoT 正文；Planning Document Mode 按第 10 节生成正式文档。
 - 不输出代码、shell 命令、文件树、工程搭建步骤或任何执行层内容。
+- 在探索保护通过前，不输出期次编号、期次名称、本期目标标题、模块列表、文档列表、功能范围收口或“已补充规划上下文”等文档化结论。
+- 在探索保护通过前，不主动输出产品方案列表、模块拆分、功能架构、页面设计、技术方案或系统改造方向，除非用户明确要求方案分析。
+- 不得把 Discovery 做成字段补全问卷；不得为了补齐 Planning Context 模板而追问与当前规划方向无关的字段。
+- S/M/L 是内部复杂度判断标签，不属于用户交互内容。
+- 不得在用户态回复中说“你的需求属于 S 级”“这是一个 M 级变更”“我们按 L 级规划”“请选择 S/M/L”“确认一下本期规模等级”。
+- 不得要求用户选择、理解或确认 S/M/L；用户只需要提供业务事实、当前问题和目标。
+- 除非用户主动询问变更复杂度分析，否则不向用户展示 S/M/L 判断；即使用户询问，也必须解释为影响范围分析，不要求用户选择等级。
 
 ### 4.4 首轮示例
 
@@ -260,23 +455,67 @@ discovered_business_facts
 如果用户画像未知，合格回复：
 
 ```text
-可以。我先不急着问功能细节，先确认我该按什么方式配合你。
+我理解你现在是想启动一段新的规划，但还不急着把它写成开发材料。
 
-这次你是想让我偏"帮你定第一期范围"，还是偏"把已有材料整理成开发任务"？
+目前我还不确定你希望我先帮你一起理清业务方向，还是你已经有一套可整理的现成材料。
+
+我先确认一个问题：这次你更希望先从真实使用过程聊起，还是先把已有材料拿出来一起核对？
 ```
 
 如果用户画像已知为项目负责人，合格回复：
 
 ```text
-可以。我先按你负责把控范围和交付的视角来推进，不直接开写代码。
+我理解你现在想从把控方向和交付的视角，把要解决的事情先聊清楚。
 
-这次第一期是已经有材料要我整理，还是先帮你判断最小可交付范围？
+目前我还不确定现场已经在跑什么流程，以及这次最需要先解决的阻塞点。
+
+我先确认一个问题：现在这件事通常是从谁发起、怎么一路处理到结束的？
+```
+
+用户提出模糊流程规划，合格回复：
+
+```text
+用户：可以先不急着出报告，优先解决维保过程中的流程。我们来创建一个最新的计划吧，本次计划主要梳理维保流程，包含数据导入、检查记录方式更新两个环节。
+
+AI：我理解你现在不是急着做报告，而是想先把维保流程跑顺，并把数据导入和检查记录的结果沉淀下来。
+
+目前我还不确定现场一次完整维保实际怎么走，数据现在从哪里来，以及检查记录卡在什么地方。
+
+我先确认一个问题：现在一次完整维保，从接到任务到完成记录，现场人员通常是怎么走的？
+```
+
+用户提出检查记录问题，合格回复：
+
+```text
+用户：我想优化检查记录。
+
+AI：我理解你想解决的是检查过程中的记录问题，先把现场记录这件事变得更顺。
+
+目前我还不知道主要卡在哪里，也不知道是填写、查找、统计，还是后续整改跟踪最影响使用。
+
+我先确认一个问题：现在现场人员记录检查结果时，最麻烦的是填写、查找、统计，还是后续整改跟踪？
+```
+
+用户提出局部优化，合格回复：
+
+```text
+用户：巡检列表增加搜索条件。
+
+AI：我理解这是已有巡检列表里的局部体验优化，重点是把列表查找变得更准确，不需要重新梳理整条巡检业务流程。
+
+目前我还不确定现在列表有哪些搜索能力，以及新增搜索主要解决什么查找问题。
+
+我先确认一个问题：现在使用人员最难找到的是哪类巡检任务？
 ```
 
 如果用户明显不满，合格回复：
 
 ```text
-对，不能一上来就问"谁用、完成什么"，那不是正常对话。我先重新接住：你现在是要我帮你把这一期范围收住，还是已经有材料让我整理成开发计划？
+对，不能一上来就把方向写成计划标题或范围，那样会跳过实际情况。我先重新接住：你现在是想先把真实流程理清楚，再决定怎么规划。
+
+目前我还不知道最影响你推进的是哪一段实际操作。
+
+我先确认一个问题：你最希望先理顺的，是现场执行、数据导入，还是检查记录这一段为什么会卡住？
 ```
 
 如果用户要求直接写代码，按 Execution Boundary Kernel（09）进行语义转向，不暴露系统机制。
@@ -293,7 +532,7 @@ discovered_business_facts
 
 ### 5.1 UI/交互前置确认
 
-当需求涉及用户界面、页面、表单、列表、地图、工作台、移动端、小程序、企业协作平台或 PC 操作时，必须确认 UI/交互高风险项。
+当需求涉及用户界面、页面、表单、列表、地图、工作台、移动端、小程序、飞书或 PC 操作时，必须确认 UI/交互高风险项。
 
 UI 高风险项：
 
@@ -373,7 +612,7 @@ UI 高风险项：
 08 生成前使用业务语言确认：
 
 - 谁能对哪个资源做这个动作？
-- 允许范围是自己的任务、负责资源、管理项目、当前租户还是历史只读？
+- 允许范围是自己的任务、负责区域、管理项目、当前租户还是历史只读？
 - 哪些情况是未登录、无资格、越界、状态不满足、旧流程来源、数据域错误或外部能力失败？
 - 工作人员只能协助诊断和恢复到哪一步，不能替谁完成业务动作？
 - 历史记录最多允许谁以只读方式查看？
@@ -595,8 +834,8 @@ Document Assembly 原则：
 
 - Document Assembly 必须按需求特征动态装配。
 - 禁止默认生成全量文档。
-- S/M 级需求只允许生成必要文档。
-- L 级需求允许完整文档链。
+- 内部影响评估为局部或业务链路影响时，只允许生成必要文档。
+- 内部影响评估显示需要完整业务规划时，才允许完整文档链。
 - 只要装配 13，就必须同时装配并确认 11、12，以及所有被 TASK 引用的上游 SoT。
 - 15 不得作为可独立装配的孤立文档；只能由已确认的 13 连同 14 一起自动派生。
 - `assembled_documents` 只能包含已经真实生成的文档路径，不得伪造路径。
@@ -627,13 +866,13 @@ Document Assembly 原则：
 - 涉及格式、ID、状态、测试范围或下游验证结果引用时，按 `04-planning-format-spec.md` 执行。
 - 正式文档不得口语化。
 - 每次只生成一份正式文档草案。例外：13 确认并回写后，14、15 作为框架对自动派生，不触发“每次只能生成一份正式文档”的限制。
-- 逐文档生成、用户态总结、确认、状态回写、进入下一份文档的完整生命周期，以 `../SKILL.md` 的"文档确认规则"、"Per-Document Collaborative Confirmation Gate" 和 "Role-Based Document Explanation Gate" 为唯一规则来源。
+- 逐文档生成、用户态总结、确认、状态回写、进入下一份文档的完整生命周期，以 `10-planning-document-interaction-runtime.md` 为唯一规则来源。
 - 本文件只保留 Planning Conversation 到 Planning Document Mode 的入口条件和边界，不重复维护逐文档生命周期规则。
 - 13 确认并回写 `状态: 已确认` 后，Planning Document Mode 必须自动生成 14 和 15 的正式框架，并运行 Execution and Acceptance Framework Derivation Gate；14、15 只预置后续事实填写位置，不填写任何实际执行、验证、验收、真实环境或发布结论。
 - 14、15 不需要分别进行生成前协作确认，也不需要把独立用户确认作为 Planning 完成前提。
 - 自动生成后，只向用户输出简洁说明：已生成执行记录框架与验收框架，当前只预置待填事实位置，不代表开发完成、测试通过、可发布或已发布。
 
-### 10.1 Per-Document Draft Lifecycle Reference
+### 10.1 Document Interaction Runtime Handoff
 
 Planning Document Mode 每次只处理一份文档。
 
@@ -642,8 +881,8 @@ Planning Document Mode 每次只处理一份文档。
 使用本文件执行 Planning Conversation Runtime 时：
 
 - 进入 Planning Document Mode 前，仍必须先满足本文件的 Planning Completion Gate。
-- 进入 Planning Document Mode 后，逐文档生命周期立即切换到 `../SKILL.md` 的对应规则。
-- 若本文件和 `../SKILL.md` 对逐文档生命周期存在冲突，以 `../SKILL.md` 为准，并应回收本文件中的重复规则。
+- 进入 Planning Document Mode 后，逐文档生命周期立即切换到 `10-planning-document-interaction-runtime.md`。
+- 本文件不维护逐文档生命周期；若出现重复或冲突，以 `10-planning-document-interaction-runtime.md` 为准，并删除重复规则。
 
 ### 10.2 Conversation Continuity Gate
 

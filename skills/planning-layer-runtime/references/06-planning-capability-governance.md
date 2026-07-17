@@ -87,7 +87,7 @@ Capability 表示完成某项功能所依赖的能力来源。
 | AI Capability | 大模型、语音、OCR、Agent、视觉等 AI 服务 | 是 |
 | SDK Capability | 官方或第三方 SDK 接入能力 | 是 |
 | MCP Capability | MCP Server 暴露的工具或资源能力 | 是 |
-| Platform Capability | 小程序平台、企业协作平台、CRM 平台、开放平台、低代码平台等平台生态能力 | 是 |
+| Platform Capability | 微信开放平台、微信小程序、飞书开放平台、企业微信、Shopify、Salesforce、钉钉开放平台等平台生态能力 | 是 |
 | Infrastructure Capability | 对象存储、消息队列、推送、地图、支付、CDN 等基础设施能力 | 按外部依赖判断 |
 | Human Capability | 人工审核、运营、客服、线下确认等人工能力 | 否，但必须定义介入边界 |
 
@@ -106,11 +106,13 @@ Capability 表示完成某项功能所依赖的能力来源。
 - 文件预览
 - 电子签章
 - 外部审批
-- 小程序平台
-- 企业协作平台
-- CRM 平台
-- 开放平台
-- 低代码平台
+- 微信开放平台
+- 微信小程序
+- 飞书开放平台
+- 企业微信
+- Shopify
+- Salesforce
+- 钉钉开放平台
 
 ## 4. Capability Discovery
 
@@ -471,11 +473,11 @@ TEST Requirement
 示例：
 
 ```ts
-type PlatformJsApiName =
+type FeishuJsApiName =
   | "getSystemInfo"
 ```
 
-上述代码只证明 `getSystemInfo` 被类型声明覆盖，不证明平台定位能力或平台录音能力完成。
+上述代码只证明 `getSystemInfo` 被类型声明覆盖，不证明飞书定位能力或飞书录音能力完成。
 
 若定位 JSAPI、RecorderManager、对应 adapter、runtime binding 和真实调用证据尚未产生，planning 阶段只能标记为：
 

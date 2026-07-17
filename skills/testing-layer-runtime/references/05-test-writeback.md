@@ -89,33 +89,33 @@ TEST-004:
 
 ```yaml
 MANUAL-OP-001:
-  operation_signature: target_user|feature-entry|precondition-ready|complete-core-action|test-domain
-  user_facing_operation: 打开目标功能入口，完成核心操作并确认页面状态
+  operation_signature: system_admin|admin-maintenance-config|project-exists|create-or-stop-region|test-domain
+  user_facing_operation: 打开配置页，创建/停用区域并确认列表状态
   depends_on:
-    - TEST-SETUP-001
+    - TEST-P7-CONFIG-001
   blocked_by: []
   queue_state: ready
   user_guidance:
-    role_or_account: 具备该功能权限的测试账号
-    entry: 目标功能入口
-    precondition: 测试数据已准备，当前使用隔离测试数据
+    role_or_account: 系统管理员账号
+    entry: 后台维护配置页
+    precondition: 项目已存在，当前使用测试数据
     steps:
-      - 打开目标功能入口
-      - 按业务流程完成一次核心操作
-      - 返回结果页或列表页查看状态变化
+      - 打开维护配置页
+      - 创建或停用一个区域
+      - 返回列表查看区域状态和团队绑定状态
     observe:
-      - 结果列表或详情可见
-      - 状态变化可见
-      - 权限或提示符合预期
-    feedback_hint: 可以自然反馈”状态正常””状态没显示”或直接发截图
+      - 区域列表可见
+      - 停用状态可见
+      - 团队绑定可见
+    feedback_hint: 可以自然反馈”列表状态正常””停用状态没显示”或直接发截图
   covers:
-    - TEST-FLOW-001
-    - TEST-STATE-001
-    - TEST-AUTH-001
+    - TEST-P7-REGION-001
+    - TEST-P7-TEAM-001
+    - TEST-P7-PERM-001
   evidence_need:
-    - result view visible
-    - state change visible
-    - permission or message visible
+    - region list visible
+    - stopped state visible
+    - team binding visible
   covered_by_evidence: false
 ```
 
@@ -174,22 +174,22 @@ MANUAL-OP-001:
   completed_at: “2026-06-30T10:08:00+08:00”
   depends_on_check: passed
   expected_evidence: screenshot + user feedback
-  result_summary: 用户确认目标功能的结果列表和状态变化均正常
+  result_summary: 用户确认区域列表和停用状态均正常
   evidence_refs:
     - manual-evidence/MANUAL-OP-001-screenshot.png
     - manual-evidence/MANUAL-OP-001-user-feedback.md
   evidence_missing_reason: null
   blocker_or_failure_reason: null
   covers:
-    - TEST-FLOW-001
-    - TEST-STATE-001
-    - TEST-AUTH-001
+    - TEST-P7-REGION-001
+    - TEST-P7-TEAM-001
+    - TEST-P7-PERM-001
   covered_by: []
   evidence_reuse: false
   writeback_status: updated
 
-TEST-AUTH-001:
-  item_id: TEST-AUTH-001
+TEST-P7-PERM-001:
+  item_id: TEST-P7-PERM-001
   item_type: case
   attempt: 1
   environment: local
@@ -197,8 +197,8 @@ TEST-AUTH-001:
   started_at: “2026-06-30T10:05:00+08:00”
   completed_at: “2026-06-30T10:08:00+08:00”
   depends_on_check: passed
-  expected_evidence: user feedback on permission or access boundary
-  result_summary: 通过 MANUAL-OP-001 复用证据确认权限边界正常
+  expected_evidence: user feedback on permission
+  result_summary: 通过 MANUAL-OP-001 复用证据确认权限正常
   evidence_refs:
     - manual-evidence/MANUAL-OP-001-user-feedback.md
   evidence_missing_reason: null
@@ -264,14 +264,14 @@ last_updated_at: “2026-06-30T10:08:30+08:00”
   item_id: MANUAL-OP-001
   from_status: pending
   to_status: in_progress
-  summary: 开始执行人工操作：打开目标功能入口并完成核心操作
+  summary: 开始执行人工操作：打开配置页创建/停用区域
 
 - timestamp: “2026-06-30T10:08:00+08:00”
   event_type: test_completed
   item_id: MANUAL-OP-001
   from_status: in_progress
   to_status: verified_by_user_report
-  summary: 用户确认结果列表和状态变化正常
+  summary: 用户确认区域列表和停用状态正常
 ```
 
 `event_type` 取值：
@@ -310,7 +310,7 @@ EVIDENCE-002:
   evidence_type: screenshot
   source: user
   path: manual-evidence/MANUAL-OP-001-screenshot.png
-  description: 目标功能结果页面截图
+  description: 区域列表页面截图
   added_at: “2026-06-30T10:07:00+08:00”
   valid: true
 

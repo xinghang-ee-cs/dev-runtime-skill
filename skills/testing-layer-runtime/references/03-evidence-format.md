@@ -104,8 +104,8 @@ EVIDENCE-001:
 复用已有证据覆盖多个测试项时，每个被覆盖的测试项必须独立记录：
 
 ```yaml
-# test-validation-results.md 中 TEST-AUTH-001 的记录
-item_id: TEST-AUTH-001
+# test-validation-results.md 中 TEST-P7-PERM-001 的记录
+item_id: TEST-P7-PERM-001
 status: verified_by_user_report
 evidence_reuse: true
 covered_by:
@@ -116,12 +116,12 @@ evidence_missing_reason: null
 若复用证据但缺少某个特定断言，只补记录缺失观察点：
 
 ```yaml
-item_id: TEST-AUTH-001
+item_id: TEST-P7-PERM-001
 status: evidence_insufficient
 evidence_reuse: true
 covered_by:
   - MANUAL-OP-001
-evidence_missing_reason: 受限角色页面是否没有提交入口
+evidence_missing_reason: 非组长页面是否没有提交入口
 ```
 
 ## Manual Guidance Conversation Rule
@@ -171,7 +171,7 @@ Manual Guidance Strategy 默认采用 Conversation Driven Testing，禁止采用
 若新 case 只缺少某个业务断言，AI 只能基于已有证据追问缺失观察点，例如：
 
 - “刚才提交后按钮是否已经不可点击？”
-- “刚才受限角色页面是否没有提交入口？”
+- “刚才非组长页面是否没有提交入口？”
 - “刚才图片详情是否只对本人可见？”
 - “刚才错误提示是否表达为权限不足，而不是系统异常？”
 
@@ -253,6 +253,6 @@ Runtime 内部必须继续判断 `Long Runtime Completion Verified`，取值只�
 - `not_requested`
 - `handoff_required`
 - `handoff_ready`
-- `handled_by_project_release_gate`
+- `handled_by_release_security_gate`
 
 不得在本 Skill 中写 `release_pass`。

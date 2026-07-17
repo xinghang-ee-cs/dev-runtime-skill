@@ -394,7 +394,7 @@ Testing Runtime 必须优先使用 `manual-test-queue.md` 中 `MANUAL-OP` 的 `d
 - 自动化失败时报告阻塞，不用人工判断掩盖失败。
 - 人工测试缺少截图或描述时，先按对话规则追问；最终仍无法形成证据时，在 Runtime 内部标记证据不足。
 - 服务器部署状态未确认时，不进入 Server Verification Mode。
-- release 测试请求必须停止在 Testing Runtime 边界内，并移交项目定义的发布/安全门禁；若项目未提供专门流程或 skill，只输出 release handoff package，不得输出 release pass。
+- release 测试请求必须切换到项目定义的发布/安全流程或可选 release/security skill。
 - 每个测试项开始前，必须完成 Per-Test Durable Writeback Rule 的前置检查点回写；检查点写入成功后方可执行或引导该测试项。
 - 每个测试项结束后，必须完成 Per-Test Durable Writeback Rule 的完成检查点回写；回写成功后方可推进到下一个测试项。
 - 推进到下一个测试项前，必须通过 Test Progression Gate 的全部条件。
