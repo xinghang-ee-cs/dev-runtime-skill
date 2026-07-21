@@ -1,9 +1,16 @@
 ---
 title: Skill 目录
-description: 四个 Runtime Skill 的用途、入口和规则源文件。
+description: 五个 Runtime Skill 的用途、入口和规则源文件。
 ---
 
 教程用于解释常见使用方式。实际执行必须先完整读取对应入口，再按照入口路由读取本次任务需要的 references。
+
+## dev-runtime
+
+- 用途：完整或模糊开发请求的统一阶段路由；先规划，再按真实 handoff、实现单元数量和当前任务意图切换实现、测试与代码检查。
+- 入口：[`skills/dev-runtime/SKILL.md`](https://github.com/xinghang-ee-cs/dev-runtime-skill/blob/main/skills/dev-runtime/SKILL.md)
+- 路径：运行时动态发现同级 Skill，不假设 `.agents/skills/`、`.claude/skills/` 或其他固定安装目录。
+- 不负责：复制阶段规则、建立第二套 Runtime、处理单一阶段请求、批准发布或生产操作。
 
 ## planning-layer-runtime
 

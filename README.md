@@ -6,27 +6,33 @@ A project-neutral set of Agent Skills for planning, implementation, testing, and
 
 Only the selected directories under `skills/` are installable Skill packages. `AGENTS.md` is the reusable project-entry template. `src/`, `public/`, `package*.json`, `astro.config.mjs`, `tsconfig.json`, and the documentation deployment workflow belong to this repository's Astro/Starlight documentation site and must not be copied into a target project.
 
-## The four skills
+## The five skills
 
 | Skill | Use it for | Boundary |
 | --- | --- | --- |
+| [`dev-runtime`](skills/dev-runtime/SKILL.md) | Route complete or vague development requests across the installed Runtime Skills, starting with planning and preserving each current entry and handoff gate. | Does not replace phase governance, handle single-stage requests, assume a fixed Skill directory, or approve release. Work below four implementation units uses the normal Agent path instead of long-task orchestration. |
 | [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | Discover requirements and produce an approved planning handoff before implementation. | Does not write production code or execute tests. |
 | [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | Implement an approved feature with at least four implementation units, run automation, and hand off at `ready_for_local_test`. | Does not perform manual acceptance or release approval. |
 | [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | Reuse long-task automation evidence and manage manual, device, server, external-capability, and final acceptance testing. | Does not change business code or approve production release. |
 | [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | Route reviews, diagnosis, confirmed fixes, completeness checks, audits, refactor assessments, merge checks, hotfixes, and standards governance by ten real work scenarios. | Scenarios 1–9 are single-run; only standards governance uses the interactive seven-step flow. Project state lives under `.runtime/ai-code-inspection/`. It is not a release or security gate. |
 
-The normal delivery chain is:
+For a complete request, `dev-runtime` discovers the installed Skills and routes the delivery chain:
 
 ```text
-planning-layer-runtime
+dev-runtime
+  -> planning-layer-runtime
   -> approved handoff
-  -> long-task-orchestrator
-  -> ready_for_local_test
-  -> testing-layer-runtime
+  -> planning_only: stop after planning
+  -> execution_ready with fewer than 4 implementation units: normal Agent implementation and project validation
+  -> execution_ready with at least 4 implementation units:
+     long-task-orchestrator
+     -> ready_for_local_test
+     -> testing-layer-runtime
+  -> optional ai-code-inspection scene selected from the actual request
   -> the target project's release/security process
 ```
 
-`ai-code-inspection` is independent and can be used for focused review, diagnosis, confirmed repair, requirement-completeness review, audit, refactor assessment, merge readiness, hotfix closure, or standards governance.
+`ai-code-inspection` is independent and can be used for focused review, diagnosis, confirmed repair, requirement-completeness review, audit, refactor assessment, merge readiness, hotfix closure, or standards governance. Scenarios 1–9 are `single_run`; only `standards_compliance_correction` uses the interactive seven-step flow.
 
 ## Install in an Agent project
 
@@ -48,17 +54,21 @@ your-project/
 ├── CLAUDE.md                   # only needed by Claude Code
 ├── .agents/skills/             # Codex + GitHub Copilot
 │   ├── ai-code-inspection/
+│   ├── dev-runtime/
 │   ├── planning-layer-runtime/
 │   ├── long-task-orchestrator/
 │   └── testing-layer-runtime/
 └── .claude/skills/             # Claude Code
     ├── ai-code-inspection/
+    ├── dev-runtime/
     ├── planning-layer-runtime/
     ├── long-task-orchestrator/
     └── testing-layer-runtime/
 ```
 
 The Agent installs only the directories required by the selected platforms. If the target project already has `AGENTS.md` or `CLAUDE.md`, it merges the instructions instead of overwriting them. When only some Skills are installed, it removes unavailable Skills from the installed `AGENTS.md` inventory.
+
+For the complete lifecycle, install `dev-runtime` together with the four phase Skills it discovers. If a phase Skill is not installed, `dev-runtime` reports the missing dependency instead of guessing a path or pretending the phase ran.
 
 Claude Code does not read `AGENTS.md` directly. The Agent therefore creates or merges this minimal project file:
 
@@ -97,6 +107,8 @@ AI initialization means locating the named target, installing the selected Skill
 Use natural language or invoke the skill explicitly where the agent supports it. Codex exposes skills through `/skills` or `$skill-name`; Claude Code uses `/skill-name`; Copilot selects skills from the request and the skill description.
 
 ```text
+Use dev-runtime to route this complete development request through the installed Runtime Skills.
+
 Use planning-layer-runtime to plan this feature. Do not implement it yet.
 
 Use long-task-orchestrator to execute the approved planning handoff.

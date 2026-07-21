@@ -17,6 +17,7 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 
 | Skill | 主要用途 | 典型触发语句 | 是否允许修改文件 | 是否需要项目初始化 | 依赖档案或 reference | 不适用场景 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `dev-runtime` | 完整开发请求的统一阶段路由；动态发现已安装 Skill，先规划，再按 handoff、实现单元数量和当前任务意图切换实现、测试与代码检查 | “开发一个应用”“开始完整开发”“继续开发并按流程推进” | 自身只路由，不直接修改业务文件；实际权限由当前选中的阶段 Skill 或小任务普通 Agent 分支决定 | 否；不建立自己的 Runtime，复用各阶段真实输入与交接 | 当前项目的 Skill 发现信息、`planning-layer-runtime`、可选的 long/testing/inspection 交接 | 单一阶段请求、无需正式生命周期的零散小改、发布批准或生产门禁 |
 | `ai-code-inspection` | 按 10 种真实工作场景路由通用代码检查、诊断、只读审计、已确认 Bug/紧急补丁闭环和受控规范矫正 | “检查当前 Git 变更”“定位这个报错”“核查需求是否实现完整”“修复这个已确认 Bug”“检查 PR 合并准备”“按规范矫正这些文件” | 依场景决定；场景 1–9 单次完成，只有场景 10 交互执行七步；代码与真实数据库权限独立 | 是；首次使用从模板初始化项目级 `.runtime/ai-code-inspection/` | 项目级环境档案和 Runtime、Step references、按需 Profiles | 上线发布、生产门禁、严格安全验收、无准入的猜测修复或大规模重构 |
 | `planning-layer-runtime` | 实现前的业务发现、Planning Context、正式规划文档和 planning handoff | “先做开发规划”“创建这一期规划文档”“梳理需求和验收边界” | 仅允许其定义的项目级规划启动上下文、正式规划文档与 planning runtime；不改生产代码 | 是；按需建立最小 `.runtime/planning-layer-runtime/`，并绑定目标项目已有的正式规划目录与当前事实基线路径 | `references/00`–`10`、`.runtime/planning-layer-runtime/`、项目当前基线和正式规划目录 | 直接实现、测试执行、发布或生产操作 |
 | `long-task-orchestrator` | 根据已确认 handoff 执行至少 4 个实现单元的完整功能，并交付到 `ready_for_local_test`；也处理已确认缺陷 patch | “按已确认计划完成这个模块”“继续长任务实现并写自动化测试”“修复 testing 已确认缺陷” | 通过 Source of Truth 与 Runtime Gate 后可修改实现、测试和其 Runtime 资产 | 是；必须确认 handoff、通过 preflight 并创建/恢复 Phase Runtime Directory | Runtime kernel references、planning handoff、Phase Runtime Directory | 小于 4 个实现单元、缺少已确认 SoT、人工验收、云端验证、上线放行 |
@@ -75,12 +76,13 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 
 多个 Skill 都可能适用时：
 
+- 完整或模糊的端到端开发请求优先由 `dev-runtime` 负责阶段路由；它不取代当前阶段 Skill 的 Runtime、权限和 handoff。
 - 选择职责最直接的 Skill 作为当前主治理 Skill。
 - 不让检查 Skill 承担规划、发布或安全验收。
 - 不让规划 Skill 直接修改生产代码。
 - 不让实现 Skill 代替人工验收，也不让测试 Skill 重新承担开发期自动化。
 - 不让发布流程代替日常代码检查。
-- 必要时按 `planning → implementation → testing → 项目发布/安全流程` 顺序切换；每个阶段只保留一个主治理 Skill，完成明确 handoff 后再切换。
+- 必要时由 `dev-runtime` 按 `planning → implementation → testing → 可选代码检查场景 → 项目发布/安全流程` 顺序切换；每个阶段只保留一个主治理 Skill，完成明确 handoff 后再切换。
 
 ## 6. 项目适配原则
 
@@ -144,4 +146,6 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 使用 ai-code-inspection 对当前项目做全量只读审计。
 
 使用适合的 Skill 处理这个任务，并先说明选择理由和执行边界。
+
+使用 dev-runtime 处理这个完整开发请求；动态发现已安装 Skill，并遵守每个阶段当前的进入和交接门禁。
 ```
