@@ -19,7 +19,7 @@
 - 仅在 Planning Conversation Mode 中加载。
 - 仅当用户从自然语言需求开始时加载。
 - Planning Document Mode 不读取。
-- 进入时按需读取 `.plan/user-profile.yaml`。
+- 进入时按需读取 `.runtime/planning-layer-runtime/user-profile.yaml`。
 
 禁止：
 
@@ -34,14 +34,14 @@
 
 ### 规划启动上下文（Planning Bootstrap Context）
 
-进入 User Discovery Runtime 前，优先按需读取 `.plan/user-profile.yaml`。
+进入 User Discovery Runtime 前，优先按需读取 `.runtime/planning-layer-runtime/user-profile.yaml`。
 
 规则：
 
-- 若 `.plan/user-profile.yaml` 存在，且 `git_identity` 匹配、`metadata.confidence: high`，则复用 `user_profile` 和 `interaction_preferences`。
-- 若 `.plan/user-profile.yaml` 缺失、身份不匹配、`confidence` 低或发现冲突，则重新执行 User Discovery Runtime。
-- 长期用户画像来源只能是 `.plan/user-profile.yaml`。
-- `.plan/project-profile.yaml`、`.plan/planning-preferences.yaml` 和 `.plan/context-index.yaml` 仅在当前轮需要时按需读取。
+- 若 `.runtime/planning-layer-runtime/user-profile.yaml` 存在且偏好项 `confidence` 足够、当前表达无冲突，则复用长期交互与规划协作偏好。
+- 若文件缺失、偏好置信度低或当前表达冲突，则通过自然对话重新识别协作方式；不得为了匹配本地账号而收集身份。
+- 长期用户画像来源只能是 `.runtime/planning-layer-runtime/user-profile.yaml`。
+- `.runtime/planning-layer-runtime/project-profile.yaml` 和 `.runtime/planning-layer-runtime/context-index.yaml` 仅在当前轮需要时按需读取；长期交互与规划协作偏好只读取 `.runtime/planning-layer-runtime/user-profile.yaml`。
 
 ### User Context Discovery
 
@@ -66,7 +66,7 @@ User Context Discovery 负责识别：
 
 ### 用户画像来源（User Profile Source）
 
-`.plan/user-profile.yaml` 是唯一长期用户画像来源。
+`.runtime/planning-layer-runtime/user-profile.yaml` 是唯一长期用户画像来源。
 
 定位：
 
@@ -78,12 +78,11 @@ User Context Discovery 负责识别：
 - 不保存 Planning Context
 - 不保存正式规划结论
 
-身份识别：
+持久化边界：
 
-- 允许使用 `git config user.name`。
-- 允许使用 `git config user.email`。
-- 当 `.plan/user-profile.yaml` 存在，且 `name + email` 匹配、`metadata.confidence: high` 时，复用 `user_profile` 和 `interaction_preferences`。
-- 当 `.plan/user-profile.yaml` 缺失、身份不匹配、`confidence` 过低或存在冲突时，重新执行 User Discovery Runtime。
+- 不使用主机账号、Git 姓名或邮箱匹配长期偏好。
+- 当前会话可以识别协作视角，但不得把身份、职位、项目角色或决策权推断写入长期文件。
+- 只有用户明确确认，且该信息确实属于跨期稳定项目上下文时，才允许保存最小身份或角色说明。
 
 命中规则：
 
@@ -101,49 +100,23 @@ User Context Discovery 负责识别：
 
 更新规则：
 
-- 允许更新 `person_identity`。
-- 允许更新 `role`。
-- 允许更新 `business_level`。
-- 允许更新 `technical_level`。
-- 允许更新 `planning_path`。
 - 允许更新 `interaction_preferences`。
-- 允许更新 `communication_preferences` 中的长期沟通偏好。
+- 允许把长期规划协作方式合并到 `interaction_preferences`。
+- 身份、职位、项目角色或决策权只有在用户明确确认且跨期稳定时才允许最小保存。
 - 禁止更新 `current_session_signal`、`last_observed_tone` 等会话情绪状态。
 - 禁止更新历史需求、业务事实、Planning Context、SoT 内容和项目内容。
 
 目标：
 
 ```yaml
-person_identity:
-  display_name:
-  organization_role:
-  job_title:
-  decision_authority:
-  project_responsibility:
-
-user_profile:
-  role:
-  business_level:
-  technical_level:
-  planning_path:
-
 interaction_preferences:
-  interview_style:
-  explanation_depth:
-  ui_first:
-  architecture_visible:
-  prefers_step_by_step:
-  prefers_business_language:
+  - preference_key:
+    value:
+    confidence:
+    last_updated:
+    evidence_type:
 
-communication_preferences:
-  emotional_acknowledgement_required:
-  prefers_direct_correction:
-  prefers_chatty_discovery:
-  dislikes_form_like_questions:
-
-metadata:
-  confidence:
-  last_updated:
+confirmed_stable_context: []
 ```
 
 `role` 可选：
@@ -238,7 +211,7 @@ metadata:
 来源优先级：
 
 ```text
-docs/项目治理/PROJECT-CURRENT-BASELINE.md
+<project_current_baseline_path>
 -> 实际发布确认
 -> 验收记录
 -> 执行记录

@@ -1,12 +1,13 @@
 # 验证门禁
 
-本文件只定义 Validation Evidence Definition。
+本文件是 Validation Evidence Schema、字段要求和枚举的唯一事实来源。`validation-results.md` 只实例化结果并引用本文件，不得独立维护冲突枚举。
 
 ## 1. 验证用途
 
 ```text
 prove_implemented_scope
 prove_contract_consistency
+prove_execution_constraint_compliance
 prove_capability_real_execution
 prove_touched_scope_stability
 prove_unavailable_validation_explicitly_recorded
@@ -78,6 +79,7 @@ frontend_score:
 backend_score:
 why_not_automated:
 manual_required:
+execution_constraint_validation:
 capability_id:
 capability_validation:
 capability_evidence:
@@ -104,6 +106,7 @@ api-test
 playwright
 capability_real_call
 capability_binding
+execution_constraint_compliance
 ```
 
 `validation_focus` 记录验证覆盖重点，允许：
@@ -116,6 +119,10 @@ user_flow
 state_transition
 permission_boundary
 capability_binding
+implementation_naming
+implementation_placement
+delegated_parameter_boundary
+dependency_governance
 ```
 
 字段定义：
@@ -127,7 +134,23 @@ capability_binding
 - `permission_binding`: Capability 是否绑定权限处理。
 - `fallback_binding`: Capability 是否定义并实现降级方案。
 - `code_evidence`: Capability 对应代码证据。
+- `why_not_automated`: 自动化不可执行时的具体原因；不得以此伪造 passed。
+- `manual_required`: 交给 testing-layer-runtime 的人工/真实环境项；无项目时必须为 `[]`。
+- `execution_constraint_validation`: Planning Handoff 执行约束合规结果。
 - `evidence`: 自动化命令输出、报告路径、截图/trace 路径或失败记录；必须能进入 Long Testing Handoff。
+
+`manual_required` 项格式：
+
+```yaml
+manual_required:
+  - id:
+    role:
+    entry:
+    action:
+    expected_visible_state:
+    reason:
+    owner_runtime: testing-layer-runtime
+```
 
 Template:
 
@@ -189,6 +212,7 @@ and add manual_required with exact role, entry, action, expected visible state
 - frontend score
 - backend score
 - Long Testing Handoff classification: `automated_passed` / `automated_failed` / `automated_skipped` / `manual_required`
+- execution constraint compliance，覆盖命名、承接位置、参数委托边界与依赖治理。
 
 ## 6. 验证报告要求
 
@@ -206,3 +230,52 @@ sdk_capability_without_binding_validation -> not_passed
 ai_capability_without_binding_validation -> not_passed
 external_capability_without_binding_validation -> not_passed
 ```
+
+## 7. Execution Constraint Compliance Validation
+
+每个涉及代码的 TASK 在完成前必须记录：
+
+```yaml
+execution_constraint_validation:
+  planning_ids_trace_only: <passed | failed | not_applicable>
+  forbidden_phase_names_absent: <passed | failed | not_applicable>
+  stable_business_naming_used: <passed | failed | not_applicable>
+  implementation_placement_respected: <passed | failed | not_applicable>
+  existing_domain_preflight_respected: <passed | failed | not_applicable>
+  new_module_architecture_basis_valid: <passed | failed | not_applicable>
+  delegated_parameter_boundary_respected: <passed | failed | not_applicable>
+  dependency_governance_passed: <passed | failed | not_applicable>
+  result: <passed | failed | not_applicable>
+  evidence:
+    - <evidence reference>
+```
+
+检查要求：
+
+- Planning ID 只能出现在注释、文档引用、Runtime 追踪字段、验证与执行记录中。
+- 扫描受影响代码、Schema、API、权限、配置和迁移，确认不存在期次、阶段、Sprint、迭代、版本或 Planning 编号命名。
+- 实现必须使用稳定业务概念并位于 `task.md` 确认的承接位置。
+- 创建新模块前必须检查现有业务域；新建长期业务域必须引用正式架构依据，否则失败，未新建则 `not_applicable`。
+- Long 只能决定 Planning 标记为 `explicitly_delegated` 的私有技术参数。
+- 依赖变更必须通过 Dependency Governance Gate；未变更则 `not_applicable`。
+
+`code_evidence` 不只证明文件存在，必须证明合法承接位置、稳定业务命名、TASK 范围一致、无期次技术域、未越过 Handoff、新模块架构依据有效、依赖治理已通过且 Planning ID 只用于追踪：
+
+```yaml
+code_evidence:
+  - path:
+    task_ref:
+    stable_business_concept:
+    implementation_placement:
+    constraint_check:
+```
+
+不得复制完整代码到验证结果。
+
+```text
+automated_tests_passed but execution_constraint_validation_failed -> TASK_NOT_DONE
+build_passed but forbidden_phase_name_exists -> TASK_NOT_DONE
+code_exists but implementation_placement_failed -> TASK_NOT_DONE
+```
+
+测试或构建通过不得覆盖架构、命名、承接位置或合同违规。

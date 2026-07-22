@@ -32,6 +32,8 @@ delegation = forbidden
 validation = required
 ```
 
+`lockfile/dependency` 除 P0 串行外，还必须先通过 `landing-checklist-preflight.md` 的 Dependency Governance Gate；并行隔离不能替代包管理器、官方版本来源、兼容性、安全/弃用状态及 lockfile 影响核验。
+
 ## P1 高风险边界
 
 | 边界 | 风险 |

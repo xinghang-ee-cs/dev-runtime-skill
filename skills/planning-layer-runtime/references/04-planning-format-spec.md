@@ -3,8 +3,223 @@
 ## 1. 文件位置
 
 ```text
-docs/计划安排/<第X期>/
+<phase_planning_directory>/
 ```
+
+### 1.1 运行数据位置
+
+期次级 Planning 运行数据只允许保存到：
+
+```text
+<phase_planning_runtime_directory>/
+├── current-interaction.yaml
+├── event-log.md
+├── event-summary.md
+├── decision-log.md
+├── decision-summary.md
+├── audit-log.md
+└── audit-summary.md
+```
+
+职责：
+
+- `current-interaction.yaml`：当前短期交互状态；是上下文压缩、会话恢复和工具中断后的恢复来源。
+- Event / Decision / Audit Log：本期追加式运行证据。
+- Event / Decision / Audit Summary：对应 Log 的压缩复盘入口。
+- 正式业务事实仍只进入 00–15 SoT；上述文件均不得替代 SoT。
+
+创建方式：
+
+```text
+读取本文件中的字段规范
+-> 在项目合法目录直接创建所需文件
+-> 写入最小运行数据
+```
+
+禁止从 Skill 目录复制任何运行文件。禁止进入 Planning Document Mode 后一次性创建全部文件。
+
+按需创建规则：
+
+- `current-interaction.yaml`：`execution_handoff_decision` 第一次需要在发问前持久化时按需创建；不得等到进入 Planning Document Mode 后才创建，是唯一默认必需文件。
+- `event-log.md`：第一次实际写入 Runtime Event 时创建。
+- `decision-log.md`：第一次实际存在 Decision Snapshot 时创建。
+- `audit-log.md`：真正触发 Runtime Audit 时创建；普通 Planning 不创建。
+- `event-summary.md`、`decision-summary.md`、`audit-summary.md`：只在达到压缩阈值、阶段收尾或确有复盘需要时创建。
+- 没有实际内容的文件不得为了目录完整性创建。
+
+禁止为同一职责新增 `feedback-runtime`、`confirmation-runtime`、`handoff-runtime`、`recovery-state` 或 `context-compression-runtime`。
+
+项目级跨期稳定信息保存到：
+
+```text
+.runtime/planning-layer-runtime/user-profile.yaml
+.runtime/planning-layer-runtime/environment-profile.yaml
+.runtime/planning-layer-runtime/project-profile.yaml
+.runtime/planning-layer-runtime/context-index.yaml（仅在确有多个稳定上下文入口时）
+```
+
+其中：
+
+- `user-profile.yaml` 是长期交互习惯和规划协作偏好的唯一来源，不保存完整聊天、原始消息、一次性情绪、临时抱怨、项目业务事实、期次内容、心理画像或未经确认的身份推断。
+- `environment-profile.yaml` 只保存稳定项目与开发环境事实，不保存任何凭证或完整敏感配置。
+- `project-profile.yaml` 只保存项目身份与当前基线入口。
+- `context-index.yaml` 只在确有多个稳定上下文入口时创建。
+- 新推断的用户倾向必须包含 `confidence` 与 `last_updated`；证据不足时不得把单次行为升级为高置信长期偏好。
+- 长期交互与规划协作偏好只能由 `user-profile.yaml` 承载，禁止第二来源。
+- `.runtime/planning-layer-runtime/` 不得默认一次性创建完整文件树；`README.md` 仅在确实需要向人说明边界时按需创建。
+- 首次创建 `.runtime/planning-layer-runtime/` 或期次 `planning-runtime/` 文件前，检查项目现有版本控制与忽略策略。未获用户明确要求时，不得把用户倾向、电脑环境或原始反馈提交到公开仓库。
+- `environment-profile.yaml` 禁止保存 Token、密码、私钥、Cookie、主机账号、可识别个人的完整 Home 路径、内网 IP、机器序列号、完整敏感环境变量或可直接调用生产服务的配置。
+
+`.runtime/planning-layer-runtime/user-profile.yaml` 最小格式：
+
+```yaml
+interaction_preferences:
+  - preference_key:
+    value:
+    confidence:
+    last_updated:
+    evidence_type:
+
+confirmed_stable_context: []
+```
+
+`preference_key` 按实际需要使用，例如：人话总结或专业文档优先、单问题或集中确认、文档解释方式、阶段与结束条件可见性、表格/列表/流程图/段落偏好、技术术语接受程度、纠正响应方式、解释深度、文档和最终规划确认方式。单次行为只能记录为低置信候选；`evidence_type` 只写简短证据类型，不保存原始聊天。
+
+`.runtime/planning-layer-runtime/environment-profile.yaml` 最小格式：
+
+```yaml
+operating_system:
+shell:
+language_runtimes: []
+package_managers: []
+common_tools: []
+project_tech_stack: []
+stable_project_paths: []
+stable_startup_rules: []
+environment_boundaries: []
+last_updated:
+```
+
+仅写后续 Planning 确实需要复用的稳定环境事实；路径必须脱敏，不写个人 Home 全路径。
+
+### 1.2 `current-interaction.yaml` 最小格式
+
+只保留恢复当前交互所需字段，不扩展为业务状态机：
+
+```yaml
+current_phase:
+
+execution_handoff_decision:
+  requires_execution_handoff:
+  handoff_type:
+  decision_basis:
+  decision_source:
+  decision_status:
+
+document_assembly:
+  planned_roles:
+    - <本期计划装配的职责名>
+  generated_documents:
+    - role:
+      path:
+      status:
+  current_document:
+  assembly_status:
+
+active_interaction:
+  target_type:
+  target_id:
+  stage:
+  version:
+  scope:
+  expected_user_action:
+  next_step:
+
+latest_feedback:
+  feedback_id:
+  received_at:
+  raw_user_input:
+  normalized_summary:
+  feedback_type:
+  target_type:
+  target_id:
+  target_stage:
+  target_version:
+  target_scope:
+  apply_status:
+  apply_result:
+  next_action:
+
+planning_status:
+```
+
+`target_type` 至少支持：
+
+```text
+document
+execution_handoff_decision
+final_summary
+```
+
+`stage` 至少支持：
+
+```text
+pre_generation_confirmation
+draft_confirmation
+execution_handoff_confirmation
+final_summary_confirmation
+```
+
+`feedback_type` 只允许：
+
+```text
+confirm
+correct
+supplement
+reject
+ask_explanation
+continue
+pause
+return_to_previous
+unknown
+```
+
+`apply_status` 只允许：
+
+```text
+recorded
+validated
+applied
+already_effective
+rejected
+needs_clarification
+```
+
+`planning_status` 至少区分：
+
+```text
+planning_in_progress
+awaiting_final_summary_confirmation
+planning_handoff_complete
+```
+
+规则：
+
+- `execution_handoff_decision` 只保存恢复分支所需的最小镜像：`requires_execution_handoff` 只允许 `true | false`，`handoff_type` 只允许 `execution_ready | planning_only`，`decision_status` 只允许 `candidate | confirmed`；`decision_basis` 只写存在或不存在后续工程任务的原因，`decision_source` 只允许实际使用的 `user_confirmation`、`confirmed_planning_context`、`document_assembly_requirement`。
+- Planning Conversation 中已确认的 Planning Context 是 `execution_handoff_decision` 的权威语义来源；本文件只是短期恢复镜像，不是第二套 Planning Context、业务 SoT、完整对话或推理记录。
+- `document_assembly.planned_roles` 只记录本期计划装配的职责，不预造文件路径；`generated_documents` 只加入已经真实生成的本期文档及其 `role / path / status`，路径必须真实存在；不得复制正式文档正文、完整 `assembled_documents` 或 Handoff Package。
+- `document_assembly` 只保存 `planned_roles`、已经真实生成的 `generated_documents`、`current_document` 与 `assembly_status`，用于恢复当前装配进度，不替代正式 `assembled_documents` 或 Document Assembly Plan。
+- 每一期只使用本期 `<phase_planning_runtime_directory>/current-interaction.yaml`；不得跨期共用或覆盖，不得把本期状态写入 Skill、`.runtime/planning-layer-runtime/`、项目根目录或其他期次目录。
+- 向用户发出任何会影响流程状态的确认问题前，必须先写完整 `active_interaction`；不得等用户回复后再从聊天记忆推断确认对象。
+- 文档确认时，`target_id` 使用真实文档路径。
+- 执行交接分支确认固定使用 `target_type: execution_handoff_decision`、`target_id: current_phase_execution_handoff_decision`、`stage: execution_handoff_confirmation`；必须先写入候选镜像和该交互目标，再向用户发问。
+- 最终总结确认固定使用 `target_type: final_summary`、`target_id: current_phase_final_summary`、`stage: final_summary_confirmation`；不得把最终总结伪装成正式文档，也不得新增最终总结 SoT 文件。
+- `feedback_id` 在本期内唯一；同一 `feedback_id` 只能成功应用一次。
+- `latest_feedback` 必须绑定当时已持久化的 `active_interaction`；不得事后转绑下一文档或其他交互目标。
+- 同一时间只允许一条未完成反馈。上一条仍为 `recorded` 或 `validated` 时，必须先恢复并处理，不得被新状态变更反馈覆盖。
+- `raw_user_input` 只允许在 `recorded`、`validated`、`needs_clarification` 状态保留；进入 `applied`、`already_effective` 或 `rejected` 后必须清空，只保留 `normalized_summary`、类型、目标、结果与下一步。
+- 同一反馈不得同时确认当前目标并消费下一目标。
+- Planning 真正完成后清空待处理反馈，并将 `planning_status` 设为 `planning_handoff_complete`。
 
 ## 2. 一级标题
 
@@ -65,6 +280,8 @@ TEST-xxx
 - 稳定
 - 不允许同义重复
 - 不允许自然语言替代
+- 本节 ID 全部是 `trace_only`，只用于 Planning 文档、执行/验收记录和变更证据追踪；不得转换为长期代码、数据库、API、权限、配置、迁移或测试套件命名。
+- ID 中的期次、阶段、Sprint 或版本标识不代表物理技术域；完整边界以 `01-planning-core-rules.md#32-planning-trace-id-boundary` 为唯一来源。
 - PROMPT 必须关联适用的 PAGE、UI-MOD 或 UX-SCN；PROMPT-STYLE 必须关联适用页面、模块或 UX 范围。
 - ASSET 在 `received`、`review_pending`、`visual_confirmed` 或 `superseded` 状态下必须关联实际收到的图或明确的外部引用。
 - PAGE、UI-MOD、UX-SCN 均不得替代 FLOW、STATE、API、PERM 的事实定义。
@@ -697,6 +914,8 @@ data_domain_state
 - 禁止把“没有任务”直接迁移为“可打卡”或其他可写状态。
 - 可执行状态必须通过任务已分配、项目/区域上下文完整、当前用户具备资格等明确业务事实重新计算。
 - “字段”只能表示业务逻辑所需事实，不得定义表名、字段类型、长度、索引、外键、SQL、ORM Schema 或迁移脚本。
+- `data_domain_state` 和“独立数据域”只定义数据来源、访问范围、状态来源、写入边界以及生产/测试隔离，不得推导以期次、Sprint、阶段或版本命名的数据库表、代码模块、API 命名空间或权限体系。
+- 是否新增物理模型或模块由执行前真实架构检查决定，且必须采用 09 确认的稳定业务概念与实现承接策略。
 
 状态迁移守卫格式：
 
@@ -1139,6 +1358,21 @@ ARCH 决策记录最小格式：
 
 逻辑承接位置：
 
+实现承接策略：
+- extend_existing_domain / reuse_shared_capability / create_stable_business_domain
+
+稳定业务概念：
+
+优先承接的现有逻辑域：
+
+新建长期业务域的必要性：
+- 不适用时明确写不适用
+
+禁止的临时命名：
+- 期次、Sprint、阶段、版本或 Planning ID 命名
+
+执行前架构核实要求：
+
 允许复用的技术基础：
 
 禁止复用的旧语义：
@@ -1171,6 +1405,11 @@ ARCH 决策记录最小格式：
 - 每个 Canonical API Contract 必须有 Architecture Binding。
 - 可复用技术基础必须写清楚“复用什么”。
 - 禁止复用旧语义必须写清楚“绝不复用什么”。
+- 实现承接策略只允许 `extend_existing_domain`、`reuse_shared_capability`、`create_stable_business_domain`。
+- 默认优先核实并扩展已有稳定业务域，或复用共享能力。
+- `create_stable_business_domain` 必须说明现有域无法承接的原因、长期业务概念、职责边界、跨期独立意义和非临时命名依据。
+- 稳定业务概念必须来自目标项目真实存在且可跨期复用的业务对象、业务任务、处理记录或证据资产，不得使用期次、阶段或版本表达。
+- 09 不定义具体目录、类名、表名、ORM Model 或迁移名称；这些必须在执行前基于真实代码架构核实。
 - 不得使用“按实现时决定”“视情况复用”“后续再看”。
 
 09 必须包含：
@@ -1200,7 +1439,7 @@ cleanup
 - 旧对象若允许历史读取，只允许 `readonly`。
 - 历史只读旧对象不得成为新流程前置、状态来源、下一步动作来源或生效来源。
 - 09 只定义内部是否需要某类能力端口、依赖方向和隔离边界。
-- 具体高德、腾讯、飞书、AI Provider、SDK、版本或鉴权方式由 10 决定。
+- 具体外部 Provider、SDK、版本或鉴权方式由 10 决定。
 - 外部能力未完成 10 选型确认时，09 只能定义 `CAPABILITY PORT`、`ARCHITECTURE REQUIREMENT`、`ADAPTER BOUNDARY`，不得把具体 Provider 绑定标记为 `confirmed`。
 - 架构风险只移交 12；09 不创建正式 `RISK-ID`、风险等级或风险闭环。
 
@@ -1443,7 +1682,7 @@ manual_or_real_environment_required
 
 允许标记为 `manual_or_real_environment_required`：
 
-- 真实设备定位、相机、麦克风、飞书或其他平台容器能力。
+- 真实设备定位、相机、麦克风或其他平台容器能力。
 - 视觉一致性与信息层级。
 - 复杂 UX 使用体验。
 - 真实网络、权限、配额、限流和 Provider 行为。
@@ -1604,6 +1843,41 @@ OPEN 格式：
 - OPEN 的关闭必须先回写真正拥有该事实的上游 SoT；上游结论确认后，12 才能记录 resolved / confirmed 及其来源。
 - 12 不重复定义已确认业务规则、状态、接口、权限或 UI 事实。
 
+### Implementation Contract Parameter Status
+
+实现所需参数按任务实际内容动态检查，每项只允许：
+
+```text
+confirmed
+explicitly_delegated
+blocking_open
+not_applicable
+```
+
+- `confirmed`：用户、已确认 SoT、官方事实或项目稳定规范已有明确值。
+- `explicitly_delegated`：只适用于不会改变业务流程、用户权利、数据含义、权限、状态、用户体验或验收结果的技术参数；必须写明执行层决策范围、项目既有规范、允许边界、验证方式和不得影响的业务结果。
+- `blocking_open`：缺失值会改变 API、数据结构、页面交互、权限、状态、业务结果、测试、验收或发布判断；必须由 12 保留 OPEN 并阻断对应 TASK Ready。
+- `not_applicable`：当前任务不涉及。
+
+禁止为了格式完整询问无关参数，也禁止用行业默认值或 AI 猜测填充文件大小、数量、次数、超时或重试等业务边界。
+
+按任务实际内容检查：
+
+- 表单和普通输入：必填性、合法值、默认值、长度、最小/最大值、数量、单位、精度、重复、修改、删除和空值处理。
+- 文件和图片：文件类型/MIME、单文件与总大小、最大数量、是否必传、失败是否阻断提交、用户重试、业务要求中的重试次数、替换/删除、业务对象绑定、修改后旧文件处理和跨租户/跨任务访问边界。
+- 时间和日期：时区、日切、截止时间、操作窗口、跨天、过期处理和时间事实来源。
+- 列表和查询：默认排序、核心筛选、可见范围、空结果、分页及会影响业务或验收的分页边界。
+- 外部能力：失败是否阻断、用户可见结果、降级、降级后保留能力、真实环境验证，以及属于业务要求的超时/重试/次数边界。
+
+适用时至少覆盖以下验收样例：
+
+- 合同文档：允许格式、最大大小、上传失败行为。
+- 作为业务必需证据的检查图片：是否必传、允许格式、单张大小、最大数量、失败时能否提交、重试/恢复、替换和删除规则。
+
+纯技术参数如数据库连接池大小、内部缓存容量或 SDK 内部算法允许 `explicitly_delegated`，但必须满足已确认的业务结果与验证边界。
+
+参数事实的文档归属以 `03-planning-doc-responsibility.md#实现合同参数的文档归属` 为唯一来源。13 只汇总 Task Ready 所需参数是否闭合，不重复定义上游事实；下游发现缺失时必须回写真正拥有该事实的上游 SoT。
+
 ### 13 Task Contract Format
 
 `13-开发任务合同与落地清单.md` 将已确认、可执行、可验证的规划结论整理为任务合同、依赖关系、并行边界、完成证明要求与后续执行记录框架的输入。若项目保留旧路径 `13-开发任务拆分与落地清单.md`，正文标题和职责必须使用“开发任务合同与落地清单”。
@@ -1663,6 +1937,21 @@ Priority：
 
 任务目标：
 
+实现命名与承接边界：
+
+- Planning ID 用途：
+  - trace_only
+- 稳定业务概念：
+- 预期实现承接策略：
+  - extend_existing_domain / reuse_shared_capability / create_stable_business_domain
+- 优先核实的现有业务域：
+- 禁止使用的实现命名：
+  - 期次编号
+  - TASK / FLOW / DOMAIN / API / PERM 等 Planning ID
+  - Sprint、阶段或临时版本名称
+- 新建物理模块允许条件：
+- 执行前架构核实：
+
 允许复用的技术基础：
 
 禁止复用的旧语义：
@@ -1691,6 +1980,14 @@ Priority：
 
 Task Ready Gate：
 
+实现合同完整性：
+- 会影响业务、接口、数据、状态、权限、页面或验收的参数是否完整：
+- 已确认参数：
+- 明确委托执行层的技术参数：
+- 委托边界：
+- 阻断 OPEN：
+- 是否允许进入开发：
+
 完成合同：
 - 应实现的能力：
 - 应保持的禁止关系：
@@ -1706,6 +2003,12 @@ Task Ready Gate 必须明确：
 - 必要 DEP 已验证，或阻断机制已明确。
 - 必要 CAP 已完成开发前门禁。
 - 上游 TASK 已满足，或并行边界已明确。
+- Implementation Naming Gate 已通过。
+- 每个 P0 TASK 已关联稳定业务概念、实现承接策略和优先核实的现有业务域。
+- Implementation Contract Completeness Gate 已通过。
+- 会影响业务合同、用户体验、接口语义、数据、状态、权限或验收结果的参数均为 `confirmed` 或 `not_applicable`。
+- 纯技术参数若为 `explicitly_delegated`，已写明决策范围、既有规范、允许边界、验证方式和不可影响的业务结果。
+- 不存在阻断本任务的 `blocking_open`。
 
 Task Completion Contract 必须明确：
 
@@ -1720,6 +2023,13 @@ Task Completion Contract 必须明确：
 - 候选文件路径不等于已确认实现事实。
 - 规划阶段只确认逻辑影响面。
 - 文件、目录、代码位置和具体实现方式只能作为候选影响面，必须在后续执行前核实。
+- 带有期次或版本标识的 TASK-ID 只用于追踪，不得推导实现名称。
+- 13 不生成具体表名、类名、模块目录、权限点、API 物理命名空间或迁移名称。
+- 若 09 未确认 `create_stable_business_domain`，13 不得暗示需要创建新物理模块。
+- “独立数据域”不得作为创建任何期次、阶段或版本物理命名空间的依据。
+- 执行前若发现必须新建长期业务模块而 09 无对应决策，必须作为架构偏差回写 Planning。
+- 任一 `blocking_open` 未关闭时，对应 TASK 不得 Ready；P0 主流程存在 `blocking_open` 时不得完成正式 Handoff。
+- `explicitly_delegated` 不得只写“实现时决定”。
 - 不得在 TASK 中使用“按实现时决定”“可选 A / B / C”“视情况复用”“后续再看”。
 - Task Completion 不等于最终验收、真实环境能力通过、已发布或 PROJECT-CURRENT-BASELINE 已更新。
 
@@ -1750,6 +2060,10 @@ Task Completion Contract 必须明确：
 ```text
 12 已确认
 -> 生成 13 草案
+-> Task Contract Gate
+-> Implementation Naming Gate
+-> Implementation Contract Completeness Gate
+-> 输出 13 人话总结
 -> 用户确认 13
 -> 回写 13：已确认
 -> 自动触发 14、15 框架派生
@@ -1757,9 +2071,14 @@ Task Completion Contract 必须明确：
 -> 对 14、15 运行 Execution and Acceptance Framework Derivation Gate
 -> 汇总实际已生成的 assembled_documents
 -> 基于实际路径生成 handoff_role_mapping
+-> 准备 execution_ready Handoff
 ```
 
 14、15 是从已确认 13 自动派生的框架对：
+
+- 三个 13 Gate 必须发生在用户确认 13 前；Gate 未通过时不得要求用户确认 13。
+- Gate 失败时必须修正 09、13 或对应上游 SoT；不得先让用户确认 13，再补做 Gate。
+- 本顺序只适用于实际装配 13、即 `requires_execution_handoff: true` 的 Planning。
 
 - 不触发“每次只能生成一份正式文档”的限制。
 - 不需要分别进行生成前协作确认。
@@ -2084,7 +2403,7 @@ GET /api/example
 使用：
 
 ```powershell
-pnpm test
+<project-test-command>
 ```
 
 ## 13. 企业级 SaaS 固定检查项

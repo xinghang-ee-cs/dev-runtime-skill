@@ -5,7 +5,7 @@
 实例化位置：
 
 ```text
-docs/计划安排/<期次>/runtime/execution-events.md
+<phase_runtime_directory>/execution-events.md
 ```
 
 禁止在本文件保存某一期项目执行事件。
@@ -13,7 +13,7 @@ docs/计划安排/<期次>/runtime/execution-events.md
 ## Runtime Session
 
 ```yaml
-runtime_session_ref: docs/计划安排/<期次>/runtime/current-runtime-context.md
+runtime_session_ref: <phase_runtime_directory>/current-runtime-context.md
 ```
 
 ## Schema
@@ -107,5 +107,5 @@ from_state: IN_PROGRESS
 to_state: WAITING_VALIDATION
 related_task: <TASK-ID>
 status: implementation_completed
-evidence_ref: docs/计划安排/<期次>/runtime/task.md
+evidence_ref: <phase_runtime_directory>/task.md
 ```

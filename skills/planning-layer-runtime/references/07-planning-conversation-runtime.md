@@ -150,28 +150,31 @@ Execution Boundary Kernel（09）
 
 详细规则见 `references/09-execution-intent-guard.md`。
 
-Planning Conversation Mode 启动前，按需读取 `.plan/`。
+Planning Conversation Mode 启动前，按需读取 `.runtime/planning-layer-runtime/`。
 
 读取顺序：
 
 ```text
-.plan/planning-preferences.yaml
-→ .plan/user-profile.yaml
-→ .plan/project-profile.yaml
-→ .plan/context-index.yaml
+.runtime/planning-layer-runtime/user-profile.yaml
+→ .runtime/planning-layer-runtime/environment-profile.yaml（当前轮需要时）
+→ .runtime/planning-layer-runtime/project-profile.yaml
+→ .runtime/planning-layer-runtime/context-index.yaml（存在多个稳定入口且当前轮需要时）
 ```
 
 规则：
 
-- 只读取当前任务需要的 `.plan` 文件。
+- 只读取当前任务需要的 `.runtime/planning-layer-runtime` 文件。
 - 遵守最小上下文原则。
-- 如果 `.plan/` 不存在，允许创建最小模板，但这不代表 Planning Context 已完成。
-- `.plan` 初始化是内部启动行为；在 Planning Conversation Mode 的首轮用户回复中，不得把已创建的文件、路径或初始化状态作为主体，除非用户明确要求查看它。
-- 读取 `.plan/` 后，不得跳过 User Discovery Sufficiency Gate。
-- `.plan` 只用于启动辅助，不是正式业务事实。
-- `.plan` 不替代 Planning Context。
-- `.plan/project-profile.yaml` 只允许保存 `project_name`、`project_type`、`project_current_baseline_path`。
-- 正式当前事实只来自 `docs/项目治理/PROJECT-CURRENT-BASELINE.md`、发布确认、验收记录、执行记录或用户明确确认。
+- 如果 `.runtime/planning-layer-runtime/` 不存在，只在当前职责真实需要时，根据 `04-planning-format-spec.md` 的字段规范直接创建对应项目文件；不得从 Skill 复制文件，也不得一次性创建完整目录树。
+- `.runtime/planning-layer-runtime` 初始化是内部启动行为；在 Planning Conversation Mode 的首轮用户回复中，不得把已创建的文件、路径或初始化状态作为主体，除非用户明确要求查看它。
+- 读取 `.runtime/planning-layer-runtime/` 后，不得跳过 User Discovery Sufficiency Gate。
+- `.runtime/planning-layer-runtime` 只用于启动辅助，不是正式业务事实。
+- `.runtime/planning-layer-runtime` 不替代 Planning Context。
+- `.runtime/planning-layer-runtime/project-profile.yaml` 只允许保存 `project_name`、`project_type`、`project_current_baseline_path`。
+- `.runtime/planning-layer-runtime/user-profile.yaml` 是长期交互倾向和规划协作偏好的唯一来源；禁止新增或读取第二个偏好来源。
+- `context-index.yaml` 只在确有多个稳定上下文入口时创建；`README.md` 不属于必建文件。
+- 首次创建 `.runtime/planning-layer-runtime/` 文件前检查项目版本控制与忽略策略；未获用户明确要求时，用户倾向与电脑环境不得进入公开仓库。
+- 正式当前事实只来自 `<project_current_baseline_path>`、发布确认、验收记录、执行记录或用户明确确认。
 
 ### 2.2 User Context Gate Parallel Discovery Rule
 
@@ -217,7 +220,7 @@ User Context Gate（读取 / 复用 / 自然识别；不阻塞业务探索）
 读取：
 
 ```text
-docs/项目治理/PROJECT-CURRENT-BASELINE.md
+<project_current_baseline_path>
 ```
 
 第一期从 0 开始时允许创建该文件，但必须明确：
@@ -329,9 +332,9 @@ Discovery 阶段的目标不是快速补齐 Planning Context 字段，而是优�
 示例：
 
 ```text
-用户：想优化维保流程。
+用户：想优化现有任务处理流程。
 
-正确：现在一次维保任务通常怎么走？
+正确：现在一次完整任务通常怎么走？
 
 错误：请描述角色、权限、数据模型、状态、接口。
 ```
@@ -426,7 +429,7 @@ discovered_business_facts
 - 当用户还没有给出明确业务问题时，用户态问题优先确认协作方式，而不是要求用户选择身份分类。
 - 当用户已经给出明确业务目标或业务问题时，用户态问题优先确认 Discovery Priority Rule 指向的最大业务不确定性。
 - 角色、职位、决策权由 AI 从后续聊天中逐步归纳，不得首轮强行收集。
-- 当前情绪只用于本轮承接，不进入 Planning Context，不进入 `.plan`，不进入正式 SoT。
+- 当前情绪只用于本轮承接，不进入 Planning Context，不进入 `.runtime/planning-layer-runtime`，不进入正式 SoT。
 - 用户侧不要求按格式回复。
 - 问题数量保持最少。
 - 优先确认阻塞项。
@@ -475,13 +478,13 @@ discovered_business_facts
 用户提出模糊流程规划，合格回复：
 
 ```text
-用户：可以先不急着出报告，优先解决维保过程中的流程。我们来创建一个最新的计划吧，本次计划主要梳理维保流程，包含数据导入、检查记录方式更新两个环节。
+用户：可以先不急着出报告，优先解决现有任务处理流程。我们来创建一个最新的计划吧，本次计划主要梳理任务流转，包含数据导入、处理记录方式更新两个环节。
 
-AI：我理解你现在不是急着做报告，而是想先把维保流程跑顺，并把数据导入和检查记录的结果沉淀下来。
+AI：我理解你现在不是急着做报告，而是想先把现有任务流程跑顺，并把数据导入和处理记录的结果沉淀下来。
 
-目前我还不确定现场一次完整维保实际怎么走，数据现在从哪里来，以及检查记录卡在什么地方。
+目前我还不确定一次完整任务实际怎么走，数据现在从哪里来，以及处理记录卡在什么地方。
 
-我先确认一个问题：现在一次完整维保，从接到任务到完成记录，现场人员通常是怎么走的？
+我先确认一个问题：现在一次完整任务，从发起到完成记录，使用人员通常是怎么走的？
 ```
 
 用户提出检查记录问题，合格回复：
@@ -499,13 +502,13 @@ AI：我理解你想解决的是检查过程中的记录问题，先把现场记
 用户提出局部优化，合格回复：
 
 ```text
-用户：巡检列表增加搜索条件。
+用户：任务列表增加搜索条件。
 
-AI：我理解这是已有巡检列表里的局部体验优化，重点是把列表查找变得更准确，不需要重新梳理整条巡检业务流程。
+AI：我理解这是已有任务列表里的局部体验优化，重点是把列表查找变得更准确，不需要重新梳理整条业务流程。
 
 目前我还不确定现在列表有哪些搜索能力，以及新增搜索主要解决什么查找问题。
 
-我先确认一个问题：现在使用人员最难找到的是哪类巡检任务？
+我先确认一个问题：现在使用人员最难找到的是哪类任务？
 ```
 
 如果用户明显不满，合格回复：
@@ -532,7 +535,7 @@ AI：我理解这是已有巡检列表里的局部体验优化，重点是把列
 
 ### 5.1 UI/交互前置确认
 
-当需求涉及用户界面、页面、表单、列表、地图、工作台、移动端、小程序、飞书或 PC 操作时，必须确认 UI/交互高风险项。
+当需求涉及用户界面、页面、表单、列表、地图、工作台、移动端、平台容器或桌面端操作时，必须确认 UI/交互高风险项。
 
 UI 高风险项：
 
@@ -727,6 +730,13 @@ UI/交互：
 验收：
 待确认项：
 涉及文档：
+执行交接判断：
+  execution_handoff_decision:
+    requires_execution_handoff:
+    handoff_type:
+    decision_basis:
+    decision_source:
+    decision_status:
 ```
 
 规则：
@@ -736,6 +746,15 @@ UI/交互：
 - 待确认项必须保留来源和影响范围。
 - 当前项目状态必须区分生产当前、已开发未发布、已验收未发布和计划目标。
 - FLOW 只记录 Planning Conversation 已确认或待确认的业务旅程，不替代 01 的正式 Flow Contract。
+- `execution_handoff_decision` 属于现有 Planning Context，不新增第二套 Planning Context、Runtime 文件、日志或状态机。
+- `requires_execution_handoff` 只允许 `true` 或 `false`；`handoff_type` 必须分别对应 `execution_ready` 或 `planning_only`。
+- `decision_source` 只记录实际来源：`user_confirmation`、`confirmed_planning_context`、`document_assembly_requirement`；可按实际情况记录一项或多项。
+- `decision_status` 只允许 `candidate` 或 `confirmed`。进入 Planning Document Mode 前必须为 `confirmed`。
+- `decision_basis` 必须说明为什么存在或不存在后续工程执行任务，不得只记录 S/M/L 或文档数量。
+- 在向用户发出执行交接分支确认问题前，必须先按 `04` 在本期 `current-interaction.yaml` 写入候选镜像，并按 `10` 绑定 `execution_handoff_decision` 交互目标；用户反馈记录、校验和应用完成后，再同步写入 `decision_status: confirmed`。
+- 如果本期目录尚未合法确定，保持 Planning Conversation，不得把候选或已确认分支暂存到 Skill、`.runtime/planning-layer-runtime/`、项目根目录或其他期次目录。
+- 现有 Document Assembly Plan 必须同步保存同一份 `execution_handoff_decision` 字段和值；Planning Context 是权威来源，Document Assembly Plan 不得独立改写或形成第二个分支结论。
+- 当前仍无法判断是否需要工程执行时，Planning Context 必须保持 `INCOMPLETE`，不得生成 Document Assembly Plan 或进入 Planning Document Mode。
 
 ### 9.1 Planning Handoff Package
 
@@ -747,32 +766,164 @@ Planning Context 状态为 `COMPLETE` 后，只能形成：
 
 此时不得生成正式 `assembled_documents`、正式路径或正式 `handoff_role_mapping`。
 
-正式 Handoff Package 的唯一生成链路：
+Planning Context 标记 `COMPLETE` 前，必须先完成以下唯一顺序：
+
+```text
+Planning Conversation 已确认目标、范围与成果用途
+-> 形成 execution_handoff_decision 候选
+-> 写入本期 current-interaction.yaml 最小恢复镜像
+-> 持久化 execution_handoff_confirmation 交互目标
+-> 向用户发问并按现有反馈事务记录、校验、应用
+-> 在 Planning Context 与恢复镜像同步执行交接判断
+-> decision_status: confirmed
+-> Planning Context COMPLETE
+-> 根据该结论生成 Document Assembly Plan
+-> 同步本期 current-interaction.yaml 的最小 document_assembly 状态
+-> 进入 Planning Document Mode
+```
+
+不得先进入 Planning Document Mode，再根据是否生成了 13、当前文件数量或压缩后的聊天摘要反向猜测分支。
+
+正式 Handoff 的准备与完成链路：
+
+`requires_execution_handoff` 不得只根据 S/M/L 判断。以下任一条件成立时必须为 `true`，且 `handoff_type` 必须为 `execution_ready`：
+
+- 用户明确要求规划完成后执行开发。
+- 本期需要新增或修改代码。
+- 本期需要新增或修改接口。
+- 本期需要新增或修改数据库。
+- 本期需要新增或修改正式页面或交互实现。
+- 本期需要接入外部能力。
+- 本期需要执行数据迁移。
+- 本期需要修改部署、配置或发布资产。
+- 本期存在必须由后续执行方完成的其他工程任务。
+- 本期需要生成 14、15 作为后续执行和验收承载。
+
+只有以下条件全部满足时，才允许 `requires_execution_handoff: false` 且 `handoff_type: planning_only`：
+
+- 本期成果只停留在规划、决策、评审或文档层。
+- 当前不产生任何工程执行任务。
+- 用户没有要求规划后直接开发。
+- 不需要生成开发任务合同。
+- 不需要 14、15 承载执行和验收。
+
+禁止出现“需要开发，但因为任务简单所以 `requires_execution_handoff: false`”。
+
+#### execution_handoff_decision 变更
+
+后续用户修改目标或范围并导致分支变化时，必须先按 `10-planning-document-interaction-runtime.md` 记录并应用用户反馈，再回写 Planning Context；失效传播复用 `08-planning-recovery-runtime.md`，不得静默覆盖已确认结论。
+
+`planning_only -> execution_ready`：
+
+```text
+记录并应用用户反馈
+-> 回写 Planning Context
+-> 同步本期 current-interaction.yaml 的 execution_handoff_decision
+-> 使旧 Document Assembly Plan、Handoff 与最终总结失效
+-> requires_execution_handoff: true
+-> handoff_type: execution_ready
+-> decision_status: confirmed
+-> 重新评估 Document Assembly Plan
+-> 装配 11、12、13 及 TASK 所需上游 SoT
+-> 13 三个 Gate
+-> 13 确认
+-> 派生 14/15
+-> 重建 assembled_documents、handoff_role_mapping 与 Handoff
+```
+
+不得直接把原 `planning_only` Handoff 交给开发执行。
+
+`execution_ready -> planning_only` 只有用户明确取消本期全部工程执行任务时才允许。必须记录并应用反馈、回写 Planning Context、同步本期 `current-interaction.yaml`、使旧 Document Assembly Plan / Handoff / 最终总结失效、重新生成 Document Assembly Plan，并按 `08` 传播原 13/14/15 计划或文档失效；当前 Handoff 不得继续包含这些职责。
+
+#### 分支 A：execution_ready
+
+适用条件：Planning Context 中已确认 `requires_execution_handoff: true` 且 `handoff_type: execution_ready`。Document Assembly Plan 包含 `Development Landing Checklist` 是该结论的结果，不得反向作为猜测分支的依据。
 
 ```text
 Planning Context COMPLETE
 -> 进入 Planning Document Mode
--> 按动态装配规则实际生成并确认所需正式文档
+-> 按动态装配规则生成并确认所有实际需要的正式文档
+-> 所有被 13 引用的上游 SoT 已生成并确认
 -> 12 已确认
--> 13 被用户确认并回写“状态：已确认”
--> 自动生成 14、15 框架对
+-> 生成 13 草案
+-> Task Contract Gate
+-> Implementation Naming Gate
+-> Implementation Contract Completeness Gate
+-> 输出 13 人话总结
+-> 用户确认 13
+-> 回写 13 状态：已确认
+-> 自动生成 14、15 框架
 -> Execution and Acceptance Framework Derivation Gate 通过
 -> 汇总实际已生成的 assembled_documents
--> 基于实际路径生成唯一正式 Handoff Package
+-> 基于真实路径生成 handoff_role_mapping
+-> 生成包含 execution_constraints 的 execution_ready Handoff Package（prepared）
+-> planning_status: awaiting_final_summary_confirmation
+-> 持久化 final_summary_confirmation active_interaction
+-> 按 10 输出本期最终人话总结
+-> 用户完成最后一次整体确认
+-> 记录并应用 final_summary 确认反馈
+-> Interaction Preference Consolidation 完成
+-> 清理 current-interaction 中的待处理原文
 -> Planning Handoff Complete
+-> 追加 PLANNING_COMPLETE
 ```
+
+本分支必须满足：13 已确认；14、15 已派生；三个 13 Gate 已通过；Handoff 包含 `execution_constraints`；P0 TASK 不存在 `blocking_open`。
+
+#### 分支 B：planning_only
+
+适用条件：Planning Context 中已确认 `requires_execution_handoff: false` 且 `handoff_type: planning_only`；本期只进行需求、流程、规则、UI、架构、能力选型、风险或其他规划确认，当前没有需要交给执行层的开发任务合同。
+
+```text
+Planning Context COMPLETE
+-> 进入 Planning Document Mode
+-> 按动态装配规则生成并确认所有实际需要的正式文档
+-> 所有实际装配文档均已确认
+-> 汇总实际 assembled_documents
+-> 基于真实路径生成 handoff_role_mapping
+-> Handoff 只包含本期真实存在且适用的职责
+-> 生成 planning_only Handoff Package（prepared）
+-> planning_status: awaiting_final_summary_confirmation
+-> 持久化 final_summary_confirmation active_interaction
+-> 按 10 输出本期最终人话总结
+-> 用户完成最后一次整体确认
+-> 记录并应用 final_summary 确认反馈
+-> Interaction Preference Consolidation 完成
+-> 清理 current-interaction 中的待处理原文
+-> Planning Handoff Complete
+-> 追加 PLANNING_COMPLETE
+```
+
+本分支：
+
+- 不要求生成 12，除非本期实际存在风险、依赖或待确认事项需要 12 承载。
+- 不生成 13、14、15。
+- 不运行 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 或 Execution and Acceptance Framework Derivation Gate。
+- Handoff 不包含 `Development Landing Checklist`、`Execution and Integration Record`、`Acceptance and Retrospective Record`，也不包含针对代码执行的 `execution_constraints`。
+- 如果本期结论需要交给开发执行，即使变更很小，也必须改走分支 A。
 
 用途：
 
 ```text
-Planning Runtime
-→ 后续执行承接方
-→ 后续测试与验收承接方
+execution_ready：Planning Runtime → 后续执行承接方 → 后续测试与验收承接方
+planning_only：Planning Runtime → 本期规划结论的实际使用方
 ```
 
 Handoff Package 格式：
 
 ```yaml
+handoff_type: <planning_only | execution_ready>
+requires_execution_handoff: <true | false>
+
+# 仅 requires_execution_handoff: true 时生成
+execution_constraints:
+  planning_ids_are_trace_only: true
+  stable_business_naming_required: true
+  phase_based_implementation_names_forbidden: true
+  existing_business_domain_preflight_required: true
+  new_business_module_requires_architecture_basis: true
+  data_domain_isolation_does_not_imply_phase_namespace: true
+
 handoff_role_mapping:
   - role: Capability Governance
     path: <真实已生成路径>
@@ -790,6 +941,31 @@ handoff_role_mapping:
     framework_status: planned_and_created
 ```
 
+Handoff Branch Consistency Check 属于既有 Handoff 准备过程，不新增独立 Gate 文件、Runtime 或状态机。正式 Handoff 生成前必须检查：
+
+```text
+Planning Context.execution_handoff_decision.requires_execution_handoff
+= current-interaction.yaml.execution_handoff_decision.requires_execution_handoff
+= Document Assembly Plan.execution_handoff_decision.requires_execution_handoff
+= Handoff.requires_execution_handoff
+
+Planning Context.execution_handoff_decision.handoff_type
+= current-interaction.yaml.execution_handoff_decision.handoff_type
+= Document Assembly Plan.execution_handoff_decision.handoff_type
+= Handoff.handoff_type
+
+Planning Context.execution_handoff_decision.decision_status
+= current-interaction.yaml.execution_handoff_decision.decision_status
+= Document Assembly Plan.execution_handoff_decision.decision_status
+= confirmed
+```
+
+`execution_ready` 必须同时满足：Planning Context 的决策状态为 `confirmed` 且分支为 `true / execution_ready`；13 已确认；14、15 已派生；三个 13 Gate 已通过；Handoff 包含 `execution_constraints`。
+
+`planning_only` 必须同时满足：Planning Context 的决策状态为 `confirmed` 且分支为 `false / planning_only`；当前不生成或不承接 13、14、15；Handoff 不包含针对代码实现的 `execution_constraints`。
+
+只强制逐项比较 `requires_execution_handoff`、`handoff_type`、`decision_status`；Handoff 不必完整复制 `decision_basis` 与 `decision_source`，但不得语义冲突。任一不一致时，不得生成或确认正式 Handoff，不得进入最终总结；必须回到 Planning Context 与本期恢复镜像修正，再重建 Document Assembly Plan。
+
 规则：
 
 - 使用职责名。
@@ -798,13 +974,25 @@ handoff_role_mapping:
 - 必须来自本次 Planning Runtime 的正式输出。
 - 上述 YAML 只表达允许的职责名；实际 Handoff 只能列出本期真实已生成且适用的 role。
 - Handoff 不得包含尚未生成的文档、空占位路径、假设路径或未适用职责。
+- `handoff_type: execution_ready` 必须具备 13、14、15、`execution_constraints`，且 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 与 Execution and Acceptance Framework Derivation Gate 均已通过。
+- `handoff_type: planning_only` 禁止包含 Development Landing Checklist、Execution and Integration Record、Acceptance and Retrospective Record 以及针对代码实现的 `execution_constraints`；允许包含本期实际生成的 Requirement and Scope、Business Domain、UI/UX Design、Architecture Decision、Capability Governance、Test and Acceptance Plan、Risk, Dependency, and Open Questions 等职责。
 - 只有本期存在并已生成 13 时，Handoff 才可包含 `Development Landing Checklist`、`Execution and Integration Record`、`Acceptance and Retrospective Record`。
 - 只有 14、15 自动派生完成且 Execution and Acceptance Framework Derivation Gate 通过后，才可以写入 `framework_status: planned_and_created`。
 - `Execution and Integration Record.framework_status: planned_and_created` 只表示 14 已由 planning skill 创建执行记录框架和待填写位置，不代表实际执行事实。
 - `Acceptance and Retrospective Record.framework_status: planned_and_created` 只表示 15 已由 planning skill 创建验收与复盘框架和待填写位置，不代表实际验收或发布事实。
 - Handoff 只定义 planning skill 的输出事实，不定义或修改任何其他 skill 的内部职责、运行方式或文件维护逻辑。
 - 后续承接方禁止通过编号猜测文件。
-- 未生成 Handoff Package 时，不得将 planning 标记为完成交接。
+- 未生成 Handoff Package 时，不得进入最终人话总结确认。
+- Handoff Package 已生成但最终人话总结尚未确认时，只能标记为 `prepared`，不得标记 Planning Handoff Complete。
+- 最终整体确认与 Interaction Preference Consolidation 未完成时，不得将 planning 标记为完成交接。
+- 最终总结输出前未持久化 `final_summary_confirmation` 目标时，不得询问用户确认。
+- `.runtime/planning-layer-runtime/user-profile.yaml` 整理失败时保持 `awaiting_final_summary_confirmation`，不得静默完成交接。
+- `execution_constraints` 仅在 `requires_execution_handoff: true` 时必须随正式 Handoff 输出，且不得复制整份 09 或 13。
+- 执行承接方必须把 Planning ID 映射为稳定业务概念，不得把 TASK、FLOW、DOMAIN、API、PERM 等追踪 ID 机械转换为代码、数据库、API 或权限命名。
+- 执行前必须优先核实现有稳定业务域能否承接；准备新建期次、Sprint、阶段或版本命名的实现资产时必须停止，并作为架构偏差回写 Planning。
+- 新建长期业务模块必须具备 09 的架构依据；数据域隔离不得解释为期次物理命名空间。
+- 上述内容只是 Planning 输出的实现边界，不定义或修改后续执行 Skill 的内部运行方式。
+- `execution_ready` 只有在三个 13 Gate 均通过、`execution_constraints` 已写入 Handoff、P0 参数不存在 `blocking_open` 时，才允许持久化最终总结确认目标并进入最终总结确认；`planning_only` 按本期实际装配文档与真实路径检查，不要求实现类 Gate 或 `execution_constraints`。
 
 正式文档真实生成后，才能加入：
 
@@ -822,11 +1010,11 @@ assembled_documents:
 assembled_documents:
 
 - role: Capability Governance
-  path: docs/计划安排/第四期/10-外部能力与集成治理.md
-  reason: feishu_location_sdk
+  path: <phase_planning_directory>/10-外部能力与集成治理.md
+  reason: external_location_sdk
 
 - role: Development Landing Checklist
-  path: docs/计划安排/第四期/13-开发任务拆分与落地清单.md
+  path: <phase_planning_directory>/13-开发任务拆分与落地清单.md
   reason: implementation_required
 ```
 
@@ -836,11 +1024,17 @@ Document Assembly 原则：
 - 禁止默认生成全量文档。
 - 内部影响评估为局部或业务链路影响时，只允许生成必要文档。
 - 内部影响评估显示需要完整业务规划时，才允许完整文档链。
+- Document Assembly 必须显式判断 `requires_execution_handoff`；该值不得只由 S/M/L 决定。
+- Document Assembly Plan 必须直接读取 Planning Context 中 `decision_status: confirmed` 的 `execution_handoff_decision`；不得重新判断或覆盖该结论。
+- Document Assembly Plan 中保存的 `execution_handoff_decision` 必须与 Planning Context 逐字段一致；不一致时不得进入 Planning Document Mode。
+- Document Assembly Plan 生成后，必须把最小装配进度同步到本期 `current-interaction.yaml.document_assembly`；只记录职责、真实已生成文档、当前文档和装配状态，不复制正式装配结果或 Handoff。
+- `requires_execution_handoff: true` 时必须装配 13 并执行 `execution_ready` 分支；`requires_execution_handoff: false` 时不装配 13/14/15 并执行 `planning_only` 分支。
 - 只要装配 13，就必须同时装配并确认 11、12，以及所有被 TASK 引用的上游 SoT。
 - 15 不得作为可独立装配的孤立文档；只能由已确认的 13 连同 14 一起自动派生。
 - `assembled_documents` 只能包含已经真实生成的文档路径，不得伪造路径。
 - `handoff_role_mapping` 只能在所有实际装配文档完成后生成，且必须只使用真实路径。
 - Planning Context COMPLETE 阶段只能记录装配计划，不得写入正式 `assembled_documents` 或正式 `handoff_role_mapping`。
+- 13 已确认、14/15 框架已生成、`assembled_documents` 与 `handoff_role_mapping` 已准备，都不等于 Planning 已真正结束。
 
 低熵原则：
 
@@ -854,6 +1048,8 @@ Document Assembly 原则：
 进入条件：
 
 - Planning Context 状态为 COMPLETE。
+- Planning Context 中 `execution_handoff_decision.decision_status: confirmed`。
+- Document Assembly Plan 与已确认的 `requires_execution_handoff`、`handoff_type` 一致。
 - Planning Completion Gate 已通过。
 - Project Current State Gate 已通过。
 - 高风险项已确认或已登记待确认项。
@@ -868,9 +1064,10 @@ Document Assembly 原则：
 - 每次只生成一份正式文档草案。例外：13 确认并回写后，14、15 作为框架对自动派生，不触发“每次只能生成一份正式文档”的限制。
 - 逐文档生成、用户态总结、确认、状态回写、进入下一份文档的完整生命周期，以 `10-planning-document-interaction-runtime.md` 为唯一规则来源。
 - 本文件只保留 Planning Conversation 到 Planning Document Mode 的入口条件和边界，不重复维护逐文档生命周期规则。
-- 13 确认并回写 `状态: 已确认` 后，Planning Document Mode 必须自动生成 14 和 15 的正式框架，并运行 Execution and Acceptance Framework Derivation Gate；14、15 只预置后续事实填写位置，不填写任何实际执行、验证、验收、真实环境或发布结论。
+- `requires_execution_handoff: true` 时，13 确认并回写 `状态: 已确认` 后，Planning Document Mode 必须自动生成 14 和 15 的正式框架，并运行 Execution and Acceptance Framework Derivation Gate；14、15 只预置后续事实填写位置，不填写任何实际执行、验证、验收、真实环境或发布结论。
+- `requires_execution_handoff: false` 时，不生成 13、14、15，不运行实现类 Gate；所有实际装配文档确认后直接准备 `planning_only` Handoff。
 - 14、15 不需要分别进行生成前协作确认，也不需要把独立用户确认作为 Planning 完成前提。
-- 自动生成后，只向用户输出简洁说明：已生成执行记录框架与验收框架，当前只预置待填事实位置，不代表开发完成、测试通过、可发布或已发布。
+- 对应分支的正式 Handoff 已基于真实路径准备后，进入 `planning_status: awaiting_final_summary_confirmation`，并按 `10-planning-document-interaction-runtime.md` 输出最终人话总结。此时只说明 Handoff 已准备及其事实边界，不得宣称 Planning 已完成。
 
 ### 10.1 Document Interaction Runtime Handoff
 
@@ -953,6 +1150,7 @@ phase_change_target_reconciled_with_current_state
 - 能力
 - 测试
 - 验收
+- execution_handoff_decision
 
 是否已确认。
 
@@ -1185,11 +1383,14 @@ Planning Context = INCOMPLETE
 检查：
 
 - 每条 P0 FLOW 都有逻辑架构承接位置。
+- 每个关键逻辑模块已选择 `extend_existing_domain`、`reuse_shared_capability` 或 `create_stable_business_domain`，并关联稳定业务概念。
+- 已优先核实现有稳定业务域；`create_stable_business_domain` 具备无法复用原因、长期职责边界和非期次命名依据。
 - 每个 Canonical API Contract 都有 Architecture Binding。
 - 每项旧资产都明确允许复用什么技术基础，以及禁止复用什么业务语义。
 - 旧审批、旧入口、旧状态无法进入新 Command、新 State 或新 Decision View。
 - 外部能力未完成 10 选型时，不得伪装为具体 Provider 已确认。
 - 架构风险只移交 12，不在 09 重复定义正式 RISK。
+- 09 未生成具体目录、类名、数据库表名或迁移名称，也未把数据域隔离解释为期次物理命名空间。
 
 规则：
 
@@ -1256,6 +1457,8 @@ Planning Context = INCOMPLETE
 
 ### Task Contract Gate
 
+仅当 `requires_execution_handoff: true`、本期实际装配 13 时运行本 Gate 及其后的 Implementation Naming Gate、Implementation Contract Completeness Gate；`planning_only` 不运行这些实现类 Gate。
+
 检查：
 
 - 每条 P0 FLOW 至少有一个主 TASK。
@@ -1275,7 +1478,48 @@ Planning Context = INCOMPLETE
 
 --------------------------------------------------
 
+### Implementation Naming Gate
+
+检查：
+
+- 所有 TASK 的 Planning ID 仅用于 `trace_only`。
+- 不存在期次、Sprint、阶段、版本或 Planning ID 被当作候选实现名称。
+- 每个 P0 TASK 已关联稳定业务概念、实现承接策略和优先核实的现有业务域。
+- `create_stable_business_domain` 具备 09 的架构依据。
+- 数据域隔离没有被解释为期次物理命名空间。
+- 候选实现位置优先指向已有稳定业务域。
+- 不存在诱导执行方创建任何带期次、阶段、Sprint、迭代或版本命名空间的代码、模块、API、权限或数据资产。
+
+规则：
+
+- Gate 未通过时，13 不得确认，不得派生 14/15，不得准备正式 Handoff。
+- 必须回到 09 或 13 修正；不得把命名决策推迟为执行层静默处理。
+
+--------------------------------------------------
+
+### Implementation Contract Completeness Gate
+
+按任务实际内容检查；详细参数状态与事实归属以 `04-planning-format-spec.md#implementation-contract-parameter-status` 为唯一来源：
+
+- 会改变业务合同、用户体验、API、数据、状态、权限、测试、验收或发布判断的参数已确认，或明确为 `blocking_open`。
+- 文件/图片任务适用时，类型、大小、数量、必传、失败阻断、重试/恢复、替换/删除和对象绑定边界已闭合。
+- 时间、输入、查询和外部能力参数只检查实际涉及项，不为格式完整追问无关值。
+- 纯技术参数可以 `explicitly_delegated`，但已写明决策范围、既有规范、允许边界、验证方式和不可影响的业务结果。
+- 不存在只写“实现时决定”的委托。
+- P0 TASK 不存在未关闭的 `blocking_open`。
+- 不存在会让开发执行到一半才必须向用户追问的 P0 业务参数。
+
+规则：
+
+- Gate 未通过时，13 不得确认；缺失参数回写真正拥有该事实的上游 SoT，并由 12 保留对应 OPEN。
+- P0 主流程存在 `blocking_open` 时，不得派生 14/15，也不得准备正式 Handoff。
+- 不得用 AI 猜测或行业默认值绕过确认。
+
+--------------------------------------------------
+
 ### Execution and Acceptance Framework Derivation Gate
+
+仅当 `requires_execution_handoff: true` 且 13 已确认、14/15 已派生时运行；`planning_only` 不运行本 Gate。
 
 检查：
 
@@ -1298,7 +1542,7 @@ Planning Context = INCOMPLETE
 
 - 14、15 不得反向定义业务、状态、接口、权限或测试标准。
 - 14、15 不需要独立用户确认作为 Planning 完成前提。
-- Gate 通过后的唯一允许动作是：生成实际 `assembled_documents`，生成唯一正式 Handoff Package，标记 Planning Handoff Complete。
+- Gate 通过后的唯一允许动作是：生成实际 `assembled_documents`，基于真实路径生成唯一正式 Handoff Package 并标记为 `prepared`，然后进入最终人话总结确认。只有用户最后确认且 Interaction Preference Consolidation 完成后，才允许标记 Planning Handoff Complete。
 
 --------------------------------------------------
 
@@ -1320,6 +1564,8 @@ COMPLETE
 才允许进入：
 
 Planning Document Mode。
+
+`execution_handoff_decision.decision_status` 不是 `confirmed`，或 `requires_execution_handoff` 与 `handoff_type` 不匹配时，Planning Context 必须保持 `INCOMPLETE`。
 
 ## 12. 运行时事件日志（Runtime Event Logging）
 
@@ -1448,7 +1694,7 @@ next_action:
 event_seq:
 event_type: CAPABILITY_DETECTED
 related_ids:
-  - CAP-FEISHU-001
+  - CAP-PLATFORM-001
 decision: evidence_gate_required
 reason: platform_capability_detected
 next_action: capability_registry
@@ -1498,7 +1744,15 @@ Runtime State：
 - 临时
 - 可覆盖
 - 可更新
-- 项目结束可删除
+- Planning 正式结束时清空待处理反馈并标记已结束
+
+当前 Planning 的 Runtime State 实例固定为：
+
+```text
+<phase_planning_runtime_directory>/current-interaction.yaml
+```
+
+它是上下文压缩、会话恢复和工具中断后的短期恢复来源；其中 `execution_handoff_decision` 只是已确认 Planning Context 的最小镜像，`document_assembly` 只是当前装配进度的最小镜像。字段以 `04-planning-format-spec.md` 为准，处理顺序以 `10-planning-document-interaction-runtime.md` 为准，恢复校验以 `08-planning-recovery-runtime.md` 为准。
 
 Project Runtime Evidence：
 
@@ -1530,16 +1784,17 @@ Project Runtime Evidence：
 
 ### 12.2 项目运行时证据目录（Project Runtime Evidence Directory）
 
-Planning Runtime Evidence 默认写入：
+Planning Runtime Evidence 的唯一合法目录：
 
 ```text
-docs/计划安排/<第X期>/planning-runtime/
+<phase_planning_runtime_directory>/
 ```
 
 结构：
 
 ```text
 planning-runtime/
+current-interaction.yaml
 event-log.md
 event-summary.md
 decision-log.md
@@ -1557,12 +1812,19 @@ planning-runtime/
 规则：
 
 - 本 skill 不定义其他 skill 的运行时目录、日志结构、证据保存位置或实际回写机制。
+- `execution_handoff_decision` 第一次需要在发问前持久化时按需创建 `current-interaction.yaml`；不得等到进入 Planning Document Mode 后才创建。
+- `event-log.md` 在第一次实际写入 Runtime Event 时创建。
+- `decision-log.md` 在第一次实际存在 Decision Snapshot 时创建。
+- `audit-log.md` 只在真正触发 Runtime Audit 时创建；普通 Planning 不默认创建。
+- Event、Decision、Audit Summary 只在达到压缩阈值、阶段收尾或确有复盘需要时创建。
+- 无内容文件不得为了目录完整性创建；所有文件直接在期次目录创建，不得从 Skill 复制。
 - 禁止提前实现其他 skill 的 evidence 目录。
 - 禁止新增 `recovery-runtime/`。
 - 禁止新增 `governance-runtime/`。
 - 禁止新增 `entropy-runtime/`。
 - 禁止新增 `analysis-runtime/`。
 - 禁止新增 `debug-runtime/`。
+- `current-interaction.yaml` 是可覆盖的短期 Runtime State，不属于 append-only Project Runtime Evidence。
 
 ### 12.3 决策快照运行时（Decision Snapshot Runtime）
 
@@ -1582,12 +1844,13 @@ Decision Snapshot Runtime 只记录关键决策快照，属于 Project Runtime E
 - 分析日志
 - 长期记忆系统
 
-默认写入：
+首次存在需要保存的 Decision Snapshot 时创建并写入：
 
 ```text
-docs/计划安排/<第X期>/planning-runtime/decision-log.md
-docs/计划安排/<第X期>/planning-runtime/decision-summary.md
+<phase_planning_runtime_directory>/decision-log.md
 ```
+
+`decision-summary.md` 只在达到压缩阈值、阶段收尾或确有复盘需要时创建。
 
 Decision Snapshot 格式：
 
@@ -1748,16 +2011,16 @@ Decision Summary 机制：
 
 ## 13. 运行时事件持久化（Runtime Event Persistence）
 
-Runtime Event Log 默认写入：
+第一次实际发生需记录的 Runtime Event 时创建并写入：
 
 ```text
-docs/计划安排/<第X期>/planning-runtime/event-log.md
+<phase_planning_runtime_directory>/event-log.md
 ```
 
-Runtime Event Summary 默认写入：
+达到压缩阈值、阶段收尾或确有复盘需要时，才创建 Runtime Event Summary：
 
 ```text
-docs/计划安排/<第X期>/planning-runtime/event-summary.md
+<phase_planning_runtime_directory>/event-summary.md
 ```
 
 规则：
@@ -1817,7 +2080,7 @@ blocking:
 next_action:
 ```
 
-Summary 生成时机：
+Summary 允许创建或更新的时机（且必须确有压缩或复盘需要）：
 
 - Planning Completion Gate 通过后。
 - Planning Document Mode 完成后。
@@ -1879,7 +2142,28 @@ conflict_count:
 missing_sections:
 ```
 
-Planning Handoff Complete 后必须追加：
+只有满足共同条件及当前 Handoff 分支的附加条件后，才允许标记 Planning Handoff Complete 并追加。
+
+共同条件：
+
+- 本期实际装配文档已生成并确认。
+- `assembled_documents` 与 `handoff_role_mapping` 已基于真实路径生成。
+- Handoff Branch Consistency Check 已通过；Planning Context、本期 `current-interaction.yaml` 恢复镜像、Document Assembly Plan 与 Handoff 的分支字段一致，前三者的 `decision_status` 均为 `confirmed`。
+- 最终人话总结已输出并获得用户最后一次整体确认。
+- Interaction Preference Consolidation 已完成，`.runtime/planning-layer-runtime/user-profile.yaml` 已按需更新或确认无需变更；写入失败不视为完成。
+- `current-interaction.yaml` 的待处理反馈已清空，`planning_status` 已设为 `planning_handoff_complete`。
+
+`execution_ready` 附加条件：
+
+- 13 已确认，14/15 已派生且 Execution and Acceptance Framework Derivation Gate 已通过。
+- Task Contract Gate、Implementation Naming Gate 与 Implementation Contract Completeness Gate 已通过。
+- Handoff 已包含 `execution_constraints`，且不存在 P0 `blocking_open` 参数。
+
+`planning_only` 附加条件：
+
+- `requires_execution_handoff: false`。
+- Handoff 不包含 13/14/15 职责或针对代码实现的 `execution_constraints`。
+- 不存在阻断本期规划结论本身的 OPEN。
 
 ```yaml
 event_seq:
@@ -1888,6 +2172,9 @@ decision:
 generated_documents:
 handoff_status:
 summary_generated:
+final_summary_confirmed:
+interaction_preference_consolidated:
+planning_status:
 blocking:
 next_action:
 ```
@@ -1896,5 +2183,6 @@ next_action:
 
 - `Planning Context COMPLETE` 只表示访谈和上下文已完成。
 - `Planning Document Assembly Complete` 表示实际装配文档已生成并确认。
-- `Planning Handoff Complete` 表示正式 Handoff Package 已按真实路径生成。
+- `Planning Handoff Prepared` 表示正式 Handoff Package 已按真实路径生成，但仍在等待最终人话总结确认。
+- `Planning Handoff Complete` 表示最终人话总结已确认、用户偏好收尾已完成，Planning 正式结束。
 - `PLANNING_COMPLETE` 只能在 Planning Handoff Complete 后追加。

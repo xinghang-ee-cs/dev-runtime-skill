@@ -87,7 +87,7 @@ Capability 表示完成某项功能所依赖的能力来源。
 | AI Capability | 大模型、语音、OCR、Agent、视觉等 AI 服务 | 是 |
 | SDK Capability | 官方或第三方 SDK 接入能力 | 是 |
 | MCP Capability | MCP Server 暴露的工具或资源能力 | 是 |
-| Platform Capability | 微信开放平台、微信小程序、飞书开放平台、企业微信、Shopify、Salesforce、钉钉开放平台等平台生态能力 | 是 |
+| Platform Capability | 移动平台、企业协作平台、电商平台、CRM 平台等生态能力 | 是 |
 | Infrastructure Capability | 对象存储、消息队列、推送、地图、支付、CDN 等基础设施能力 | 按外部依赖判断 |
 | Human Capability | 人工审核、运营、客服、线下确认等人工能力 | 否，但必须定义介入边界 |
 
@@ -106,13 +106,13 @@ Capability 表示完成某项功能所依赖的能力来源。
 - 文件预览
 - 电子签章
 - 外部审批
-- 微信开放平台
-- 微信小程序
-- 飞书开放平台
-- 企业微信
-- Shopify
-- Salesforce
-- 钉钉开放平台
+- 移动平台开放能力
+- 平台容器能力
+- 企业协作平台开放能力
+- 企业通信平台开放能力
+- 电商平台开放能力
+- CRM 平台开放能力
+- 其他第三方平台能力
 
 ## 4. Capability Discovery
 
@@ -340,7 +340,7 @@ Capability 不允许抽象存在。
 
 平台环境正常不等于平台能力完成。
 
-例如，OAuth、UA 识别、容器识别、页面打开、JSSDK ready 只能证明环境或入口可用，不能证明平台 JSAPI、runtime adapter、RecorderManager、定位、摄像头、推送等真实能力已接入。
+例如，OAuth、客户端识别、容器识别、页面打开或 SDK ready 只能证明环境或入口可用，不能证明平台 API、runtime adapter、录音、定位、摄像头、推送等真实能力已接入。
 
 以下属于后续执行和验收要证明的事实，不得作为生成 TASK 前置：
 
@@ -473,13 +473,13 @@ TEST Requirement
 示例：
 
 ```ts
-type FeishuJsApiName =
-  | "getSystemInfo"
+type PlatformCapabilityName =
+  | "deviceInfo"
 ```
 
-上述代码只证明 `getSystemInfo` 被类型声明覆盖，不证明飞书定位能力或飞书录音能力完成。
+上述代码只证明某个平台能力名称被类型声明覆盖，不证明真实设备定位、录音或其他运行时能力已经完成。
 
-若定位 JSAPI、RecorderManager、对应 adapter、runtime binding 和真实调用证据尚未产生，planning 阶段只能标记为：
+若目标平台 API、对应 adapter、runtime binding 和真实调用证据尚未产生，planning 阶段只能标记为：
 
 ```text
 待后续实现与验收证明
@@ -649,11 +649,11 @@ Capability Acceptance Requirement：
 正确示例：
 
 ```text
-TASK-FEISHU-CAPABILITY-REALIZATION-CONTRACT
-TASK-FEISHU-LOCATION-REQUIREMENT
-TASK-FEISHU-RECORDER-REQUIREMENT
-TASK-FEISHU-PERMISSION-REQUIREMENT
-TASK-FEISHU-FALLBACK-REQUIREMENT
+TASK-PLATFORM-CAPABILITY-REALIZATION-CONTRACT
+TASK-PLATFORM-LOCATION-REQUIREMENT
+TASK-PLATFORM-RECORDING-REQUIREMENT
+TASK-PLATFORM-PERMISSION-REQUIREMENT
+TASK-PLATFORM-FALLBACK-REQUIREMENT
 ```
 
 真实设备验证不得作为开发实现任务；应进入 `11-测试方案与验收用例.md` 的测试范围条目，并由后续测试与验收承接方承接。
@@ -703,7 +703,7 @@ Capability Acceptance Matrix 不能替代结构化测试范围条目。
 - OAuth 对象
 - JSSDK ready 对象
 - 定位 JSAPI 对象
-- RecorderManager 对象
+- 录音 API 对象
 - 权限对象
 - fallback 对象
 - 真实设备要求

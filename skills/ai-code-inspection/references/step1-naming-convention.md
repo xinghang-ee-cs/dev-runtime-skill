@@ -1,6 +1,6 @@
 # Step 1: 命名与放置
 
-本 Step 检查文件名、符号名、路由名、DTO/type 名、模块放置和术语一致性。
+本 Step 检查文件名、符号名、入口名、公共契约名、放置位置和术语一致性。
 
 ## 输入
 
@@ -13,35 +13,48 @@
 
 - 遵循所属目录已有命名风格。
 - 优先使用当前代码库中的清晰领域名词和动词，避免 `helper`、`common2`、`newService`、`dataUtil`、`temp` 等模糊名称。
-- 前端和后端同时变更时，契约术语必须一致。
+- 多个组件或公共契约同时变更时，跨边界术语必须一致。
 - 测试文件名应与被测文件或被测行为对应。
 - 已有模块或目录能承接该职责时，不要新增顶层目录。
 - 除非是明确的 adapter/infrastructure 类型，否则不要把实现技术名泄漏进领域类型。
 
-## Frontend 检查
+## 项目既有结构检查
 
-当 frontend 文件在范围内时执行：
+按 `project-environment-profile.md` 中当前范围涉及的组件执行：
 
-- Vue component 应遵循本项目组件命名风格，通常为 `PascalCase.vue`。
-- route/page/view 文件应保留在现有路由或视图结构下。
-- API wrapper 文件应使用 resource/domain 名称，并对 page/component 隐藏 HTTP client 细节。
-- 共享类型应放在已有 frontend type 或 API type 目录中；只有真正局部使用时才放在单个 view 内。
-- 框架相关代码应放在项目已有分层中，例如 component、view、composable、router、platform 等。
-
-## Backend 检查
-
-当 backend 文件在范围内时执行：
-
-- NestJS module 应保持常规命名，例如 `*.module.ts`、`*.controller.ts`、`*.service.ts`、DTO、provider、repository 和 test。
-- controller、service、DTO、repository、adapter 应放在所属 module 或已有 shared infrastructure 目录中。
-- DTO 和 request/response type 名称应描述传输契约，不应混入 UI 细节。
-- repository 或 data-source 名称必须真实反映实现类型。
-- route root 应符合现有 resource 命名风格。
+- 用户界面单元、页面单元、路由或入口处理器应遵循所属目录和框架已有命名方式。
+- 请求传输边界、应用服务或 use case、数据访问边界、外部能力 adapter 等对象只有在项目真实存在时才检查其命名和放置；不得为套用本 Skill 要求项目新增这些层。
+- 公共请求、响应、事件或消息契约的名称应描述传输语义，不应混入某个调用端的展示细节。
+- 共享契约应沿用项目已有共享位置；真正局部的名称留在局部范围。
+- 不创建无必要的新顶层目录，不把实现技术名污染到领域名称。
 
 ## 数据与持久化检查
 
-当 schema、repository、migration、entity/model 或 generated type 使用发生变化时执行：
+当环境档案声明的持久化 schema、model、migration、mapping 或 generated artifact 发生变化时执行：
 
-- Prisma model 和 field 应遵循现有 schema 命名和 mapping 风格。
-- 数据库 table/column 名称应遵循现有 migration/schema 风格。
-- enum-like 值在 frontend type、backend DTO/domain type、Prisma schema、OpenAPI/docs 和 test 中应保持一致。
+- 名称应遵循当前持久化方案已有的 schema 和 mapping 风格。
+- 数据库或其他持久化对象名称应遵循已有迁移和 schema 风格。
+- 枚举类值在公共契约、领域表示、持久化定义、契约文档和测试中应保持一致。
+
+## 规范矫正安全边界
+
+本 Step 的问题统一使用 `../SKILL.md` 定义的六种分类；以下只规定命名与放置问题的归类边界。
+
+### 可安全矫正
+
+仅将下列问题归为 `safe_standard_correction`：
+
+- 本次新增的局部变量、私有函数或局部文件名称明显不符合现有风格。
+- 明确错别字。
+- 新增测试文件名称与被测对象不一致。
+- 当前新增代码中的跨组件术语明显不一致，且不存在公共契约变化。
+- 不涉及引用扩散、反射、动态加载或外部使用的局部命名问题。
+
+### 只能报告或路由
+
+- 公共导出名、入口名、公共契约字段、持久化对象/字段/枚举、序列化名或可能被外部使用的名称：归为 `report_only_risk`；如已有可证明错误行为，归为 `confirmed_bug` 并转入 `confirmed_bugfix`。
+- 领域术语需要业务选择或契约确认：归为 `incremental_design_required`。
+- 历史文件/模块批量重命名、大量移动文件或目录、公共名称引用扩散：归为 `refactor_assessment_required`。
+- 涉及 Breaking API、数据库执行、权限或其他硬边界：归为 `blocked_out_of_boundary`。
+
+不得为统一风格批量改造历史代码。文件移动、公共名称调整或大范围命名统一不得在规范矫正中执行。

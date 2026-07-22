@@ -90,6 +90,10 @@ INVALIDATED -> DONE
 - 所有权边界清楚。
 - 不与其他并行任务冲突。
 - 不存在高风险未确认项。
+- Planning Handoff Intake 与 execution constraints 有效。
+- 实现承接策略已确认，稳定业务命名与禁止命名已记录。
+- 当前 TASK 的实现合同完整，参数状态无 `blocking_open`。
+- 涉及依赖变更时 Dependency Governance Gate 已通过。
 
 ### WAITING_VALIDATION
 
@@ -97,7 +101,7 @@ INVALIDATED -> DONE
 
 - 实现动作已完成。
 - 已记录实际改动文件。
-- 已记录实现偏差或确认无偏差。
+- 已确认不存在架构/合同偏差；存在时必须转入 `BLOCKED`。
 - 准备执行验证门禁。
 
 ### IN_REVIEW
@@ -117,6 +121,7 @@ INVALIDATED -> DONE
 - 验证证据成立，或验证不可用原因已记录。
 - 主 Agent 已复核。
 - 无未处理高风险偏差。
+- `execution_constraint_validation.result = passed`。
 - 已同步正式执行记录。
 
 ### PARTIAL
@@ -138,6 +143,10 @@ INVALIDATED -> DONE
 - 验证命令不可确认且无替代证据。
 - 所有权边界冲突。
 - 继续执行可能破坏接口、权限、状态、数据或共享环境。
+- 业务/合同参数缺失或为 `blocking_open`。
+- 实现承接位置不成立，或新业务域缺少正式架构依据。
+- 架构/合同偏差等待上游确认。
+- 依赖版本、官方来源或兼容性无法确认。
 
 ### SKIPPED
 
@@ -154,10 +163,11 @@ INVALIDATED -> DONE
 进入条件：
 
 - 正式计划变化。
+- Planning Handoff 或 execution constraints 变化。
 - 接口/状态/权限/数据模型变化。
 - Runtime 恢复失败。
 - context-version 冲突。
-- 高风险偏差接受。
+- 上游确认后正式计划、Planning Handoff 或 execution constraints 发生变化。
 - Runtime Kernel 变化。
 
 进入 `INVALIDATED` 后：
@@ -196,7 +206,28 @@ Static Task Definition 只包含静态字段。
 - 是否允许委派：是/否
 - 验证方式：
 - 完成证明：
+- Planning 追踪来源：
+- 稳定业务概念：
+- execution_constraints 来源：
+- 实现承接策略：
+- 优先承接的现有业务域：
+- 是否需要新建长期业务域：
+- 新业务域架构依据：
+- 禁止实现命名：
+- 参数合同状态：
+- 明确委托的技术参数：
+- 是否涉及依赖变更：
 ```
+
+字段规则：
+
+- Planning 追踪来源只引用 Planning ID 与路径，不作为实现命名来源。
+- 稳定业务概念不得使用期次、阶段、Sprint、版本或 Planning ID。
+- 实现承接策略只允许 `extend_existing_domain`、`reuse_shared_capability`、`create_stable_business_domain`。
+- `create_stable_business_domain` 时“新业务域架构依据”必填，且必须引用正式架构依据。
+- 禁止实现命名必须列出本任务不可出现的期次/阶段/Sprint/版本/追踪 ID 命名模式。
+- 参数合同状态记录适用参数是否均为 `confirmed`、`explicitly_delegated` 或 `not_applicable`。
+- 明确委托的技术参数只记录 Planning 明确委托给执行层的参数。
 
 ### Current Task State Table
 
@@ -239,7 +270,7 @@ patch task must also use Current Task State Table
 | 验证结果 | `Phase Runtime Directory/validation-results.md` |
 | Long Testing Handoff | `Phase Runtime Directory/testing-handoff.md` 或 `Phase Runtime Directory/long-runtime-testing-summary.md` |
 | subAgent 采纳/拒绝 | `Phase Runtime Directory/agent-decisions.md` |
-| 偏差接受/拒绝 | `Phase Runtime Directory/agent-decisions.md` |
+| 明确委托范围内的私有技术实现决策 | `Phase Runtime Directory/agent-decisions.md` |
 | 无法分类临时事实 | `Phase Runtime Directory/temporary-execution-log.md` |
 | 当前任务状态索引 | `Phase Runtime Directory/task.md` 的 `Current Task State Table` |
 | 当前快照 | `Phase Runtime Directory/current-runtime-context.md` |

@@ -5,7 +5,7 @@
 实例化位置：
 
 ```text
-docs/计划安排/<期次>/runtime/current-runtime-context.md
+<phase_runtime_directory>/current-runtime-context.md
 ```
 
 禁止在本文件保存某一期项目运行状态。
@@ -19,6 +19,11 @@ phase_runtime_directory:
 runtime_mode:
 based_on_plan:
 recovery_source:
+planning_handoff_source:
+execution_constraints_source:
+execution_constraints_status:
+implementation_contract_status:
+dependency_governance_status:
 capability_governance_source:
 current_effective_phase:
 current_effective_status:
@@ -34,6 +39,7 @@ invalidated_by:
 recovery_required:
 task_file:
 checkpoint_file:
+project_execution_baseline_file:
 execution_events_file:
 validation_results_file:
 testing_handoff_file:
@@ -41,6 +47,8 @@ agent_decisions_file:
 temporary_execution_log_file:
 formal_execution_record:
 formal_acceptance_record:
+acceptance_status:
+acceptance_owner_runtime:
 active_task:
 active_big_unit:
 active_execution_unit:
@@ -53,10 +61,15 @@ last_updated:
 ```yaml
 runtime_epoch: <project-phase-runtime-epoch>
 context_version: 1
-phase_runtime_directory: docs/计划安排/<期次>/runtime
+phase_runtime_directory: <phase_runtime_directory>
 runtime_mode: main
 based_on_plan: <confirmed Development Landing Checklist path>
 recovery_source: <confirmed Development Landing Checklist path>
+planning_handoff_source: <current valid Planning Handoff path>
+execution_constraints_source: <field/path reference in Planning Handoff>
+execution_constraints_status: <passed | failed | invalidated>
+implementation_contract_status: <passed | blocked | pending>
+dependency_governance_status: <passed | blocked | not_applicable | pending>
 capability_governance_source: <confirmed Capability Governance path or null>
 current_effective_phase: preflight.pending
 current_effective_status: phase_runtime_directory_created
@@ -70,15 +83,18 @@ open_blockers: []
 open_manual_required: []
 invalidated_by: null
 recovery_required: false
-task_file: docs/计划安排/<期次>/runtime/task.md
-checkpoint_file: docs/计划安排/<期次>/runtime/checkpoint-runtime.md
-execution_events_file: docs/计划安排/<期次>/runtime/execution-events.md
-validation_results_file: docs/计划安排/<期次>/runtime/validation-results.md
-testing_handoff_file: docs/计划安排/<期次>/runtime/testing-handoff.md
-agent_decisions_file: docs/计划安排/<期次>/runtime/agent-decisions.md
-temporary_execution_log_file: docs/计划安排/<期次>/runtime/temporary-execution-log.md
+task_file: <phase_runtime_directory>/task.md
+checkpoint_file: <phase_runtime_directory>/checkpoint-runtime.md
+project_execution_baseline_file: null
+execution_events_file: <phase_runtime_directory>/execution-events.md
+validation_results_file: <phase_runtime_directory>/validation-results.md
+testing_handoff_file: <phase_runtime_directory>/testing-handoff.md
+agent_decisions_file: <phase_runtime_directory>/agent-decisions.md
+temporary_execution_log_file: <phase_runtime_directory>/temporary-execution-log.md
 formal_execution_record: <planning handoff Execution and Integration Record path>
 formal_acceptance_record: <planning handoff Acceptance and Retrospective Record path>
+acceptance_status: not_started
+acceptance_owner_runtime: testing-layer-runtime
 active_task: null
 active_big_unit: null
 active_execution_unit: null
@@ -102,12 +118,18 @@ ready_for_local_test_since: 首次进入 ready_for_local_test 的时间
 ready_for_local_retest_since: 最近一次进入 ready_for_local_retest 的时间
 open_blockers: 当前仍有效阻塞项
 open_manual_required: 交给 testing-layer-runtime 的人工/真实环境验证项
+formal_acceptance_record: 只读路径指针，不授权 Long 创建或写入正式验收记录
+acceptance_status: Long 中固定为 not_started
+acceptance_owner_runtime: 固定为 testing-layer-runtime
 ```
 
 规则：
 
 ```text
 checkpoint-runtime.md and current-runtime-context.md must agree on current_effective_phase
+dependency_governance_status must agree with Preflight Result, checkpoint, baseline, and active task
+project_execution_baseline_file remains null during first bootstrap until the Baseline instance is written and marked current
+once written, project_execution_baseline_file must point to current Phase Runtime Directory
 patch segment must update current_effective_status
 main runtime closed does not override active patch effective status
 ```
@@ -121,9 +143,14 @@ source_of_truth_confirmed = <path or false>
 capability_governance_confirmed = <path or not_applicable>
 planning_capability_gate_passed_or_not_applicable = false
 planning_capability_binding_gate_passed_or_not_applicable = false
-preflight_passed = false
+planning_handoff_intake_passed = false
+execution_constraints_loaded = false
 phase_runtime_directory_created = false
 runtime_state_instantiated = false
+implementation_contract_complete_for_task = false
+implementation_placement_confirmed_for_task = false
+dependency_governance_passed_or_not_applicable = false
+preflight_passed = false
 task_runtime_generated = false
 runtime_context_valid = false
 lifecycle_order_valid = false
@@ -135,9 +162,17 @@ execution_gate_open = false
 ```yaml
 runtime_epoch: <phase-name>-development-<date>
 context_version: 1
-phase_runtime_directory: docs/计划安排/<期次>/runtime
-based_on_plan: docs/计划安排/<期次>/<Development Landing Checklist>.md
-recovery_source: docs/计划安排/<期次>/<Development Landing Checklist>.md
+phase_runtime_directory: <phase_runtime_directory>
+project_execution_baseline_file: <phase_runtime_directory>/project-execution-baseline.md
+based_on_plan: <development_landing_checklist_path>
+recovery_source: <development_landing_checklist_path>
+planning_handoff_source: <planning_handoff_path>
+execution_constraints_source: <Planning Handoff path>#execution_constraints
+execution_constraints_status: passed
+implementation_contract_status: passed
+dependency_governance_status: not_applicable
+acceptance_status: not_started
+acceptance_owner_runtime: testing-layer-runtime
 runtime_mode: main
 current_effective_phase: execution.in_progress
 current_effective_status: active

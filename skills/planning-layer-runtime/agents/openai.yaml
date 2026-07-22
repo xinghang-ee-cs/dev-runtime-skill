@@ -1,5 +1,4 @@
 interface:
   display_name: "规划层运行时"
-  short_description: "在实现前启动规划上下文与规划文档。"
-  description: "在实现前触发 planning-layer-runtime，用于加载 `.plan/` 启动上下文、Planning Context 和正式规划文档，覆盖需求、范围、数据模型、权限模型、UI、验收标准、风险、P0/P1/P2 与测试范围。它可以定义必须测试什么，但不能定义怎么测、谁测、测试顺序、执行状态或测试结果。"
-  default_prompt: "在实现前使用 $planning-layer-runtime，先加载 `.plan/`，再创建 Planning Context 并起草正式规划文档；只定义测试范围，不定义怎么测/谁测/顺序/状态/结果。"
+  short_description: "在开发前完成规划访谈、逐文档确认、正式交接与最终整体确认"
+  default_prompt: "使用 $planning-layer-runtime 完成开发前规划，并在正式交接前逐份确认文档和最终人话总结。"

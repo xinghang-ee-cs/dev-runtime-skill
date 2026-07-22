@@ -74,6 +74,70 @@ Recovery Runtime 只允许：
 - Capability Binding 失效
 - Acceptance Reopen
 - 高风险冲突重新出现
+- 上下文压缩
+- 会话恢复
+- 工具调用中断
+- 长时间文件编辑后恢复
+- 当前文档或确认对象无法确定
+- 用户中途插入其他问题
+- 同时存在多个草案
+
+### 3.1 当前交互恢复来源
+
+上下文压缩、会话恢复、工具中断或当前确认对象不确定时，必须先读取：
+
+```text
+<phase_planning_runtime_directory>/current-interaction.yaml
+```
+
+只允许读取当前期次的该文件；不得到 Skill 目录寻找运行数据，不得把 Skill 中的示例代码块当成状态，不得读取其他期次的 `current-interaction.yaml`，也不得使用 `.runtime/planning-layer-runtime/user-profile.yaml` 或 `.runtime/planning-layer-runtime/project-profile.yaml` 恢复本期分支。
+
+唯一恢复顺序：
+
+```text
+读取本期 current-interaction.yaml
+-> 恢复 active_interaction
+-> 恢复未完成 latest_feedback
+-> 校验反馈与 active_interaction 的目标绑定
+-> document：检查目标正式文档当前状态
+-> final_summary：检查总结版本与 planning_status
+-> 恢复 execution_handoff_decision
+-> 检查 decision_status
+-> 与 Planning Context 中的 execution_handoff_decision 核对
+-> 恢复 document_assembly
+-> 核对实际已生成正式文档的状态
+-> 核对 Document Assembly Plan
+-> 恢复 execution_ready 或 planning_only 分支
+-> 判断 recorded / already_effective / invalid
+-> 完成或阻止该反馈
+-> 更新 apply_status 与 next_action
+-> 再恢复当前 Planning 阶段
+```
+
+判断：
+
+- 反馈已记录、目标与版本仍有效且尚未应用：继续校验并应用到原目标。
+- `target_type: document` 时，目标文档已经达到反馈预期但反馈仍为 `recorded` 或 `validated`：标记 `already_effective`，不得重复应用。
+- `target_type: final_summary`、`target_id: current_phase_final_summary`、`stage: final_summary_confirmation` 且版本匹配时，用户的“确认”只能消费最终总结目标，不得确认任何文档。
+- 目标不存在、版本不匹配、确认范围不唯一或无法合法应用：标记 `needs_clarification` 或 `rejected`，不得猜测。
+- 上一条反馈仍为 `recorded` 或 `validated` 时，必须先完成该反馈，不得用新反馈覆盖。
+
+禁止根据压缩后的对话摘要、最近提到的文档编号、“下一步是第 X 份”、编号大小或模型记忆推断当前确认对象。
+
+Planning Context 中已确认的 `execution_handoff_decision` 是权威语义来源，本期 `current-interaction.yaml` 是短期恢复镜像。恢复时：
+
+- `decision_status: confirmed` 且与 Planning Context 一致时，按该分支恢复，不得重新推断。
+- `decision_status: candidate` 时，恢复到 `execution_handoff_confirmation` 交互。
+- 镜像字段缺失时不得猜测，回到执行交接判断确认。
+- 不得根据压缩后的聊天摘要重新推断分支。
+- 不得根据当前已生成的文件数量反向推断分支。
+- 不得因为 13 尚未生成而自动判断为 `planning_only`。
+- 不得因为用户在压缩摘要中提到“开发”一词而覆盖已确认分支。
+- Handoff 中的 `requires_execution_handoff`、`handoff_type` 必须与 Planning Context 一致。
+- Document Assembly Plan 中的 `execution_handoff_decision` 必须与 Planning Context 逐字段一致；它只是恢复当前装配计划的同步字段，不是第二个决策来源。
+- `current-interaction.yaml` 与 Planning Context 不一致，或 Document Assembly Plan 与恢复镜像不一致时，必须阻止恢复推进，回到 Planning Context 与本期恢复镜像修正。
+
+`current-interaction.yaml` 是短期恢复来源，但不是正式 SoT、历史日志或长期聊天记录。不得新增 `recovery-state`、`feedback-runtime`、`confirmation-runtime` 或 `context-compression-runtime`。
 
 ## 4. 恢复输出（Recovery Output）
 
@@ -99,6 +163,7 @@ blocking:
 - 不允许长篇解释。
 - 不允许 AI 推理内容。
 - 不允许自然语言总结。
+- 与当前用户反馈有关的恢复结果写回现有 `current-interaction.yaml` 字段；不得为 Recovery Output 新增独立持久化文件。
 
 ## 5. SoT 失效传播（SoT Invalid Propagation）
 
@@ -248,6 +313,49 @@ TASK 合同变化
 - 14、15 未填写实际事实的预置项可以标记为 `framework_rebuild_required` 并按新合同重建；已经由后续阶段填写的事实不得由 planning recovery 自动删除、覆盖、伪造或回退。
 - Recovery 不得出现“先有 14、15 才能确认 13”的恢复路径；14、15 只在 13 已确认后派生或重建未填写的预置项。
 
+### 5.1 执行交接分支变化传播
+
+本节复用现有用户反馈事务、Planning Context、文档状态和失效传播规则，不新增 Recovery 类型、Runtime 文件、日志或状态体系。
+
+`planning_only -> execution_ready`：
+
+```text
+记录并应用用户反馈
+-> 回写 Planning Context 中的 execution_handoff_decision
+-> 同步更新本期 current-interaction.yaml
+-> requires_execution_handoff: true / handoff_type: execution_ready / decision_status: confirmed
+-> 使旧 Document Assembly Plan 失效
+-> 使原 planning_only Handoff 与最终总结失效
+-> 重新生成 Document Assembly Plan
+-> 同步 document_assembly
+-> 装配 11、12、13 及 TASK 所需上游 SoT
+-> 13 三个 Gate 与确认
+-> 派生 14/15
+-> 重建 assembled_documents、handoff_role_mapping 与 execution_ready Handoff
+```
+
+`execution_ready -> planning_only` 只有用户明确取消本期全部工程执行任务时才允许：
+
+```text
+记录并应用用户反馈
+-> 回写 Planning Context 中的 execution_handoff_decision
+-> 同步更新本期 current-interaction.yaml
+-> requires_execution_handoff: false / handoff_type: planning_only / decision_status: confirmed
+-> 使旧 Document Assembly Plan 失效
+-> 重新评估实际适用文档
+-> 使原 execution_ready Handoff 与最终总结失效
+-> 重新生成 Document Assembly Plan
+-> 同步 document_assembly
+-> 重新生成 planning_only Handoff
+```
+
+若 13、14、15 已经生成：
+
+- 不得静默删除历史文件。
+- 按既有失效传播规则标记为不再适用或 `superseded`。
+- 不得继续放入当前 `assembled_documents`、`handoff_role_mapping` 或 Handoff。
+- 已由后续阶段写入的实际事实不得由 Planning Recovery 删除、覆盖或回退。
+
 ## 6. 恢复恢复门禁（Recovery Resume Gate）
 
 Recovery 不允许无限进行。
@@ -270,7 +378,7 @@ revalidation_required:
 规则：
 
 - Recovery Runtime 必须复用 Runtime Event Logging。
-- Recovery Event 写入 `docs/计划安排/<第X期>/planning-runtime/event-log.md`。
+- Recovery Event 写入 `<phase_planning_runtime_directory>/event-log.md`。
 - 禁止新增独立 Recovery Event System。
 - Recovery Trigger 只允许追加一条 Decision Snapshot。
 - Resume Gate 不得依赖历史 Decision Log。
@@ -298,12 +406,13 @@ revalidation_required:
 
 ## 8. 运行时审计日志（Runtime Audit Log）
 
-Audit 输出默认写入：
+真正触发 Runtime Audit 时，才创建并写入：
 
 ```text
-docs/计划安排/<第X期>/planning-runtime/audit-log.md
-docs/计划安排/<第X期>/planning-runtime/audit-summary.md
+<phase_planning_runtime_directory>/audit-log.md
 ```
+
+`audit-summary.md` 只在达到压缩阈值、阶段收尾或确有复盘需要时创建。普通 Planning 不默认创建 Audit 文件，没有内容时不得为了目录完整性创建。
 
 仅用于：
 
@@ -482,9 +591,9 @@ Recovery Runtime 可以使用 Decision Snapshot，但只允许：
 
 规则：
 
-- `.plan/` 是 Bootstrap Context，不是 Runtime Recovery Source。
-- Recovery 判断必须来自当前 SoT、当前 Gate、当前 Recovery Output。
-- 不得用 `.plan/` 中的历史信息恢复正式业务状态。
+- `.runtime/planning-layer-runtime/` 是 Bootstrap Context，不是 Runtime Recovery Source。
+- 当前交互恢复先读取 `current-interaction.yaml`：文档目标再读取正式文档状态，最终总结目标读取总结版本与 `planning_status`；业务事实与失效传播仍以当前 SoT、当前 Gate 和当前 Recovery Output 为准。
+- 不得用 `.runtime/planning-layer-runtime/` 中的历史信息恢复正式业务状态。
 - Decision Snapshot 只能辅助复盘，不得成为恢复依据。
 
 ## 13. 低熵规则（Low Entropy Rule）
@@ -525,6 +634,14 @@ planning-runtime/decision-summary.md
 planning-runtime/audit-log.md
 planning-runtime/audit-summary.md
 ```
+
+短期 Runtime State 另为：
+
+```text
+planning-runtime/current-interaction.yaml
+```
+
+该文件可覆盖更新并作为当前交互恢复来源，不属于 append-only Project Runtime Evidence。
 
 规则：
 

@@ -5,7 +5,7 @@
 实例化位置：
 
 ```text
-docs/计划安排/<期次>/runtime/agent-decisions.md
+<phase_runtime_directory>/agent-decisions.md
 ```
 
 禁止在本文件保存某一期项目决策记录。
@@ -13,7 +13,7 @@ docs/计划安排/<期次>/runtime/agent-decisions.md
 ## Runtime Session
 
 ```yaml
-runtime_session_ref: docs/计划安排/<期次>/runtime/current-runtime-context.md
+runtime_session_ref: <phase_runtime_directory>/current-runtime-context.md
 ```
 
 ## Schema
@@ -27,6 +27,8 @@ decision:
 reason:
 impact:
 evidence_ref:
+delegation_source:
+boundary_check:
 ```
 
 ## 允许记录
@@ -37,7 +39,7 @@ evidence_ref:
 - subAgent使用
 - subAgent拒绝
 - 风险接受
-- 偏差接受
+- 明确委托范围内的私有技术实现决策
 
 ## 禁止记录
 
@@ -51,12 +53,14 @@ evidence_ref:
 ```yaml
 decision_id: <DECISION-ID>
 time: <ISO-8601 timestamp>
-decision_type: <accepted | rejected | deferred | subagent_used | subagent_rejected | risk_accepted | deviation_accepted>
+decision_type: <accepted | rejected | deferred | subagent_used | subagent_rejected | risk_accepted | delegated_technical_detail>
 related_task: <TASK-ID or null>
 decision: <decision summary>
 reason: <reason>
 impact: <runtime impact>
-evidence_ref: <Project Runtime Workspace file or formal project record path>
+evidence_ref: <Phase Runtime Directory file or formal project record path>
+delegation_source: <Planning Handoff explicitly_delegated field reference or not_applicable>
+boundary_check: <private, reversible, no public semantic impact, within task boundary>
 ```
 
 ## Example
@@ -69,5 +73,5 @@ related_task: <TASK-ID>
 decision: defer server or external capability final verification
 reason: manual/server/final verification is outside long-task-orchestrator boundary
 impact: record manual_required item for testing-layer-runtime handoff
-evidence_ref: docs/计划安排/<期次>/runtime/testing-handoff.md
+evidence_ref: <phase_runtime_directory>/testing-handoff.md
 ```

@@ -1,83 +1,103 @@
 # 项目环境档案
 
-本文件记录 `ai-code-inspection` 使用的稳定环境事实。
+本文件记录 `ai-code-inspection` 使用的稳定项目环境事实，不保存临时运行状态、Step 输出、命令日志、检查发现或执行历史。
 
-不得在这里记录临时运行状态、Step 输出、命令日志、检查发现或执行历史。只有稳定项目环境事实变化时，才允许更新本文件。
+本文件是未初始化模板。首次在目标项目使用前，必须只读扫描当前仓库的真实文件、manifest、workspace 配置、源码入口、测试配置、持久化定义和 CI/CD workflow，再填写本档案。不得从 Skill 示例或其他项目复制环境事实；档案与仓库冲突时，以当前仓库事实为准并纠正档案。
 
-本文件是模板。首次在具体项目中使用 `ai-code-inspection` 前，必须先检查当前仓库的真实文件、包管理器、脚本、框架、CI/CD 和数据库迁移方式，再填写或更新本档案。不得从其他项目复制环境事实。
-
-## 工作区
+```yaml
+profile_status: uninitialized
 
 workspace:
-  package_manager:
-  monorepo:
-  workspace_packages: []
+  structure: null
+  root_path: .
+  package_managers: []
+  languages: []
+  workspace_tools: []
   root_scripts:
-    build:
-    test:
-    verify:
+    build: null
+    test: null
+    lint: null
+    typecheck: null
+    verify: null
 
-## 前端
+components: []
 
-frontend:
-  present:
-  path:
-  framework:
-  language:
-  build_tool:
-  router:
-  state_management:
-  ui_library:
-  test_runner:
-  package_scripts:
-    build:
-    test:
-    test_coverage:
+persistence: []
 
-## 后端
-
-backend:
-  present:
-  path:
-  framework:
-  language:
-  orm:
-  database:
-  validation:
-  test_runner:
-  package_scripts:
-    build:
-    build_deploy:
-    test:
-    test_integration:
-    test_coverage:
-    orm_generate:
-    schema_validate:
-    migrate_dev:
-
-## 远程平台与 CI/CD
+contracts: []
 
 ci_cd:
-  remote_platform:
-  ci_enabled:
-  workflow_path:
-  ci_capabilities: []
-
-## 日常验证命令
+  enabled: null
+  platforms: []
+  workflow_paths: []
+  capabilities: []
 
 validation_commands:
-  broad_verify:
-  root_build:
-  root_test:
-  frontend_test:
-  backend_test:
-  schema_validate:
+  broad_verify: []
+  build: []
+  test: []
+  lint: []
+  typecheck: []
+  coverage: []
+  schema_validate: []
+  contract_validate: []
+```
 
-## 数据库迁移处理
+## 条目结构
 
-database_migrations:
-  schema_path:
-  migration_path:
-  routine_schema_validation:
-  migration_deploy_command:
-  migration_execution_policy: 常规代码检查 Skill 不执行数据库迁移命令；只有开发者明确确认目标数据库、目标环境和具体命令后，才能进入相应操作。
+`components` 支持任意数量的前端、后端服务、worker、CLI、共享包或其他组件。每个条目按仓库事实使用以下字段；不存在或无法确认的字段保持 `null` 或空列表，不得猜测：
+
+```yaml
+- id: null
+  type: null
+  path: null
+  language: null
+  framework: null
+  runtime: null
+  build_tool: null
+  router_or_entry: null
+  state_management: null
+  validation_tool: null
+  test_runners: []
+  scripts:
+    build: null
+    test: null
+    lint: null
+    typecheck: null
+    coverage: null
+```
+
+`persistence` 支持多个组件、数据库或其他持久化方案：
+
+```yaml
+- id: null
+  component_id: null
+  database: null
+  orm_or_client: null
+  schema_paths: []
+  migration_paths: []
+  generated_paths: []
+  validation_commands: []
+  migration_commands: []
+  execution_policy: explicit_confirmation_required
+```
+
+`contracts` 支持多个公共契约来源：
+
+```yaml
+- id: null
+  component_ids: []
+  type: null
+  paths: []
+  generation_commands: []
+  validation_commands: []
+```
+
+`validation_commands` 的数组项使用 `{ component_id, cwd, command }` 记录真实命令；工作区级命令的 `component_id` 使用 `workspace`。只记录项目实际存在的命令，不记录单次运行结果。
+
+## 初始化与维护规则
+
+- 单项目、多组件、monorepo、多语言、多持久化、多测试框架和多 CI workflow 都使用同一结构，不再预设固定的前端或后端槽位。
+- 初始化完成且关键事实已由仓库证据确认后，将 `profile_status` 改为 `initialized`；存在未确认字段时在执行报告中说明，不把推测写入档案。
+- 只有稳定项目事实变化时才更新本文件；临时范围、当前模式、修改权限、Step 状态和验证结果写入 `inspection-runtime-state.md`。
+- 数据库或持久化执行默认要求用户明确确认目标、环境和具体命令；本 Skill 不因档案中存在命令而自动执行。

@@ -1,50 +1,65 @@
 # Step 3: 架构与分层
 
-本 Step 检查变更代码是否留在正确的架构层。
+本 Step 检查变更代码是否遵循当前项目真实存在的架构边界。
 
 ## 通用检查
 
-- 判断架构前先确认真实调用路径，例如 route/view -> API/store/composable -> backend controller/service/repository/provider。
-- transport、业务编排、data access、外部能力 adapter 应保持分离。
+- 判断架构前先确认真实调用路径和组件边界。
+- 识别项目已经存在的入口层、传输层、业务编排层、数据访问层、外部能力边界和共享契约边界。
+- 只有当前项目真实存在这些层时，才检查跨层调用、职责泄漏和依赖方向。
+- 如果项目没有该分层，不得仅因 Skill 偏好而要求新增该层。
 - 已有公开边界时，不要新增跨层 import。
 - 修复局部问题时，不要顺手移动无关职责。
 - 优先沿用项目既有模式，而不是创造新抽象。
-- 只有在能消除真实重复或隔离真实边界时，才新增抽象。
+- 只有存在真实重复或真实边界隔离需求时，才允许提出新增抽象建议；本 Skill 的检查和规范矫正不得直接新增抽象。
 
-## Frontend 分层检查
+## 既有边界检查
 
-当 frontend 文件在范围内时执行：
+按当前组件真实存在的等价结构执行：
 
-- route/page/view 文件负责 workflow 协调和页面组合。
-- component 负责可复用 UI，并通过清晰 props/events 或本项目等价约定交互。
-- composable/store/module 负责可复用状态或 workflow 逻辑。
-- API module 负责 HTTP 细节和 response normalization。
-- 如果项目已有 platform/SDK/browser adapter 边界，普通 UI 文件不应直接承接这些能力。
-- 框架相关检查由 `project-environment-profile.md` 决定。
-
-## Backend 分层检查
-
-当 backend 文件在范围内时执行：
-
-- NestJS `main.ts` / app module 负责 bootstrap 和全局配置。
-- module 应明确声明所有权和依赖。
-- controller 不应包含业务 mutation 逻辑。
-- 已有 repository/provider 边界时，service 不应复制 query 细节。
-- repository/provider 应向 controller 和 public DTO 隐藏 ORM 或外部 IO 细节。
-- guard/interceptor/filter 应专注横切关注点，不承接业务 workflow。
+- 用户界面或页面单元只承担项目已有约定分配给它的展示、交互或流程协调职责。
+- 路由或入口处理器不应越过已有业务编排边界直接复制业务或数据访问细节。
+- 应用服务、use case 或业务编排单元不应绕过已有数据访问或外部能力边界。
+- 数据访问边界应按项目已有模式隔离持久化 mapping；外部能力 adapter 应隔离协议和 IO 细节。
+- 共享契约边界应避免调用端、处理端和持久化表示无依据地互相泄漏。
+- 框架专用对象、目录与依赖规则只从当前范围匹配的 Profile 加载。
 
 ## API 契约边界
 
 当 frontend/backend 或共享契约同时变化时执行：
 
-- request/response shape 应在 client wrapper、DTO、server handler、docs/OpenAPI 和 test 中一致。
-- error behavior 应在 frontend handling 和 backend exception 中一致表达。
-- optional/nullable 字段从 persistence 到 UI 应保持一致处理。
+- 请求、响应、事件或消息 shape 应在调用端、入口处理器、公共契约描述和测试中一致。
+- error behavior 应在边界两侧一致表达。
+- optional/nullable 字段从持久化到使用端应保持一致处理。
 
 ## 持久化边界
 
-当 ORM/schema/repository 文件在范围内时执行：
+当环境档案声明的持久化 schema、migration、mapping 或 data access 文件在范围内时执行：
 
-- 如果项目已有 repository/provider mapping，应把 persistence-specific model 隔离在该边界后。
-- schema/migration 变化不应直接把 raw generated type 泄漏到 UI-facing contract，除非项目既有模式如此。
-- runtime repository wiring 应明确且可测试。
+- 如果项目已有数据访问或 mapping 边界，应把持久化专用表示隔离在该边界后。
+- schema/migration 变化不应直接把 raw generated type 泄漏到公共契约，除非项目既有模式如此。
+- runtime wiring 应明确且可测试。
+
+## 规范矫正安全边界
+
+本 Step 的问题统一使用 `../SKILL.md` 定义的六种分类。Step 3 主要防止本次新增或修改代码继续引入新的分层违规，不负责把历史项目重构成理想架构。
+
+### 可安全矫正
+
+仅当以下条件全部满足时归为 `safe_standard_correction`：
+
+- 本次新增代码明显绕过项目已经存在的请求封装、数据访问或外部能力边界。
+- 可通过局部修改恢复到已经存在的调用模式。
+- 不新增抽象、不移动历史职责、不改变调用结果和业务行为。
+
+同时必须满足 `../SKILL.md` 的全局无外部行为、无契约语义和无实现路径变化条件；无法证明等价时不得修正。
+
+### 只能报告或路由
+
+- 历史职责混杂、系统性跨层依赖或持久化类型已广泛泄漏，但没有唯一局部修正：归为 `report_only_risk`。
+- 分层问题已经造成明确运行错误或公共契约冲突：归为 `confirmed_bug`，只在 `confirmed_bugfix` 处理。
+- 模块所有权、业务编排或边界职责需要新增决策：归为 `incremental_design_required`。
+- 需要拆分模块、移动大量文件、新增架构层或抽象、替换状态管理/数据访问/通信方式，或改变调用路径、调用顺序、事务与业务编排：归为 `refactor_assessment_required`。
+- 涉及权限、数据库执行、生产、安全策略或 Breaking API：归为 `blocked_out_of_boundary`。
+
+规范矫正只允许让本次新增代码恢复到项目已经存在的架构模式。禁止新增架构层、移动历史职责、改变调用路径、改变事务或业务编排顺序，也禁止因理想架构要求重构历史代码。

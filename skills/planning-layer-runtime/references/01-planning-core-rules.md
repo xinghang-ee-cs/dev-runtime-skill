@@ -24,7 +24,7 @@
 唯一项目级当前事实文件：
 
 ```text
-docs/项目治理/PROJECT-CURRENT-BASELINE.md
+<project_current_baseline_path>
 ```
 
 职责：
@@ -35,12 +35,36 @@ docs/项目治理/PROJECT-CURRENT-BASELINE.md
 
 规则：
 
-- `.plan/project-profile.yaml` 只保存 `project_name`、`project_type`、`project_current_baseline_path`。
+- `.runtime/planning-layer-runtime/project-profile.yaml` 只保存 `project_name`、`project_type`、`project_current_baseline_path`。
 - 生产当前状态只能由实际发布确认、发布 skill 或用户明确确认更新。
 - 已验收未发布不得写成生产已生效。
 - 00–13 的计划内容不得反向覆盖项目当前事实。
 - 14、15 后续填写的结果可更新当前交付状态，但框架生成本身不能自行把未发布内容标记为生产已生效。
 - 已有旧代码、旧接口、旧页面或上一期计划只能作为待核实来源，不得绕过业务规划结论。
+
+## 2.1 规划数据保存边界
+
+Planning 运行数据按职责只允许落在三个位置：
+
+| 位置 | 只允许保存 | 禁止保存 |
+| --- | --- | --- |
+| `skills/planning-layer-runtime/` | 静态规则、路由、格式规范、职责说明、行为规则与必要 agents 配置 | 运行实例、运行文件复制源、项目、用户、环境、期次、反馈、进度、真实 Event / Decision / Audit 数据 |
+| `<phase_planning_runtime_directory>/` | 当前交互状态与本期 Event / Decision / Audit 证据 | 跨期用户画像、跨期环境档案、正式业务事实的替代副本 |
+| 项目根目录 `.runtime/planning-layer-runtime/` | 跨期稳定的用户交互倾向、项目与开发环境、启动入口 | 期次需求、业务事实、完整聊天、一次性情绪、凭证、运行日志 |
+
+规则：
+
+- 期次级真实运行实例统一进入 `planning-runtime/`，不得再创建语义重复的 `feedback-runtime`、`confirmation-runtime`、`handoff-runtime`、`recovery-state` 或 `context-compression-runtime`。
+- Skill 中不得保存 `runtime-*`、用户画像、环境档案、当前交互、Event、Decision、Audit 或 Summary 的独立运行文件；运行时根据 `04-planning-format-spec.md` 的内联字段规范，直接在项目合法目录按需创建。
+- 正式业务事实只能进入对应 00–15 SoT；Runtime State、Event、Decision、Audit 和 Summary 均不得替代 SoT。
+- `.runtime/planning-layer-runtime/user-profile.yaml` 是用户长期交互倾向的唯一来源，只保存反复体现且具有长期价值的倾向。
+- `.runtime/planning-layer-runtime/environment-profile.yaml` 只保存后续 Planning 需要复用的稳定环境事实，例如操作系统、Shell、语言运行时、包管理器、常用工具、技术栈、稳定目录与启动方式、测试/预发布/生产的基本区分。
+- `.runtime/planning-layer-runtime/` 禁止保存 Token、密码、私钥、Cookie、主机账号、可识别个人的完整 Home 路径、内网 IP、机器序列号、完整敏感环境变量、生产密钥或可直接调用外部服务的配置。
+- 包含本地用户或电脑环境信息的 `.runtime/planning-layer-runtime` 文件默认视为项目本地启动上下文；写入前先检查现有忽略策略，没有明确版本管理要求时建议加入 `.gitignore`，不得未经判断改变项目已有策略。
+- `.runtime/planning-layer-runtime/` 和期次 `planning-runtime/` 默认按本地私有数据处理；Skill 打包、分享或上传不得携带这两个项目目录。
+- 未得到用户明确要求时，用户倾向、电脑环境和用户原始反馈不得进入公开仓库；项目已有团队共享策略优先，确需共享时只允许共享脱敏后的稳定项目信息。
+- `.runtime/planning-layer-runtime/user-profile.yaml` 同时承载长期交互习惯和规划协作偏好，禁止新增第二个长期偏好文件。
+- 项目运行文件按需创建：进入该期 Planning Document Mode 时创建 `current-interaction.yaml`；Event、Decision、Audit 和各类 Summary 只在对应事件、快照、审计或压缩需求真实发生时创建；无内容文件不得为了目录完整性创建。
 
 ## 3. 最高优先级规则
 
@@ -81,6 +105,45 @@ docs/项目治理/PROJECT-CURRENT-BASELINE.md
 - SoT 唯一：同一事实只能由一个文件定义
 - 状态流：必须定义来源、去向、非法迁移、回滚规则
 - 跨模块变更：必须定义影响文档、接口、状态、权限、测试、租户隔离、缓存、历史兼容
+
+## 3.2 Planning Trace ID Boundary
+
+以下 ID 及其包含的期次、阶段、版本或迭代标识，只用于 Planning 追踪：
+
+```text
+REQ FLOW SCN DOMAIN MODULE STATE API PERM ARCH CAP TASK TEST RISK DEP OPEN EXEC
+```
+
+允许用途：
+
+- 00–15 文档内部及文档之间的引用。
+- 14 执行记录与 15 验收记录关联。
+- Commit、PR、执行证据和变更说明中的追踪引用。
+
+这些 ID 不是业务名称，也不是技术命名规范。除非用户明确要求版本化实现，且 09 存在单独确认的架构决策，否则期次、Sprint、阶段、版本和 Planning ID 不得直接、缩写、翻译或变形进入长期实现命名。
+
+禁止进入：
+
+- 源码模块、目录、包、命名空间、类、函数、变量和 DTO。
+- 数据库表、字段、索引、约束、外键、枚举、ORM Model 和迁移目标名称。
+- API 物理路径、权限点、业务事件、消息 Topic、缓存 Key、配置键、环境变量、Feature Flag 和长期测试套件。
+- 任何会长期保留在项目中的实现资产。
+
+任何包含期次、阶段、Sprint、迭代或版本编号的标识都只能作为追踪上下文，不得推导代码或数据命名。Planning ID 可以出现在注释和证据中，但不得成为业务对象或技术组件的正式名称。
+
+### 数据域隔离与物理技术域
+
+```text
+业务数据域隔离
+!= 以期次编号新建数据库表
+!= 以期次编号新建代码模块
+!= 以期次编号新建 API
+!= 以期次编号新建权限体系
+```
+
+“新业务事实”“独立数据域”“重新开始”“旧数据不得进入新流程”默认只表示业务语义、数据来源、状态来源、权限与访问范围、新旧流程写入边界、生产/测试数据隔离，以及旧对象不得成为新流程生效来源。
+
+它们不自动表示必须新建物理表、独立模块、复制业务模型、API 命名空间或期次权限点。是否新增物理模型或模块，必须由执行前真实代码架构检查决定，并采用长期稳定的业务领域名称。
 
 ## 4. 高风险不确定项
 
@@ -397,7 +460,7 @@ Planning Runtime 最终输出（仅以下四项）：
 
 ```text
 1. Planning Context
-2. 正式 SoT 文档（docs/计划安排/<第X期>/00-xx.md）
+2. 正式 SoT 文档（<phase_planning_directory>/<formal-plan-document>.md）
 3. assembled_documents
 4. handoff_role_mapping
 ```

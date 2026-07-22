@@ -17,26 +17,20 @@
 
 - 不明显的 fallback 行为。
 - 保护真实 workflow 的边界条件。
-- 外部格式或持久化格式到内部 contract 的 mapping 逻辑。
+- 外部格式或持久化格式到内部契约的 mapping 逻辑。
 - concurrency、transaction、retry 或 cleanup 规则。
 - 有意保留的兼容行为。
 
-## Frontend 检查
+## 结构相关检查
 
-当 frontend 文件在范围内时执行：
+按项目真实存在的结构执行：
 
-- comment 应只在命名不足以说明 component/composable/store 行为时补充。
-- 除非属于产品 UX，不要新增可见的 in-app instructional text。
-- 如果项目已有 platform/browser/SDK adapter 层，相关注释应留在 adapter/platform 层，不散落到普通 UI 文件。
-
-## Backend 检查
-
-当 backend 文件在范围内时执行：
-
-- DTO validation 通常应通过 decorator 或 schema definition 自解释。
-- service comment 应解释业务规则或编排约束，而不是复述 controller route。
-- repository/provider comment 可以解释 mapping、transaction、migration 或 external IO 意图。
-- test 应优先通过名称和断言说明行为，不要依赖大量注释。
+- 用户界面或页面单元的注释只在命名和结构不足以说明交互意图时补充；除非属于产品 UX，不新增可见的 instructional text。
+- 输入校验通常应通过项目已有 schema、类型或声明自解释。
+- 业务编排注释解释规则或约束，不复述入口调用。
+- 数据访问和外部能力注释解释 mapping、transaction、migration 或 IO 意图。
+- 如果项目已有协议、平台或外部能力隔离边界，相关注释应留在对应边界，不散落到普通调用单元。
+- 测试优先通过名称和断言说明行为，不依赖大量注释。
 
 ## 文件头检查
 
@@ -44,6 +38,29 @@
 
 - 确认变更过的手写 source 文件符合本地文件头形态。
 - 新增修改记录必须来自可观察变更，不得写泛泛描述。
-- 不更新 generated output、build artifact、dependency folder、lockfile、binary asset 或 generated SDK/client 文件。
+- 不更新 generated output、build artifact、dependency folder、lockfile、binary asset 或 generated client 文件。
 
 如果项目没有标准文件头约定，文件头检查不适用。
+
+## 规范矫正安全边界
+
+本 Step 的问题统一使用 `../SKILL.md` 定义的六种分类。
+
+### 可安全矫正
+
+仅将下列问题归为 `safe_standard_correction`：
+
+- 与当前代码明确矛盾的局部注释。
+- 重复复述下一行代码的本次新增注释。
+- 本次修改后已经明确失效的局部注释。
+- 明确错别字或不涉及业务决策的局部说明。
+
+### 只能报告或路由
+
+- 历史业务解释是否仍正确无法确认，或删除可能丢失上下文：归为 `report_only_risk`。
+- 注释揭示了明确运行错误或契约冲突：代码问题归为 `confirmed_bug` 并转入 `confirmed_bugfix`，不得通过改注释掩盖错误。
+- 需要重新确认业务意图、兼容要求、事务、重试或异常规则：归为 `incremental_design_required`。
+- 注释暴露系统性职责或架构问题，需要移动职责或改变调用路径：归为 `refactor_assessment_required`。
+- 涉及安全策略、生产决策、数据库执行、权限或 Breaking API：归为 `blocked_out_of_boundary`。
+
+禁止全量清洗历史注释；禁止根据 AI 推测修改业务解释；禁止虚构作者、日期或决策历史；禁止删除无法确认是否仍有价值的兼容说明。

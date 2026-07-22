@@ -7,12 +7,16 @@
 执行需要：
 
 - preflight 已通过
+- Planning Handoff Intake Gate 已通过
+- `execution_constraints` 已从当前有效 Planning Handoff 读取
 - `task.md` 已生成
 - Runtime 上下文有效
 - execution_gate_open
 - task 状态有效
 - 拓扑约束有效
 - 验证证据定义有效
+- 当前 TASK 的 Implementation Placement Gate 与 Implementation Contract Completeness Intake 已通过
+- dependency_governance_passed_or_not_applicable
 - 涉及外部能力时，Capability Evidence Gate 已通过
 - 涉及 Platform Capability、SDK Capability、AI Capability、External Capability 时，Capability Binding Gate 已通过
 
@@ -21,6 +25,10 @@
 ```text
 select_next_executable_unit
 -> confirm_dependencies
+-> confirm_execution_constraints_current
+-> confirm_implementation_contract_complete
+-> confirm_implementation_placement
+-> confirm_dependency_governance_if_applicable
 -> confirm_capability_gate_if_applicable
 -> confirm_capability_binding_if_applicable
 -> confirm_ownership_boundary
@@ -39,17 +47,32 @@ Patch 分支：
 ```text
 if testing_feedback_patch_confirmed:
   enter_patch_runtime
+  -> confirm_patch_source
   -> confirm_patch_scope
   -> confirm_existing_runtime_valid
+  -> reload_current_planning_handoff
+  -> recheck_execution_constraints
+  -> confirm_patch_traceable_to_existing_SoT_or_confirmed_defect
   -> confirm_patch_does_not_require_full_replanning
+  -> run_Implementation_Placement_Gate
+  -> run_Implementation_Contract_Completeness_Intake
+  -> run_Dependency_Governance_Gate_if_applicable
+  -> run_Capability_Evidence_and_Binding_Gates_if_applicable
   -> generate_patch_task
   -> execute_patch_unit
-  -> validate_patch_unit
-  -> write_back_patch_runtime_state
+  -> run_patch_automated_validation
+  -> run_patch_execution_constraint_validation
+  -> main_agent_review
+  -> update_validation_results
   -> update_testing_handoff
+  -> update_checkpoint
   -> ready_for_local_retest
   -> STOP
 ```
+
+Patch Task 必须复用 `task-state-machine.md` 的完整 Static Task Definition，不得省略 Planning 追踪、稳定业务概念、execution constraints 来源、承接策略、现有业务域、新业务域依据、禁止命名、参数合同、明确委托参数或依赖变更字段。
+
+Patch 涉及依赖变化时必须重新执行 Dependency Governance Gate，不得沿用主 Runtime 的旧状态。
 
 Patch 停止条件：
 
@@ -59,7 +82,13 @@ patch_introduces_new_requirement_without_user_confirmation -> STOP
 patch_requires_SoT_change_without_writeback -> STOP
 patch_crosses_P0_without_boundary_confirmation -> STOP
 patch_validation_missing -> NOT_DONE
+patch_execution_constraint_validation_failed -> PATCH_NOT_DONE
+patch_execution_constraint_validation_failed -> CURRENT_PATCH_TASK_BLOCKED
+patch_contract_or_parameter_unconfirmed -> CURRENT_PATCH_TASK_BLOCKED
+patch_dependency_governance_blocked -> DO_NOT_INSTALL
 ```
+
+Patch 不得使用期次/阶段/Sprint/版本/Planning ID 命名实现资产，不得创建未规划业务模块、修改未确认 API/数据/权限/状态/租户边界、自行补业务参数、超出 `explicitly_delegated` 范围、绕过依赖治理、修改原始 SoT 或扩展未确认需求。
 
 ## 执行阶段
 
@@ -71,6 +100,21 @@ review
 writeback
 continue_or_stop
 ```
+
+## 偏差停止规则
+
+以下任一偏差立即执行：
+
+```text
+STOP_IMPLEMENTATION
+-> CURRENT_TASK_BLOCKED
+-> WRITE_BACK_UPSTREAM_FIRST
+-> WAIT_FOR_CONFIRMED_HANDOFF
+```
+
+适用于新增未规划模块、以期次或 Planning ID 命名实现资产、修改 API/权限/状态机/数据模型/租户边界/用户可见规则/关键参数、引入外部能力或正式业务域，以及改变验收口径。禁止记录偏差后继续开发。
+
+若上游正式计划更新，按 `context-lifecycle.md` 失效 Runtime Context、提升 `context_version`、使受影响 TASK 进入 `INVALIDATED`，重读 Handoff/SoT 后重新生成 Context 与 TASK。
 
 ## Worker/SubAgent 编排
 
@@ -142,6 +186,7 @@ context_pointer -> after_active_unit_change
 checkpoint_runtime -> after_long_stage_completed_or_before_stage_change
 formal_execution_record -> after_unit_result
 testing_handoff -> before_ready_for_local_test_or_ready_for_local_retest
+formal_acceptance_record -> read_and_reference_only
 ```
 
 ## Execution Completion Rule
@@ -153,26 +198,35 @@ testing_handoff -> before_ready_for_local_test_or_ready_for_local_retest
 - function_unit_tests_passed
 - business_unit_tests_passed
 - contract_validation_passed
+- execution_constraint_validation_passed
 - minimum_capability_validation_passed_or_blocked
 - automated_validation_recorded
 - long_testing_handoff_written
-- ready_for_local_test
-- no unresolved P0 validation issue
+- no_unresolved_P0_validation_issue
 
 则：
 
 ```text
-retrospective
+completion_boundary_passed
+-> retrospective
 -> execution_record_writeback
 -> testing_handoff_writeback
--> acceptance_placeholder_writeback
 -> runtime_checkpoint_writeback
 -> runtime_archive
 -> runtime_cleanup
 -> implementation_completed
 -> ready_for_local_test
+-> record ready_for_local_test_since
 -> runtime_closed
 -> STOP
+```
+
+`long_testing_handoff_written` 是 Completion Boundary 前置条件；`ready_for_local_test` 是 Completion Rule 的输出，不得反向作为完成前置条件。
+
+```text
+long_testing_handoff_written = false
+-> completion_boundary_not_passed
+-> do_not_produce ready_for_local_test
 ```
 
 `ready_for_local_test` 表示：
@@ -195,7 +249,8 @@ retrospective
 ```text
 runtime_cleanup
 =
-仅清理 Skill 内实例状态
+清理当前进程中的临时上下文
++ 清理当前期次 Runtime 目录中明确标记为可清理的临时项
 ```
 
 不得删除：
@@ -205,6 +260,8 @@ runtime_cleanup
 - 当前期次 Validation 记录
 - 当前期次 Decision 记录
 - 当前期次 Recovery 数据
+- current-runtime-context、checkpoint、project-execution-baseline、task、execution-events、validation-results、agent-decisions、Testing Handoff
+- 正式执行记录、P0/P1 决策及已填写的执行、验证或验收事实
 
 禁止：
 
@@ -243,3 +300,5 @@ long_execution_over_30_to_45_min
 - task.md 未生成或不可追溯到 Source of Truth 时不得执行 implementation。
 - 外部能力缺少 CAP-ID、官方 SoT、版本、鉴权、请求响应结构或最小真实调用验证时不得执行 implementation。
 - Platform Capability、SDK Capability、AI Capability、External Capability 缺少 runtime binding、adapter binding、sdk api binding 或 permission binding 时不得执行 implementation。
+- Long 不得创建或写入正式验收记录、验收占位文件、人工/服务器/最终验收结果或 release 判断。
+- dependency governance 为 `blocked` 或 `pending` 时，关闭当前任务 execution gate，不得安装或实现。

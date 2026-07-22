@@ -1,0 +1,22 @@
+{
+  "name": "dev-runtime-skill-docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro dev",
+    "start": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro dev",
+    "check": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro check",
+    "build": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro check && cross-env ASTRO_TELEMETRY_DISABLED=1 astro build",
+    "preview": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.3",
+    "astro": "^7.1.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "cross-env": "^10.1.0",
+    "typescript": "^6.0.3"
+  }
+}

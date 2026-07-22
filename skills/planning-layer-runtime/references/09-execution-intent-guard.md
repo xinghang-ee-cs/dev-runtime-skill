@@ -71,8 +71,8 @@ execution_intent → 禁止执行产物；仅进行自然语义转向
 - 需求、范围、风险、架构方案讨论
 - 数据模型、接口契约、权限模型的规划性描述
 - 专业 SoT 文档草案
-- `docs/计划安排` 下的正式规划文档
-- `.plan` 最小启动上下文
+- `<planning_root>` 下的正式规划文档
+- `.runtime/planning-layer-runtime` 最小启动上下文
 - `planning-runtime` 内必要的结构化事件记录
 - Handoff Package
 

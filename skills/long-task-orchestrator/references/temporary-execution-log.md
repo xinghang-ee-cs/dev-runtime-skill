@@ -5,7 +5,7 @@
 实例化位置：
 
 ```text
-docs/计划安排/<期次>/runtime/temporary-execution-log.md
+<phase_runtime_directory>/temporary-execution-log.md
 ```
 
 本文件不承担核心 Runtime State，仅用于短期、可清理的信息。

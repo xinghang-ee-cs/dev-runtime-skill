@@ -5,7 +5,7 @@
 实例化位置：
 
 ```text
-docs/计划安排/<期次>/runtime/checkpoint-runtime.md
+<phase_runtime_directory>/checkpoint-runtime.md
 ```
 
 禁止在本文件保存某一期项目恢复状态。
@@ -20,6 +20,12 @@ current_effective_phase:
 current_effective_status:
 active_patch_id:
 current_sot:
+planning_handoff_source:
+execution_constraints_status:
+implementation_contract_status:
+active_placement_decision:
+dependency_governance_status:
+project_execution_baseline_status:
 completed:
 pending:
 validation_state:
@@ -39,14 +45,24 @@ runtime_mode: <main | patch>
 current_effective_phase: <preflight.pending | execution.in_progress | validation.in_progress | retrospective.in_progress | runtime.closed | patch.in_progress | patch.validation | patch.ready_for_local_retest>
 current_effective_status: <current status>
 active_patch_id: <patch id or null>
+planning_handoff_source: <current valid Planning Handoff path>
+execution_constraints_status: <passed | failed | invalidated>
+implementation_contract_status: <passed | blocked | pending>
+active_placement_decision: <extend_existing_domain | reuse_shared_capability | create_stable_business_domain | null>
+dependency_governance_status: <passed | blocked | not_applicable | pending>
+project_execution_baseline_status: <current | stale | missing | invalidated>
 ```
+
+首次 Runtime Bootstrap 中，Baseline 实例写入前允许暂时为 `missing`；环境检查并写入实例后必须同步为 `current`，才能继续 Remaining Preflight Gates。只有已有 Runtime 恢复时的 `missing | stale | invalidated` 才触发 `STOP -> refresh_environment_baseline -> rerun Runtime Recovery Consistency Gate`。
 
 ---
 
 ## Current SoT
 
 - `<confirmed Development Landing Checklist path>`
+- `<current valid Planning Handoff path>`
 - `<confirmed Capability Governance path or not_applicable>`
+- `<Phase Runtime Directory/project-execution-baseline.md>`
 - `<Phase Runtime Directory/task.md>`
 
 ---
@@ -68,6 +84,7 @@ active_patch_id: <patch id or null>
 | item | status |
 | --- | --- |
 | source of truth | `<status>` |
+| project execution baseline | `<current | stale | missing | invalidated>` |
 | task runtime | `<status>` |
 | execution gate | `<status>` |
 
@@ -105,8 +122,14 @@ runtime_mode: main
 current_effective_phase: execution.in_progress
 current_effective_status: active
 active_patch_id: null
+planning_handoff_source: <planning_handoff_path>
+execution_constraints_status: passed
+implementation_contract_status: passed
+active_placement_decision: extend_existing_domain
+dependency_governance_status: not_applicable
+project_execution_baseline_status: current
 current_sot:
-  - docs/计划安排/<期次>/<Development Landing Checklist>.md
+  - <development_landing_checklist_path>
 completed:
   - <TASK-ID> implementation completed
 pending:

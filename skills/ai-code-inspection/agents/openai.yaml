@@ -1,3 +1,7 @@
-display_name: AI Code Inspection
-short_description: 日常前后端代码检查
-default_prompt: 使用本 Skill 检查已修改的前后端代码；先报告问题，只有开发者输入“继续”后才修复同一步问题；修复后执行验证，记录 runtime 状态，并保留 release/deploy 边界。
+interface:
+  display_name: "AI Code Inspection"
+  short_description: "通用前后端代码检查、全量只读审计与受控规范矫正流程"
+  default_prompt: "使用 $ai-code-inspection 依据项目环境档案和按需技术栈 Profile 选择 11 种模式之一：前 10 种单次完成，第 11 种交互执行完整七步；不要承担发布、生产门禁、严格安全验收或大规模重构。"
+
+policy:
+  allow_implicit_invocation: true
