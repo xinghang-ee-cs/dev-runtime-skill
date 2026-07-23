@@ -33,7 +33,7 @@ git diff --cached --name-status
 
 ## 验证摘要
 
-使用 `../project-environment-profile.md` 中的命令。
+使用项目根目录 `.runtime/ai-code-inspection/project-environment-profile.md` 中的命令。
 
 typed source 或公共契约变化时，优先使用可用的 broad verify 命令。范围较窄时，运行环境档案中与相关组件匹配的 build、test、lint、typecheck、schema 或 contract validation 命令。
 
@@ -102,6 +102,6 @@ schema/migration 发生变化但当前 runtime 数据库应用未确认时，不
 - 需要拆分职责、移动模块或改变技术路径：归为 `refactor_assessment_required`。
 - 越过授权、数据库、权限、生产、发布、安全策略或 Breaking API 边界：归为 `blocked_out_of_boundary`。
 
-发现越界修改时立即停止，标记 `validation_failed` 或 `blocked_out_of_boundary`，报告实际 diff；不得自行删除、回滚或扩大权限。
+发现越界修改时立即停止，按 `../SKILL.md` 的统一分类记录为 `blocked_out_of_boundary`，并在验证结果中记录失败和实际 diff；不得自行删除、回滚或扩大权限。
 
 继续禁止未经授权执行 stage、commit、push、merge、reset、checkout、stash、deploy、release 或数据库迁移。

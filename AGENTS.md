@@ -17,7 +17,7 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 
 | Skill | 主要用途 | 典型触发语句 | 是否允许修改文件 | 是否需要项目初始化 | 依赖档案或 reference | 不适用场景 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ai-code-inspection` | 通用代码检查、诊断、只读审计、已确认 Bug 最小修复和受控规范矫正 | “检查当前 Git 变更”“做全量只读审计”“修复这个已确认 Bug”“按规范矫正这些文件” | 依模式决定；多数检查只读，已确认 Bug 和已授权规范问题才可在精确范围修改 | 是；首次使用先初始化 `project-environment-profile.md` | 环境档案、`inspection-runtime-state.md`、Step references、按需 Profiles | 发布、生产门禁、严格安全验收、大规模重构 |
+| `ai-code-inspection` | 按 10 种真实工作场景路由通用代码检查、诊断、只读审计、已确认 Bug/紧急补丁闭环和受控规范矫正 | “检查当前 Git 变更”“定位这个报错”“核查需求是否实现完整”“修复这个已确认 Bug”“检查 PR 合并准备”“按规范矫正这些文件” | 依场景决定；场景 1–9 单次完成，只有场景 10 交互执行七步；代码与真实数据库权限独立 | 是；首次使用从模板初始化项目级 `.runtime/ai-code-inspection/` | 项目级环境档案和 Runtime、Step references、按需 Profiles | 上线发布、生产门禁、严格安全验收、无准入的猜测修复或大规模重构 |
 | `planning-layer-runtime` | 实现前的业务发现、Planning Context、正式规划文档和 planning handoff | “先做开发规划”“创建这一期规划文档”“梳理需求和验收边界” | 仅允许其定义的项目级规划启动上下文、正式规划文档与 planning runtime；不改生产代码 | 是；按需建立最小 `.runtime/planning-layer-runtime/`，并绑定目标项目已有的正式规划目录与当前事实基线路径 | `references/00`–`10`、`.runtime/planning-layer-runtime/`、项目当前基线和正式规划目录 | 直接实现、测试执行、发布或生产操作 |
 | `long-task-orchestrator` | 根据已确认 handoff 执行至少 4 个实现单元的完整功能，并交付到 `ready_for_local_test`；也处理已确认缺陷 patch | “按已确认计划完成这个模块”“继续长任务实现并写自动化测试”“修复 testing 已确认缺陷” | 通过 Source of Truth 与 Runtime Gate 后可修改实现、测试和其 Runtime 资产 | 是；必须确认 handoff、通过 preflight 并创建/恢复 Phase Runtime Directory | Runtime kernel references、planning handoff、Phase Runtime Directory | 小于 4 个实现单元、缺少已确认 SoT、人工验收、云端验证、上线放行 |
 | `testing-layer-runtime` | 继承 long 自动化结果并管理人工、真实设备、服务器、外部能力和最终验收，输出 release handoff | “开始这一期人工测试”“继承 long handoff 做验收”“整理服务器验证和上线移交” | 只写其 `testing-runtime/` 输出；不改业务产物或 planning SoT | 是；必须定位测试期次、读取 long handoff 和测试范围 | 项目环境事实源、long testing handoff、测试方案、`references/01`–`05` | 开发实现、重跑已有通过自动化、定义新需求、直接发布或安全门禁 |
@@ -35,8 +35,8 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 ## 3. 安装到外部项目
 
 1. 复制所需 Skill 的完整目录并保持内部相对路径不变。
-2. 同时复制 `SKILL.md`、`agents/` 元数据、references、Profiles、模板和必要 Runtime 文件；不要只复制单个 `SKILL.md`。
-3. 不复制其他项目已经填写的环境事实或运行状态。包含项目环境档案时，将其恢复为 Skill 提供的 `uninitialized` 模板；Runtime 文件恢复为空闲初始模板。
+2. 同时复制 `SKILL.md`、`agents/` 元数据、references、Profiles、模板和必要 Runtime bootstrap 资产；不要只复制单个 `SKILL.md`。
+3. 不复制其他项目已经填写的环境事实或运行状态。`ai-code-inspection` 安装包中的 `assets/runtime-templates/` 只作为初始化源；首次使用时在目标项目根目录创建 `.runtime/ai-code-inspection/`，环境档案从 `uninitialized` 模板开始，运行状态从空闲模板开始。
 4. 目标项目已有 `AGENTS.md` 时合并适用规则，不得直接覆盖。
 5. 根据目标 Agent 平台和项目约定选择项目级 Skill 目录。可能的目录例如但不限于 `.skills/`、`.agents/skills/`、`.claude/skills/`、`.codex/skills/`。
 6. 实际路径由所使用的 Agent 平台和项目约定决定；不得把任一示例目录视为唯一安装方式。
@@ -110,7 +110,7 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 
 - 环境档案是稳定事实索引，不得覆盖更新、更直接的真实仓库事实；发现冲突时按选中 Skill 的规则纠正档案并报告。
 - reference 不得覆盖 `SKILL.md` 的权限和 Runtime 治理。
-- 技术栈 Profile 不得重新定义模式、范围、授权、问题分类或生命周期。
+- 技术栈 Profile 不得重新定义场景、范围、授权、问题分类或生命周期。
 - 项目代码与正式契约冲突时，按选中 Skill 定义的事实优先级取证；没有明确依据时不得自行猜测。
 
 ## 8. 安全与修改原则

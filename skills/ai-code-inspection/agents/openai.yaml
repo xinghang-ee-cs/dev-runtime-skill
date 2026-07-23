@@ -1,7 +1,7 @@
 interface:
   display_name: "AI Code Inspection"
-  short_description: "通用前后端代码检查、全量只读审计与受控规范矫正流程"
-  default_prompt: "使用 $ai-code-inspection 依据项目环境档案和按需技术栈 Profile 选择 11 种模式之一：前 10 种单次完成，第 11 种交互执行完整七步；不要承担发布、生产门禁、严格安全验收或大规模重构。"
+  short_description: "按十种真实工作场景路由代码检查、根因诊断、审计与受控修复"
+  default_prompt: "使用 $ai-code-inspection 根据当前工作阶段选择十种场景之一，按项目环境档案和技术栈 Profile 完成代码检查、诊断或受控修复；只有规范治理交互执行 Step 1–7。"
 
 policy:
   allow_implicit_invocation: true

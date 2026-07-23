@@ -13,7 +13,7 @@ Only the selected directories under `skills/` are installable Skill packages. `A
 | [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | Discover requirements and produce an approved planning handoff before implementation. | Does not write production code or execute tests. |
 | [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | Implement an approved feature with at least four implementation units, run automation, and hand off at `ready_for_local_test`. | Does not perform manual acceptance or release approval. |
 | [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | Reuse long-task automation evidence and manage manual, device, server, external-capability, and final acceptance testing. | Does not change business code or approve production release. |
-| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | Review changes, diagnose issues, run a full read-only audit, apply a confirmed minimal bug fix, or perform controlled standards correction. | The first ten modes are single-run; only standards correction uses the interactive seven-step flow. It is not a release or security gate. |
+| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | Route reviews, diagnosis, confirmed fixes, completeness checks, audits, refactor assessments, merge checks, hotfixes, and standards governance by ten real work scenarios. | Scenarios 1–9 are single-run; only standards governance uses the interactive seven-step flow. Project state lives under `.runtime/ai-code-inspection/`. It is not a release or security gate. |
 
 The normal delivery chain is:
 
@@ -26,7 +26,7 @@ planning-layer-runtime
   -> the target project's release/security process
 ```
 
-`ai-code-inspection` is independent and can be used whenever a focused review, diagnosis, audit, or confirmed bug fix is needed.
+`ai-code-inspection` is independent and can be used for focused review, diagnosis, confirmed repair, requirement-completeness review, audit, refactor assessment, merge readiness, hotfix closure, or standards governance.
 
 ## Install in an Agent project
 

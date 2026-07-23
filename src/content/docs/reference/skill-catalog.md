@@ -25,9 +25,10 @@ description: 四个 Runtime Skill 的用途、入口和规则源文件。
 
 ## ai-code-inspection
 
-- 用途：已修改前后端代码的日常检查和提交准备。
+- 用途：按 10 种真实工作场景处理改动检查、根因诊断、确认修复与内部回归、需求完整性、业务规则、全项目审计、重构评估、合并准备、hotfix 和规范治理。
 - 入口：[`skills/ai-code-inspection/SKILL.md`](https://github.com/xinghang-ee-cs/dev-runtime-skill/blob/main/skills/ai-code-inspection/SKILL.md)
-- 不负责：发布就绪检查、生产门禁和企业级安全验收。
+- 运行态：首次使用时从 Skill 模板初始化到项目根目录 `.runtime/ai-code-inspection/`。
+- 不负责：上线发布、生产门禁、企业级安全验收、无准入的猜测修复或大规模重构。
 
 :::caution[规则优先级]
 教程与 Skill 源文件不一致时，以当前版本的 `SKILL.md` 和它路由的 references 为准，并修订教程。

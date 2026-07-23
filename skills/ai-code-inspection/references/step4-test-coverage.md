@@ -4,7 +4,7 @@
 
 ## 测试发现
 
-先读取 `../project-environment-profile.md`，再检查项目 manifest、脚本和测试配置，最后选择命令。
+先读取项目根目录 `.runtime/ai-code-inspection/project-environment-profile.md`，再检查项目 manifest、脚本和测试配置，最后选择命令。
 
 项目使用什么测试框架，就优先使用该框架和已有项目命令；不要优先拼装 ad hoc runner 命令。
 

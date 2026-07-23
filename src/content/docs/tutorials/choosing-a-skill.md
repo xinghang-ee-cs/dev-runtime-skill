@@ -14,7 +14,7 @@ sidebar:
 | 需求、范围或验收方式还没有确认 | `planning-layer-runtime` | 只规划，不产生执行层产物 |
 | 已有确认的规划交接，并且包含至少 4 个实现单元 | `long-task-orchestrator` | 实现和自动化验证截止到 `ready_for_local_test` |
 | 已有 long 测试交接，需要人工或真实环境验证 | `testing-layer-runtime` | 默认继承已通过的自动化证据，不修改业务代码 |
-| 需要检查当前代码改动 | `ai-code-inspection` | 先报告问题，获得新的 `继续` 后才修复当前 Step |
+| 需要检查、诊断、审计或受控修复代码 | `ai-code-inspection` | 按 10 种工作场景路由；场景 1–9 单次完成，只有规范治理交互执行七步 |
 
 ## 三个常见误区
 
@@ -28,7 +28,7 @@ sidebar:
 
 ### 用代码检查代替发布门禁
 
-`ai-code-inspection` 适合高频日常检查，不承担生产上线、安全验收或企业级 release gate。
+`ai-code-inspection` 适合高频日常检查、根因诊断、确认修复、完整性核查、审计、重构评估、合并检查、hotfix 和规范治理，不承担生产上线、安全验收或企业级 release gate。
 
 ## 示例
 

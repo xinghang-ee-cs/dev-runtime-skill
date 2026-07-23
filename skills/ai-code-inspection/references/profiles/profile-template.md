@@ -35,4 +35,4 @@ applies_to_steps: []
 
 说明如何跳过本 Profile，同时继续执行通用 Step。
 
-本模板不得增加模式、范围、修改授权、`继续` gate、Runtime 状态或问题分类。
+本模板不得增加用户场景、范围、修改授权、`继续` gate、Runtime 状态或问题分类。

@@ -13,7 +13,7 @@
 | [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | 开发前梳理需求并产出已确认的规划交接。 | 不写生产代码，不执行测试。 |
 | [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | 根据已确认规划实现至少 4 个实现单元，执行自动化验证，并交接到 `ready_for_local_test`。 | 不负责人工验收和上线批准。 |
 | [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | 继承 long 的自动化证据，管理人工、设备、服务器、外部能力和最终验收。 | 不修改业务代码，不批准生产上线。 |
-| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | 检查改动、专项诊断、全量只读审计、已确认 Bug 最小修复和受控规范矫正。 | 前 10 种模式单次完成；只有规范矫正使用交互式七步。它不是发布或安全门禁。 |
+| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | 按 10 种真实工作场景路由改动检查、根因诊断、确认修复、完整性核查、审计、重构评估、合并检查、hotfix 和规范治理。 | 场景 1–9 单次完成；只有规范治理使用交互式七步。项目运行态位于 `.runtime/ai-code-inspection/`。它不是发布或安全门禁。 |
 
 正常开发链路：
 
@@ -26,7 +26,7 @@ planning-layer-runtime
   -> 目标项目自己的发布/安全流程
 ```
 
-`ai-code-inspection` 是独立流程，需要代码检查、诊断、审计或已确认 Bug 修复时可单独使用。
+`ai-code-inspection` 是独立流程，可单独用于代码检查、根因诊断、确认修复、需求完整性核查、审计、重构评估、合并准备、hotfix 或规范治理。
 
 ## 部署到 Agent 项目
 

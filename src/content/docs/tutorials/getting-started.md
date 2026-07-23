@@ -16,6 +16,8 @@ sidebar:
 ```text
 your-project/
   AGENTS.md
+  .runtime/
+    ai-code-inspection/        # 首次使用时按需初始化，不从其他项目复制
   skills/
     ai-code-inspection/
     planning-layer-runtime/
@@ -38,7 +40,7 @@ your-project/
 
 ## 3. 让首次运行发现项目事实
 
-第一次运行 `ai-code-inspection` 时，如果环境档案仍为空模板，Codex 应先检查目标仓库的真实框架、包管理器、脚本、数据库和 CI 配置，再填写稳定事实。
+第一次运行 `ai-code-inspection` 时，Codex 从 `skills/ai-code-inspection/assets/runtime-templates/` 初始化项目根目录 `.runtime/ai-code-inspection/`，再检查目标仓库的真实组件、语言、框架、包管理器、脚本、持久化、契约和 CI 配置，填写稳定环境事实。
 
 只有无法从仓库可靠判断的信息才需要询问。不要从另一个项目复制环境结论。
 
@@ -49,6 +51,8 @@ your-project/
 ```text
 AGENTS.md
 skills/ai-code-inspection/SKILL.md
+skills/ai-code-inspection/assets/runtime-templates/project-environment-profile.md
+skills/ai-code-inspection/assets/runtime-templates/inspection-runtime-state.md
 skills/planning-layer-runtime/SKILL.md
 skills/long-task-orchestrator/SKILL.md
 skills/testing-layer-runtime/SKILL.md

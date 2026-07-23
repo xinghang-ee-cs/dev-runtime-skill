@@ -4,7 +4,7 @@
 
 ## 输入
 
-- `../project-environment-profile.md`
+- 项目根目录 `.runtime/ai-code-inspection/project-environment-profile.md`
 - 已声明的检查边界。
 - 变更文件或范围内文件。
 - 所属目录中相邻的现有文件。
@@ -20,7 +20,7 @@
 
 ## 项目既有结构检查
 
-按 `project-environment-profile.md` 中当前范围涉及的组件执行：
+按项目级 `project-environment-profile.md` 中当前范围涉及的组件执行：
 
 - 用户界面单元、页面单元、路由或入口处理器应遵循所属目录和框架已有命名方式。
 - 请求传输边界、应用服务或 use case、数据访问边界、外部能力 adapter 等对象只有在项目真实存在时才检查其命名和放置；不得为套用本 Skill 要求项目新增这些层。
