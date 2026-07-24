@@ -6,27 +6,33 @@
 
 只有 `skills/` 下被选中的目录属于可安装 Skill 包；`AGENTS.md` 是可复用的项目入口模板。`src/`、`public/`、`package*.json`、`astro.config.mjs`、`tsconfig.json` 和文档部署 workflow 只用于构建本仓库的 Astro/Starlight 文档站，不能复制到目标项目。
 
-## 四个 Skill
+## 五个 Skill
 
 | Skill | 适用任务 | 边界 |
 | --- | --- | --- |
+| [`dev-runtime`](skills/dev-runtime/SKILL.md) | 为完整或模糊开发请求动态发现并路由已安装的 Runtime Skill；先进入规划，并保留各阶段当前的进入和交接门禁。 | 不替代阶段治理，不处理单一阶段请求，不假设固定 Skill 目录，也不批准发布；少于 4 个实现单元时使用普通 Agent 分支，不强行进入 long。 |
 | [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | 开发前梳理需求并产出已确认的规划交接。 | 不写生产代码，不执行测试。 |
 | [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | 根据已确认规划实现至少 4 个实现单元，执行自动化验证，并交接到 `ready_for_local_test`。 | 不负责人工验收和上线批准。 |
 | [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | 继承 long 的自动化证据，管理人工、设备、服务器、外部能力和最终验收。 | 不修改业务代码，不批准生产上线。 |
 | [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | 按 10 种真实工作场景路由改动检查、根因诊断、确认修复、完整性核查、审计、重构评估、合并检查、hotfix 和规范治理。 | 场景 1–9 单次完成；只有规范治理使用交互式七步。项目运行态位于 `.runtime/ai-code-inspection/`。它不是发布或安全门禁。 |
 
-正常开发链路：
+完整请求由 `dev-runtime` 动态发现已安装 Skill，并按以下链路分流：
 
 ```text
-planning-layer-runtime
+dev-runtime
+  -> planning-layer-runtime
   -> 已确认规划交接
-  -> long-task-orchestrator
-  -> ready_for_local_test
-  -> testing-layer-runtime
+  -> planning_only：规划完成后停止
+  -> execution_ready 且少于 4 个实现单元：普通 Agent 实现并执行项目验证
+  -> execution_ready 且至少 4 个实现单元：
+     long-task-orchestrator
+     -> ready_for_local_test
+     -> testing-layer-runtime
+  -> 按实际请求选择可选的 ai-code-inspection 场景
   -> 目标项目自己的发布/安全流程
 ```
 
-`ai-code-inspection` 是独立流程，可单独用于代码检查、根因诊断、确认修复、需求完整性核查、审计、重构评估、合并准备、hotfix 或规范治理。
+`ai-code-inspection` 是独立流程，可单独用于代码检查、根因诊断、确认修复、需求完整性核查、审计、重构评估、合并准备、hotfix 或规范治理。场景 1–9 使用 `single_run`；只有 `standards_compliance_correction` 使用交互式七步。
 
 ## 部署到 Agent 项目
 
@@ -48,17 +54,21 @@ your-project/
 ├── CLAUDE.md                   # 仅 Claude Code 需要
 ├── .agents/skills/             # Codex + GitHub Copilot
 │   ├── ai-code-inspection/
+│   ├── dev-runtime/
 │   ├── planning-layer-runtime/
 │   ├── long-task-orchestrator/
 │   └── testing-layer-runtime/
 └── .claude/skills/             # Claude Code
     ├── ai-code-inspection/
+    ├── dev-runtime/
     ├── planning-layer-runtime/
     ├── long-task-orchestrator/
     └── testing-layer-runtime/
 ```
 
 Agent 只安装所选平台需要的目录。目标项目已有 `AGENTS.md` 或 `CLAUDE.md` 时，由 Agent 合并指令而不是覆盖；只安装部分 Skill 时，由 Agent 从安装后的 `AGENTS.md` 清单中移除未安装项。
+
+使用完整生命周期时，需要同时安装 `dev-runtime` 和它动态发现的四个阶段 Skill。某个阶段 Skill 未安装时，`dev-runtime` 必须报告缺失依赖，不猜测路径，也不假装该阶段已经执行。
 
 Claude Code 不会直接读取 `AGENTS.md`，因此 Agent 会创建或合并这个最小项目文件：
 
@@ -97,6 +107,8 @@ AI 初始化只包括：定位指定目标、安装选中的 Skill 包、合并 
 可以直接使用自然语言；支持显式调用的平台也可以直接点名 Skill。Codex 可通过 `/skills` 或 `$skill-name` 调用，Claude Code 使用 `/skill-name`，Copilot 根据请求和 Skill 描述自动选择。
 
 ```text
+使用 dev-runtime，让这个完整开发请求通过已安装的 Runtime Skill 按门禁推进。
+
 使用 planning-layer-runtime 规划这个功能，暂时不要实现。
 
 使用 long-task-orchestrator 执行已经确认的规划交接。

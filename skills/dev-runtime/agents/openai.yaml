@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Runtime"
+  short_description: "Route complete development through installed Runtime Skills."
+  default_prompt: "Use $dev-runtime to discover the installed Runtime Skills, plan this request, and route each eligible stage without bypassing its current handoff gates."
