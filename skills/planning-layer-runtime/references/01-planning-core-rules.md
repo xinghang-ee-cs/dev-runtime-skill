@@ -32,6 +32,7 @@
 - 记录项目现在真实处于什么状态。
 - 区分生产当前状态、已开发但未发布状态、计划中的目标状态。
 - 记录旧入口、旧对象、旧状态、旧审批或旧流程的当前处理边界。
+- 记录当前前端体验基线及其权威来源，包括布局、导航、通用组件、表单/列表/表格/弹窗/抽屉、空/错/加载/禁用/反馈、移动端与桌面端适配、允许模式、已废弃模式和已知不一致问题。
 
 规则：
 
@@ -41,6 +42,21 @@
 - 00–13 的计划内容不得反向覆盖项目当前事实。
 - 14、15 后续填写的结果可更新当前交付状态，但框架生成本身不能自行把未发布内容标记为生产已生效。
 - 已有旧代码、旧接口、旧页面或上一期计划只能作为待核实来源，不得绕过业务规划结论。
+- 当前前端体验基线只记录已经真实生效的体验事实和权威来源，不复制完整 CSS、Token、组件代码或设计资产；禁止新建第二份项目级设计基线文件。
+- 实际发布后，才允许依据 15 的发布事实更新生产当前状态与当前前端体验事实；已验收未发布仍只属于交付状态。
+- 一期关闭后，该期 00–15 进入历史只读；只允许受控修正事实错误，独立新增需求默认从最新 `PROJECT-CURRENT-BASELINE.md` 启动下一期。
+
+一期必须保持以下事实链，不得用最新完整文档覆盖历史执行事实：
+
+```text
+当前项目事实
+-> 本期规划基线
+-> Planning Execution Baseline
+-> Change Set（仅冻结后发生变更时）
+-> 执行事实
+-> 验收事实
+-> 实际发布后的新项目基线
+```
 
 ## 2.1 规划数据保存边界
 
@@ -65,6 +81,10 @@ Planning 运行数据按职责只允许落在三个位置：
 - 未得到用户明确要求时，用户倾向、电脑环境和用户原始反馈不得进入公开仓库；项目已有团队共享策略优先，确需共享时只允许共享脱敏后的稳定项目信息。
 - `.runtime/planning-layer-runtime/user-profile.yaml` 同时承载长期交互习惯和规划协作偏好，禁止新增第二个长期偏好文件。
 - 项目运行文件按需创建：进入该期 Planning Document Mode 时创建 `current-interaction.yaml`；Event、Decision、Audit 和各类 Summary 只在对应事件、快照、审计或压缩需求真实发生时创建；无内容文件不得为了目录完整性创建。
+- `13-开发任务合同与落地清单.md` 是 Planning Execution Baseline 完整正文的唯一承载；首次 13 只读取已确认且适用的 01–12，确认后才在 13 中追加冻结基线区块。
+- 完整 Change Set 历史只作为追加式 Decision Snapshot 写入既有 `planning-runtime/decision-log.md`；它是范围准入与增量选择的 Runtime 证据，不是业务 SoT，不得复制完整 00–15 正文。
+- `current-interaction.yaml` 只保存 Planning Execution Baseline revision、当前 active Change revision、状态与 `decision_ref` 的最小恢复引用，不保存完整 Baseline、Change Set、TASK 或执行事实。
+- 14、15 和 Handoff 只引用 Planning Execution Baseline revision、active Change Set revision 与必要 TASK contract revision，不重复定义其正文。
 
 ## 3. 最高优先级规则
 
@@ -226,6 +246,13 @@ Project Current Baseline
 -> 测试方案
 -> 风险依赖
 -> 开发任务
+-> Planning Execution Baseline
+-> 14/15 Framework
+-> Handoff
+-> 执行与测试事实
+-> 验收与发布事实
+-> Project Current Baseline 更新
+-> 本期关闭
 ```
 
 03/04/05 相关规划链路固定为：
@@ -245,6 +272,9 @@ Project Current Baseline
 - 代码实现不能反向定义需求。
 - 验收结果不能替代测试方案。
 - 执行记录不能替代任务清单。
+- Planning Execution Baseline 冻结后，Change Set 只能增量修订受影响合同，不得覆盖既有执行事实。
+- 14、15 中已经由后续阶段填写的事实不得被 Planning 删除、覆盖、重置或重新绑定。
+- 未受影响但尚未开始、仍属于原执行基线的 active TASK 必须继续承接，不得因为产生 Change Set 或替换旧 Handoff 而从执行队列丢失。
 
 ## 6.2 03/04/05 事实归属与上游写回
 

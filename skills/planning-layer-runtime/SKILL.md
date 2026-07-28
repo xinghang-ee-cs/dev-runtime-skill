@@ -1,6 +1,6 @@
 ---
 name: planning-layer-runtime
-description: 交互式规划层运行时。用于实现前加载项目级规划启动上下文、开展规划访谈、创建 Planning Context，或创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，覆盖需求、范围、数据模型、权限模型、UI、架构、外部能力选型、测试设计、风险、优先级和验收边界。它可以定义测试与验收方案中按什么业务顺序证明什么、自动化等级和真实环境要求，但不能定义测试代码、命令、执行状态或实际测试结果。
+description: 交互式规划层运行时。用于读取目标项目当前基线、开展规划访谈、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
 ---
 
 # 规划层运行时（Planning Layer Runtime）
@@ -14,14 +14,14 @@ description: 交互式规划层运行时。用于实现前加载项目级规划�
 只读取当前任务需要的文件：
 
 - `references/00-planning-user-discovery.md`：用户发现访谈、业务事实发现、专业词翻译和 Discovery Sufficiency Gate。
-- `references/01-planning-core-rules.md`：规划层核心约束、Planning 追踪 ID 与实现命名隔离、数据域语义边界、项目级/期次级/Skill 静态数据边界。
-- `references/02-planning-change-levels.md`：内部变更影响范围评估与影响分析。
+- `references/01-planning-core-rules.md`：规划层核心约束、完整一期事实链、Planning Execution Baseline 与 Change Set 唯一承载边界、项目当前基线与前端体验事实、期次关闭、Planning 追踪 ID 与实现命名隔离。
+- `references/02-planning-change-levels.md`：变更影响分级、期内范围扩展准入、多 Change Set 生命周期、冻结基线后的增量执行选择与 carried-forward pending 任务保护。
 - `references/03-planning-doc-responsibility.md`：文档清单、职责、上游 SoT、下游输出和禁止内容。
 - `references/04-planning-format-spec.md`：AI Runtime 文件位置、ARCH 实现承接策略、TASK 命名与实现参数状态、`current-interaction.yaml`、ID、引用和验收结构。
 - `references/05-planning-priority-system.md`：规划优先级、严重性、发布阻塞与下游验证门禁语义。
 - `references/06-planning-capability-governance.md`：外部能力、SDK、OpenAPI、MCP、AI 提供方、官方 SoT、证据门禁与 Runtime 门禁治理。
-- `references/07-planning-conversation-runtime.md`：Planning Conversation 行为运行层；维护 Planning 完成链路、Implementation Naming / Contract Completeness Gate、Handoff 约束和对话生命周期。
-- `references/08-planning-recovery-runtime.md`：上下文压缩与中断恢复、Runtime Recovery、失效传播、恢复门禁、Runtime Audit 日志与用户隔离。
+- `references/07-planning-conversation-runtime.md`：Planning Conversation 行为运行层；维护完整一期生命周期、三个变更门禁编排、Planning Execution Baseline 冻结、Implementation Naming / Contract Completeness Gate、增量 Handoff 完整性、前端体验绑定和期次关闭。
+- `references/08-planning-recovery-runtime.md`：上下文压缩与中断恢复、Change Triage 后的精确 Planning Recovery、失效传播、恢复门禁、Runtime Audit 日志与用户隔离。
 - `references/09-execution-intent-guard.md`：Execution Boundary Kernel。所有输入的 execution intent 判定、阻断结果和语义转向规则的唯一事实来源。
 - `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、逐文档交互、13 开发前准备总结、最终人话总结确认和状态回写规则。
 
@@ -160,9 +160,13 @@ Execution Boundary Kernel（09）
 -> 实际装配文档生成并确认
 
 requires_execution_handoff: true
-  -> 13 通过 Task Contract、Implementation Naming、Implementation Contract Completeness 三个 Gate
-  -> 13 确认
-  -> 14/15 派生
+  -> 13 通过 Task Contract Gate
+  -> 13 通过 Implementation Naming Gate
+  -> 13 通过 Implementation Contract Completeness Gate
+  -> 用户确认 13
+  -> 在 13 中冻结 Planning Execution Baseline
+  -> 自动派生 14/15 框架
+  -> Execution and Acceptance Framework Derivation Gate
 
 requires_execution_handoff: false
   -> 不生成 13/14/15
@@ -170,7 +174,13 @@ requires_execution_handoff: false
 -> 汇总实际 assembled_documents
 -> 基于真实路径生成 handoff_role_mapping
 -> 校验 Handoff 分支与 Planning Context 一致
--> 根据分支准备 execution_ready 或 planning_only Handoff
+
+requires_execution_handoff: true
+  -> 准备 execution_ready Handoff
+
+requires_execution_handoff: false
+  -> 准备 planning_only Handoff
+
 -> planning_status: awaiting_final_summary_confirmation
 -> 持久化 final_summary_confirmation 交互目标（10）
 -> 本期最终人话总结（10）
@@ -178,6 +188,14 @@ requires_execution_handoff: false
 -> Interaction Preference Consolidation
 -> Planning Handoff Complete
 -> PLANNING_COMPLETE
+
+-> 后续执行 / 测试 / 验收发现问题时先做 Execution/Test Change Triage Gate（07）
+-> 仅 planning_gap、requirement_change 或真正改变设计合同的 design_drift 进入 Planning Recovery（08）
+-> 冻结基线后只通过 Change Set 修订受影响 SoT、TEST、TASK、14/15 空白框架与 Handoff
+-> 未受影响和已完成事实保持不变
+-> 实际验收与发布由后续承接方填写
+-> 实际发布确认后才更新 PROJECT-CURRENT-BASELINE
+-> 更新当前前端体验事实并关闭本期；关闭后的 00–15 历史只读
 ```
 
 进入 Planning Document Mode 的最低条件：
@@ -199,6 +217,10 @@ Planning Document Mode 的逐文档生成前确认、生成后解释、用户确
 - 使用 `references/02-planning-change-levels.md`，由 Planning Runtime 内部评估变更影响范围，用于决定 Planning Conversation 的探索深度。
 - 涉及外部能力、SDK、OpenAPI、MCP、AI 提供方、基础设施依赖或人工能力时，按 `references/06-planning-capability-governance.md` 执行。
 - 实际装配 13 时，13 按 `references/10-planning-document-interaction-runtime.md` 完成确认后，14 和 15 作为执行记录框架与验收框架自动派生；它们只预置待填写事实位置，不填写任何实际执行、验证、验收、真实环境或发布结论。
+- 13 首次确认后冻结 `planning_execution_baseline`；Handoff 已生成、14/15 已派生或任一 TASK 已开始时同样视为已经冻结。冻结后的变更只能按 `references/02-planning-change-levels.md` 形成 Change Set，不得静默覆盖既有规划基线。
+- Planning Execution Baseline 完整正文只由 13 承载；Change Set 完整历史只以 Decision Snapshot 追加到本期既有 `planning-runtime/decision-log.md`。`current-interaction.yaml`、14、15 和 Handoff 只保存或引用必要 revision。
+- 执行、测试或验收发现的问题必须先按 `references/07-planning-conversation-runtime.md` 分类；只有需要规划回流的分类才调用 `references/08-planning-recovery-runtime.md`。
+- 增量修订只重建 Recovery Output 和 Change Set 明确列出的受影响文档、TEST、TASK 与尚未填写真实事实的框架占位；完整 13 不等于全部待执行队列，但原基线中尚未完成且仍有效的 TASK 必须继续进入增量 Handoff。
 - `11-测试方案与验收用例.md` 只定义测试设计：按什么业务顺序证明什么、测试类型、自动化等级、真实环境要求和预期证明结果。
 - 规划文档不得定义测试代码、测试命令、fixture 脚本、测试执行调度、失败重试命令、实际执行状态、实际证据内容或实际测试结果。
 

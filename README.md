@@ -10,9 +10,9 @@ Only the selected directories under `skills/` are installable Skill packages. `A
 
 | Skill | Use it for | Boundary |
 | --- | --- | --- |
-| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | Discover requirements and produce an approved planning handoff before implementation. | Does not write production code or execute tests. |
-| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | Implement an approved feature with at least four implementation units, run automation, and hand off at `ready_for_local_test`. | Does not perform manual acceptance or release approval. |
-| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | Reuse long-task automation evidence and manage manual, device, server, external-capability, and final acceptance testing. | Does not change business code or approve production release. |
+| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | Discover requirements, freeze an execution baseline, produce initial/incremental handoffs, and precisely re-enter planning after accepted change triage. | Does not write production code or execute tests. |
+| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | Consume revisioned execution queues, implement an approved feature with at least four units, preserve unaffected/completed work, run automation, and hand off at `ready_for_local_test`. | Does not perform manual acceptance or absorb untriaged contract changes. |
+| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | Reuse revisioned long-task evidence, manage manual/device/server/external/final acceptance testing, and triage findings back to Testing, Long, or Planning. | Phase state stays in its bound writeback target; it does not change business code or approve production release. |
 | [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | Route reviews, diagnosis, confirmed fixes, completeness checks, audits, refactor assessments, merge checks, hotfixes, and standards governance by ten real work scenarios. | Scenarios 1–9 are single-run; only standards governance uses the interactive seven-step flow. Project state lives under `.runtime/ai-code-inspection/`. It is not a release or security gate. |
 
 The normal delivery chain is:
@@ -27,6 +27,8 @@ planning-layer-runtime
 ```
 
 `ai-code-inspection` is independent and can be used for focused review, diagnosis, confirmed repair, requirement-completeness review, audit, refactor assessment, merge readiness, hotfix closure, or standards governance.
+
+After the planning baseline is frozen, accepted requirement or contract changes use an append-only Change Set and an incremental handoff. Long executes only the selected queues, and Testing classifies findings before routing them; neither stage reopens or reruns the whole phase by default.
 
 ## Install in an Agent project
 

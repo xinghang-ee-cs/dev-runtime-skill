@@ -237,6 +237,7 @@ User Context Gate（读取 / 复用 / 自然识别；不阻塞业务探索）
 - 当前已验收但未发布什么。
 - 当前有哪些旧入口、旧对象、旧状态、旧审批或旧流程。
 - 本期目标是新增、替换、阻断、迁移还是清理。
+- 当前真实生效的前端体验来源、布局、导航、通用组件、常见交互与多端适配方式，以及已废弃模式和已知不一致问题。
 
 Gate 检查项：
 
@@ -246,6 +247,7 @@ project_current_state_classified
 production_state_distinguished_from_delivery_state
 existing_legacy_assets_identified_or_explicitly_unknown
 phase_change_target_reconciled_with_current_state
+current_frontend_experience_baseline_available_or_not_applicable
 ```
 
 规则：
@@ -255,6 +257,7 @@ phase_change_target_reconciled_with_current_state
 - 不得把上一期 00–13 的计划内容当成当前已实现事实。
 - 不得把已验收未发布写成生产已生效。
 - 不得用已有旧代码绕过业务规划结论。
+- 不得新建独立设计基线文件；当前前端体验事实只进入唯一 `PROJECT-CURRENT-BASELINE.md`。
 
 ## 3. 对话生命周期（Conversation Lifecycle）
 
@@ -282,6 +285,7 @@ phase_change_target_reconciled_with_current_state
 → 风险确认
 → 开发任务合同确认
 → 执行与验收框架派生检查
+→ Planning Execution Baseline 冻结与 Handoff
 ```
 
 规则：
@@ -296,6 +300,7 @@ phase_change_target_reconciled_with_current_state
 - 阶段不是问卷；不得要求用户按阶段字段回答。
 - 不得为了补齐 Planning Context 模板而主动遍历所有阶段或字段。
 - 问题优先级由 Discovery Priority Rule 决定。
+- Handoff 后执行、测试或验收反馈重新到达 Planning 时，不重跑上述完整阶段；先进入第 9.2 节的 Change Triage 与范围准入。
 
 ### 3.2 用户发现访谈（User Discovery Interview）
 
@@ -714,6 +719,7 @@ Conversation Mode 最终输出 Planning Context：
 
 ```text
 当前项目状态：
+当前前端体验基线：
 目标：
 范围：
 角色：
@@ -729,6 +735,7 @@ UI/交互：
 风险：
 验收：
 待确认项：
+future_phase_inputs:
 涉及文档：
 执行交接判断：
   execution_handoff_decision:
@@ -745,7 +752,9 @@ UI/交互：
 - Planning Context 不替代正式 SoT 文档。
 - 待确认项必须保留来源和影响范围。
 - 当前项目状态必须区分生产当前、已开发未发布、已验收未发布和计划目标。
+- 涉及 UI 时，当前前端体验基线必须引用 `PROJECT-CURRENT-BASELINE.md` 的当前事实和权威来源，不复制设计资产。
 - FLOW 只记录 Planning Conversation 已确认或待确认的业务旅程，不替代 01 的正式 Flow Contract。
+- 15 尚不存在时，已确认的延期输入暂由 `future_phase_inputs` 承载；后续派生 15 时同步到其下一期输入区，planning_only 时进入 Handoff。不得为记录延期项提前生成 13、14、15。
 - `execution_handoff_decision` 属于现有 Planning Context，不新增第二套 Planning Context、Runtime 文件、日志或状态机。
 - `requires_execution_handoff` 只允许 `true` 或 `false`；`handoff_type` 必须分别对应 `execution_ready` 或 `planning_only`。
 - `decision_source` 只记录实际来源：`user_confirmation`、`confirmed_planning_context`、`document_assembly_requirement`；可按实际情况记录一项或多项。
@@ -852,11 +861,12 @@ Planning Context COMPLETE
 -> 输出 13 人话总结
 -> 用户确认 13
 -> 回写 13 状态：已确认
+-> 冻结 Planning Execution Baseline
 -> 自动生成 14、15 框架
 -> Execution and Acceptance Framework Derivation Gate 通过
 -> 汇总实际已生成的 assembled_documents
 -> 基于真实路径生成 handoff_role_mapping
--> 生成包含 execution_constraints 的 execution_ready Handoff Package（prepared）
+-> 生成包含 execution_constraints 与 incremental_execution_contract 的 execution_ready Handoff Package（prepared）
 -> planning_status: awaiting_final_summary_confirmation
 -> 持久化 final_summary_confirmation active_interaction
 -> 按 10 输出本期最终人话总结
@@ -868,7 +878,7 @@ Planning Context COMPLETE
 -> 追加 PLANNING_COMPLETE
 ```
 
-本分支必须满足：13 已确认；14、15 已派生；三个 13 Gate 已通过；Handoff 包含 `execution_constraints`；P0 TASK 不存在 `blocking_open`。
+本分支必须满足：13 已确认；Planning Execution Baseline 已冻结；14、15 已派生；三个 13 Gate 已通过；Handoff 包含 `execution_constraints` 与 `incremental_execution_contract`；P0 TASK 不存在 `blocking_open`。
 
 #### 分支 B：planning_only
 
@@ -900,6 +910,7 @@ Planning Context COMPLETE
 - 不生成 13、14、15。
 - 不运行 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 或 Execution and Acceptance Framework Derivation Gate。
 - Handoff 不包含 `Development Landing Checklist`、`Execution and Integration Record`、`Acceptance and Retrospective Record`，也不包含针对代码执行的 `execution_constraints`。
+- Planning Context 存在已确认 `future_phase_inputs` 时，Handoff 必须保留这些输入并标记 `handed_off`；不得为此生成 13、14、15。
 - 如果本期结论需要交给开发执行，即使变更很小，也必须改走分支 A。
 
 用途：
@@ -914,8 +925,17 @@ Handoff Package 格式：
 ```yaml
 handoff_type: <planning_only | execution_ready>
 requires_execution_handoff: <true | false>
+future_phase_inputs: []
 
-# 仅 requires_execution_handoff: true 时生成
+# Handoff Package 的完整结构、分支条件和生成规则由本节维护
+# frontend_experience_binding 等复用子格式以 04-planning-format-spec.md 为唯一格式来源
+frontend_experience_binding: <UI 适用时填写完整绑定；不适用时 applicable: false>
+
+# 以下字段仅 execution_ready / requires_execution_handoff: true 时生成
+planning_baseline_revision: <Planning Execution Baseline revision>
+# 首次 execution_ready 省略；增量 execution_ready 必填
+active_change_revision: <active Change Set revision>
+
 execution_constraints:
   planning_ids_are_trace_only: true
   stable_business_naming_required: true
@@ -923,6 +943,25 @@ execution_constraints:
   existing_business_domain_preflight_required: true
   new_business_module_requires_architecture_basis: true
   data_domain_isolation_does_not_imply_phase_namespace: true
+
+incremental_execution_contract:
+  planning_baseline_revision:
+  # 仅增量 execution_ready 时生成；首次 execution_ready 必须省略
+  active_change_revision:
+  execute_only: []
+  resume_only: []
+  reexecute_affected_part: []
+  context_only: []
+  completed_locked: []
+  cancelled: []
+  prohibited_actions:
+    - 不得重新执行 completed_locked TASK
+    - 不得重建未受影响模块
+    - 不得修改未受影响接口、状态、数据和权限
+    - 不得重新命名现有稳定业务概念
+    - 不得重新生成已有数据结构
+    - 不得重新设计已确认且未受影响的 UI
+    - 不得把 context_only TASK 当作待执行任务
 
 handoff_role_mapping:
   - role: Capability Governance
@@ -960,9 +999,26 @@ Planning Context.execution_handoff_decision.decision_status
 = confirmed
 ```
 
-`execution_ready` 必须同时满足：Planning Context 的决策状态为 `confirmed` 且分支为 `true / execution_ready`；13 已确认；14、15 已派生；三个 13 Gate 已通过；Handoff 包含 `execution_constraints`。
+`execution_ready` 必须同时满足：Planning Context 的决策状态为 `confirmed` 且分支为 `true / execution_ready`；13 已确认；Planning Execution Baseline 已冻结；14、15 已派生；三个 13 Gate 已通过；Handoff 包含合法 `planning_baseline_revision`、`execution_constraints` 与 `incremental_execution_contract`。首次 execution_ready 的顶层和 `incremental_execution_contract` 内都必须省略 `active_change_revision`，不得写空字符串、`null`、`unknown`、`not_applicable`、空键或虚构 revision；两处 `planning_baseline_revision` 必须正常存在。增量 execution_ready 的顶层与 `incremental_execution_contract` 内都必须包含合法 `active_change_revision`。
 
-`planning_only` 必须同时满足：Planning Context 的决策状态为 `confirmed` 且分支为 `false / planning_only`；当前不生成或不承接 13、14、15；Handoff 不包含针对代码实现的 `execution_constraints`。
+`planning_only` 必须同时满足：Planning Context 的决策状态为 `confirmed` 且分支为 `false / planning_only`；当前不生成或不承接 13、14、15；Handoff 必须省略 `planning_baseline_revision`、`active_change_revision`、`execution_constraints` 与 `incremental_execution_contract`。禁止用空字符串、`null`、`unknown`、`not_applicable` 或虚构 revision 占位。
+
+active Change revision 一致性检查：
+
+```text
+首次 execution_ready：
+Handoff.active_change_revision
+和 Handoff.incremental_execution_contract.active_change_revision
+必须同时不存在
+
+增量 execution_ready：
+Handoff.active_change_revision
+= Handoff.incremental_execution_contract.active_change_revision
+= current-interaction.yaml.active_change.change_revision
+= active_change.decision_ref 指向的 Change Set.change_revision
+```
+
+首次 execution_ready 任一位置出现 `active_change_revision`，或增量 execution_ready 任一位置缺失、冲突、使用空值或虚构占位时，不得生成正式 Handoff，不得进入最终人话总结确认，也不得标记 Planning Handoff Complete。
 
 只强制逐项比较 `requires_execution_handoff`、`handoff_type`、`decision_status`；Handoff 不必完整复制 `decision_basis` 与 `decision_source`，但不得语义冲突。任一不一致时，不得生成或确认正式 Handoff，不得进入最终总结；必须回到 Planning Context 与本期恢复镜像修正，再重建 Document Assembly Plan。
 
@@ -974,8 +1030,9 @@ Planning Context.execution_handoff_decision.decision_status
 - 必须来自本次 Planning Runtime 的正式输出。
 - 上述 YAML 只表达允许的职责名；实际 Handoff 只能列出本期真实已生成且适用的 role。
 - Handoff 不得包含尚未生成的文档、空占位路径、假设路径或未适用职责。
-- `handoff_type: execution_ready` 必须具备 13、14、15、`execution_constraints`，且 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 与 Execution and Acceptance Framework Derivation Gate 均已通过。
-- `handoff_type: planning_only` 禁止包含 Development Landing Checklist、Execution and Integration Record、Acceptance and Retrospective Record 以及针对代码实现的 `execution_constraints`；允许包含本期实际生成的 Requirement and Scope、Business Domain、UI/UX Design、Architecture Decision、Capability Governance、Test and Acceptance Plan、Risk, Dependency, and Open Questions 等职责。
+- `handoff_type: execution_ready` 必须具备 13、14、15、Planning Execution Baseline revision、`execution_constraints` 与 `incremental_execution_contract`，且 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 与 Execution and Acceptance Framework Derivation Gate 均已通过。
+- 首次 `execution_ready` 在顶层与 `incremental_execution_contract` 内同时省略 `active_change_revision`；增量 `execution_ready` 两处必须包含完全一致的合法 active Change Set revision，并与 `current-interaction.yaml.active_change.change_revision` 及 `decision_ref` 指向的 Change Set revision 一致。任何分支都不得生成空键或伪造 revision。
+- `handoff_type: planning_only` 禁止包含 Development Landing Checklist、Execution and Integration Record、Acceptance and Retrospective Record、`planning_baseline_revision`、`active_change_revision`、`execution_constraints` 与 `incremental_execution_contract`；允许包含本期实际生成的 Requirement and Scope、Business Domain、UI/UX Design、Architecture Decision、Capability Governance、Test and Acceptance Plan、Risk, Dependency, and Open Questions 等职责。
 - 只有本期存在并已生成 13 时，Handoff 才可包含 `Development Landing Checklist`、`Execution and Integration Record`、`Acceptance and Retrospective Record`。
 - 只有 14、15 自动派生完成且 Execution and Acceptance Framework Derivation Gate 通过后，才可以写入 `framework_status: planned_and_created`。
 - `Execution and Integration Record.framework_status: planned_and_created` 只表示 14 已由 planning skill 创建执行记录框架和待填写位置，不代表实际执行事实。
@@ -988,11 +1045,44 @@ Planning Context.execution_handoff_decision.decision_status
 - 最终总结输出前未持久化 `final_summary_confirmation` 目标时，不得询问用户确认。
 - `.runtime/planning-layer-runtime/user-profile.yaml` 整理失败时保持 `awaiting_final_summary_confirmation`，不得静默完成交接。
 - `execution_constraints` 仅在 `requires_execution_handoff: true` 时必须随正式 Handoff 输出，且不得复制整份 09 或 13。
+- 首次执行时，所有正常 Ready TASK 进入 `execute_only`。
+- 增量执行时，`executable_tasks + carried_forward_pending_tasks -> execute_only`；`reopened_tasks` 按合同分别进入 `resume_only` 或 `reexecute_affected_part`；正在执行且未受影响的原基线 TASK 进入 `resume_only`；`context_only_tasks -> context_only`；`completed_unchanged_tasks` 与已完成的 `prohibited_rerun_tasks -> completed_locked`；明确取消或 superseded TASK 进入 `cancelled`。
+- 增量 Handoff 必须覆盖原 Planning Execution Baseline 中所有仍有效 TASK。未受影响、尚未开始但仍需完成的 TASK 必须作为 carried-forward pending 进入 `execute_only`，不得丢失或降为 `context_only`。
+- `execution_ready` Handoff 必须明确 Planning Execution Baseline revision；增量 execution_ready 还必须明确 active Change Set revision，首次 execution_ready 必须省略该字段。`planning_only` 两者都省略；不得把完整 13 解释为全部重新执行。
+- 存在 UI TASK 或前端体验变化时必须填写 `frontend_experience_binding`；其 `style_mode`、基线、参考页面、现有组件、允许扩展、禁止重定义、已确认资产和一致性 TEST 必须与 05、09、11、13 一致。
 - 执行承接方必须把 Planning ID 映射为稳定业务概念，不得把 TASK、FLOW、DOMAIN、API、PERM 等追踪 ID 机械转换为代码、数据库、API 或权限命名。
 - 执行前必须优先核实现有稳定业务域能否承接；准备新建期次、Sprint、阶段或版本命名的实现资产时必须停止，并作为架构偏差回写 Planning。
 - 新建长期业务模块必须具备 09 的架构依据；数据域隔离不得解释为期次物理命名空间。
 - 上述内容只是 Planning 输出的实现边界，不定义或修改后续执行 Skill 的内部运行方式。
-- `execution_ready` 只有在三个 13 Gate 均通过、`execution_constraints` 已写入 Handoff、P0 参数不存在 `blocking_open` 时，才允许持久化最终总结确认目标并进入最终总结确认；`planning_only` 按本期实际装配文档与真实路径检查，不要求实现类 Gate 或 `execution_constraints`。
+- `execution_ready` 只有在三个 13 Gate 均通过、执行基线已冻结、`execution_constraints` 与 `incremental_execution_contract` 已写入 Handoff、P0 参数不存在 `blocking_open` 时，才允许持久化最终总结确认目标并进入最终总结确认；`planning_only` 按本期实际装配文档与真实路径检查，不要求实现类 Gate 或执行合同。
+
+#### Incremental Handoff Completeness Gate
+
+生成增量 Handoff 前必须检查，不新增独立 Runtime、文件或状态机：
+
+1. 原 Planning Execution Baseline 中每个 active TASK 都在 Handoff 六个队列中唯一归类；对新增 TASK 再以当前有效 13 补充校验。
+2. `executable_tasks`、`reopened_tasks` 与新增/受影响 TASK 必须和 active Change Set 一致。
+3. `carried_forward_pending_tasks` 全部进入 `execute_only`，没有进入 `context_only`。
+4. completed TASK 只能进入 `completed_locked` 或 `cancelled`，不得 execute。
+5. superseded TASK 不得进入 `execute_only`、`resume_only` 或 `reexecute_affected_part`。
+6. `context_only` TASK 不得同时进入任何执行队列。
+7. Handoff 不得包含当前有效 13 中不存在的 TASK。
+8. Handoff 不得遗漏原基线中仍需执行的 TASK。
+9. Recovery Output 与 Change Set 不一致时，不得扩大范围。
+10. UI TASK 的 `frontend_experience_binding` 完整且通过一致性检查。
+
+集合完整性：
+
+```text
+原 Baseline active TASK
+= (execute_only + resume_only + reexecute_affected_part + context_only + completed_locked + cancelled)
+  与原 Baseline TASK 的交集
+
+当前有效 13 中应交接的 TASK
+= execute_only + resume_only + reexecute_affected_part + context_only + completed_locked + cancelled
+```
+
+六个队列必须两两互斥。同一 TASK 未分类、重复分类、被遗漏或进入错误队列时，不得生成增量 Handoff，不得进入最终人话总结确认，也不得标记 Planning Handoff Complete。
 
 正式文档真实生成后，才能加入：
 
@@ -1035,6 +1125,7 @@ Document Assembly 原则：
 - `handoff_role_mapping` 只能在所有实际装配文档完成后生成，且必须只使用真实路径。
 - Planning Context COMPLETE 阶段只能记录装配计划，不得写入正式 `assembled_documents` 或正式 `handoff_role_mapping`。
 - 13 已确认、14/15 框架已生成、`assembled_documents` 与 `handoff_role_mapping` 已准备，都不等于 Planning 已真正结束。
+- 冻结后的 Document Assembly 必须直接使用 active Change Set 与 Recovery Output 的受影响列表；只重建受影响且尚未填写真实事实的内容，未受影响文档保持确认状态。
 
 低熵原则：
 
@@ -1042,6 +1133,81 @@ Document Assembly 原则：
 - Handoff 不是新的 Runtime 系统。
 - 优先复用现有结构。
 - 禁止为了 Runtime 交接新增长期 Runtime 结构。
+
+### 9.2 Execution/Test Change Triage 与期内范围扩展
+
+#### Execution/Test Change Triage Gate
+
+开发、联调、测试或验收阶段发现问题或新增需求时，必须先分类，不能直接改代码、改规划或触发整套 Recovery。判定字段以 `04-planning-format-spec.md` 的 `change_decision` 为唯一格式来源。
+
+分类只允许：
+
+```text
+implementation_defect
+test_defect
+planning_gap
+requirement_change
+design_drift
+deferred_improvement
+```
+
+处理：
+
+- `implementation_defect`：当前规划仍正确，`fix_in_execution`；不重新打开 01–13，由后续执行承接方修复并重测，实际事实继续进入 14/15。
+- `test_defect`：`fix_in_test`；修复测试脚本、数据、环境或证据，不修改业务规划。
+- `planning_gap`：`reopen_current_planning`；只回到真正拥有该事实的上游 SoT，再调用 08 传播受影响范围。
+- `requirement_change`：先按 `02-planning-change-levels.md` 做范围准入，决定本期吸收、增量、下一期或替换本期范围；不得先改 13。
+- `design_drift`：规划仍正确时优先 `fix_in_execution`；设计合同确实需要改变时才回到 05/09/11/13。只有用户路径或业务流程改变时才继续回到 03/01/02。
+- `deferred_improvement`：不影响本期验收且经确认允许延期时，`defer_to_next_phase`；15 已存在则进入其下一期输入区，否则进入已确认 Planning Context 的 `future_phase_inputs`。
+- 15 尚不存在时，将已确认 `future_phase_inputs` 同步为 `current-interaction.yaml` 的最小恢复镜像；Planning Context 仍是临时权威来源。Baseline 已冻结但 14/15 未真实派生时属于框架派生未完成，不得准备 execution-ready Handoff 或进入执行。
+
+只有 `planning_gap`、`requirement_change` 或真正改变设计合同的 `design_drift` 可以触发 Planning Recovery 与 SoT 失效传播。
+
+#### In-Phase Scope Expansion and Incremental Execution Gate
+
+用户提出新增或修改时，范围准入结果只允许 `absorb_as_current_phase_scope`、`absorb_as_current_phase_delta`、`defer_to_next_phase`、`replace_current_phase_scope`。执行已开始后的独立能力默认进入下一期；必须留在本期的内容形成 Change Set，并执行：
+
+```text
+范围准入
+-> 冻结基线保持不变
+-> Change Set
+-> 精确 SoT 回写
+-> 08 输出受影响范围
+-> 只重建受影响 TEST / TASK / 未填写框架占位
+-> 增量 Handoff
+```
+
+未受影响文档、TASK、TEST、EXEC 和已经填写的执行、测试、验收、发布事实不得重置、覆盖、重新确认或重新执行。
+
+需要 Planning 重入时，复用现有 `current-interaction.yaml`，将 `planning_status` 恢复为 `planning_in_progress`，写入冻结基线最小引用与 active Change Set 最小引用，并使旧 Handoff 按现有 `superseded` 语义退出当前执行入口。不得新增 Change Runtime、Scope Runtime、状态机或持久化文件。
+
+active Change Set 生命周期复用既有 `decision-log.md` 与 `current-interaction.yaml`：
+
+```text
+candidate -> confirmed -> applied_to_planning -> handoff_prepared -> closed
+```
+
+- 新变化到达时先检查旧状态，不得直接覆盖 `active_change`。
+- 旧 Change Set 可继续时，新 revision 基于当前有效规划视图与上一 revision；新变化使旧 revision 失效时，旧快照追加 `superseded`，新快照引用被替代 revision。
+- `decision-log.md` 保留全部追加式 Change Set Decision Snapshot；`current-interaction.yaml` 只保存当前 revision、状态与 `decision_ref`。
+- 当前 active Snapshot 必须保存相对冻结 Baseline 的累计有效增量，包含仍有效前序 revision 与当前 revision 的完整影响范围、TASK 分类和执行选择；不得只写当前局部差量。旧 revision 保留实际最后状态，active 指针前移不自动等于 `closed` 或 `superseded`。
+- 同一 Change Set Decision Snapshot 必须同时包含完整 Change Set 和按 08 唯一格式生成的 Recovery Output。Recovery 通过 `planning_execution_baseline_reference + active_change.decision_ref` 精确读取该 Snapshot，恢复累计有效范围，不扫描整个历史拼装当前状态。
+
+### 9.3 发布后基线更新与期次关闭
+
+```text
+验收结果
+-> 发布判定
+-> 实际发布
+-> 更新 PROJECT-CURRENT-BASELINE
+-> 更新当前前端体验事实
+-> 本期关闭
+```
+
+- Planning 只定义 15 的更新条件，不填写真实验收、发布或基线更新结果。
+- 只有实际发布确认后才更新生产当前事实；已验收未发布仍保持交付状态。
+- 本期关闭后 00–15 历史只读。旧期次只允许受控修正事实错误，独立新增需求默认进入下一期。
+- 下一期始终从最新 `PROJECT-CURRENT-BASELINE.md` 开始。
 
 ## 10. Planning Document Mode
 
@@ -1304,6 +1470,26 @@ Planning Context = INCOMPLETE
 
 --------------------------------------------------
 
+### Frontend Experience Inheritance Gate
+
+检查：
+
+- 已读取 `PROJECT-CURRENT-BASELINE.md` 中当前前端体验基线及权威来源。
+- `style_inheritance_decision.mode` 仅为 `inherit_current / extend_current / replace_current`。
+- 用户未明确要求整体改版且现有体系可承接时，使用 `inherit_current`。
+- `extend_current` 只增加现有体系缺少的组件或适配能力，没有重定义全局体系。
+- `replace_current` 具备明确用户要求或不可承接证据，并列出受影响页面、提示词、组件和设计资产。
+- 05、09、11、13 与 Handoff 对前端基线、允许扩展和禁止重定义的绑定一致。
+- `05.style_inheritance_decision = 09.frontend implementation binding = 13.UI TASK frontend binding = Handoff.frontend_experience_binding`；绑定内容引用可追踪。execution_ready 的 revision 由 Handoff 顶层 `planning_baseline_revision`、增量时的 `active_change_revision` 和 `incremental_execution_contract` 中的 TASK contract revision 共同锁定；planning_only 不因此生成 Baseline、Change Set 或执行合同 revision，也不在 `frontend_experience_binding` 内重复定义第二套 revision。
+
+规则：
+
+- Gate 未通过时，05 不得确认，UI TASK 不得 Ready。
+- 不得创建第二份项目级设计基线文件。
+- 本 Gate 通过后再运行 UI/UX Design Readiness Gate。
+
+--------------------------------------------------
+
 ### UI/UX Design Readiness Gate
 
 检查：
@@ -1311,7 +1497,8 @@ Planning Context = INCOMPLETE
 - 每个 P0 SCN 已映射 PAGE。
 - 每个 PAGE 有合法进入条件和 UI STATE。
 - 每个 UI STATE 有唯一主操作。
-- 全局风格提示词已准备。
+- 已确认新的 PROMPT-STYLE，或存在已确认的 inherited frontend baseline reference。
+- `style_inheritance_decision` 已确认且 mode 合法；用户未要求整体改版时默认为 `inherit_current`。
 - P0 页面提示词已准备。
 - 关键模块图需求已识别。
 - UX 是否可由现有 UI 图覆盖已明确。
@@ -1322,6 +1509,7 @@ Planning Context = INCOMPLETE
 - 不满足时，05 的交互合同不得确认。
 - 涉及该页面的 UI 依赖开发任务不得生成或进入可执行状态。
 - 不依赖 UI 的后续规划文档不应被无故阻塞。
+- `replace_current` 时，受影响页面提示词、模块提示词、UX 提示词和设计资产均已进入重新审查；`inherit_current` 不要求机械重做全局风格提示词。
 
 --------------------------------------------------
 
@@ -1429,6 +1617,7 @@ Planning Context = INCOMPLETE
 - 每条测试都明确自动化等级。
 - 11 中的测试顺序与 01 FLOW 顺序一致。
 - 11 不记录实际测试结果。
+- 涉及前端时，已验证布局继承、同类组件和交互一致、主次操作符合 05、空/错/加载/禁用/反馈一致、多端适配遵循基线，并检查无依据全页重绘与重复组件。
 
 规则：
 
@@ -1468,6 +1657,10 @@ Planning Context = INCOMPLETE
 - 每个旧流程隔离要求均被至少一个 TASK 承接。
 - 每个 TASK 有 Ready Gate、完成合同和回写目标。
 - TASK 不引用不存在、未装配或未确认的 FLOW / STATE / API / PERM / ARCH / CAP / TEST 结论。
+- 每个 TASK 具有合法 `task_revision`；增量 TASK 与前一合同的关系和执行处置明确。
+- 同一 TASK ID 发生合同修订时，`previous_contract_revision` 必须精确指向上一合同 revision，`previous_task_id` 指向自身；跨 TASK 的 `extends / replaces / supersedes` 同时指向前一 TASK 与其合同 revision。
+- UI TASK 已绑定当前前端体验基线、参考页面、设计资产、允许扩展和禁止重定义内容。
+- active Change Set 存在时，未受影响 TASK 按实际状态继续分类：未开始且仍需执行者为 carried-forward pending 并保持 `execute`，正在执行者保持 `resume`，已完成者为 `completed_locked`；只有纯背景项为 `context_only`。
 
 规则：
 
@@ -1524,6 +1717,7 @@ Planning Context = INCOMPLETE
 检查：
 
 - 13 状态已确认。
+- Planning Execution Baseline 已冻结并被 14、15 与 Handoff 引用。
 - 14 已按 TASK 预置 `EXEC-<TASK-ID>` 空白执行项。
 - 14 已继承 TASK 的目标、完成合同、预期 TEST、RISK / DEP / CAP 阻断与偏差回写位置。
 - 14 只包含框架和待填写位置。
@@ -1537,6 +1731,8 @@ Planning Context = INCOMPLETE
 - 所有 EXEC、TEST、CAP、发布与基线事实初始只能是 `not_started` 或空白待填。
 - 14 未填写实际代码改动、实际文件修改、自动化测试通过、接口已联调、真实外部能力可用、真机验证完成、最终验收通过、可发布或已发布。
 - 15 未填写通过、失败、已验收、真实环境已通过、可发布、已发布、生产已更新或 PROJECT-CURRENT-BASELINE 已更新。
+- 增量派生时只追加或重建 Change Set 涉及且尚未填写事实的占位；已有真实事实和未受影响 EXEC / TEST / 验收项保持原样。
+- 增量 Handoff Completeness Gate 已通过，原基线未完成且仍有效的 TASK 无遗漏、无重复分类。
 
 规则：
 
@@ -1752,7 +1948,7 @@ Runtime State：
 <phase_planning_runtime_directory>/current-interaction.yaml
 ```
 
-它是上下文压缩、会话恢复和工具中断后的短期恢复来源；其中 `execution_handoff_decision` 只是已确认 Planning Context 的最小镜像，`document_assembly` 只是当前装配进度的最小镜像。字段以 `04-planning-format-spec.md` 为准，处理顺序以 `10-planning-document-interaction-runtime.md` 为准，恢复校验以 `08-planning-recovery-runtime.md` 为准。
+它是上下文压缩、会话恢复和工具中断后的短期恢复来源；其中 `execution_handoff_decision` 与 15 尚不存在时的 `future_phase_inputs` 只是已确认 Planning Context 的最小镜像，`document_assembly` 只是当前装配进度的最小镜像。字段以 `04-planning-format-spec.md` 为准，处理顺序以 `10-planning-document-interaction-runtime.md` 为准，恢复校验以 `08-planning-recovery-runtime.md` 为准。
 
 Project Runtime Evidence：
 
@@ -1868,6 +2064,14 @@ impact:
 supersedes:
 next_action:
 ```
+
+`decision_ref` 的唯一语法为：
+
+```text
+<phase_planning_runtime_directory>/decision-log.md#decision_id=<DEC-ID>
+```
+
+它必须同时命中真实文件与其中唯一 `decision_id`，不得只写文件路径、自然语言标题、时间戳或不稳定 Markdown 标题。Change Set Snapshot 在上述通用外壳内同时保存完整 `change_set` 和 08 的 `recovery_output`；两者共享同一 `decision_id`，不得拆成两个不可关联的日志条目。
 
 Decision Status：
 
@@ -2157,13 +2361,15 @@ missing_sections:
 
 - 13 已确认，14/15 已派生且 Execution and Acceptance Framework Derivation Gate 已通过。
 - Task Contract Gate、Implementation Naming Gate 与 Implementation Contract Completeness Gate 已通过。
-- Handoff 已包含 `execution_constraints`，且不存在 P0 `blocking_open` 参数。
+- Handoff 已包含 `execution_constraints` 与 `incremental_execution_contract`，且不存在 P0 `blocking_open` 参数。
+- 增量 Handoff 适用时，Incremental Handoff Completeness Gate 已通过；存在 UI TASK 时 `frontend_experience_binding` 完整且一致。
 
 `planning_only` 附加条件：
 
 - `requires_execution_handoff: false`。
-- Handoff 不包含 13/14/15 职责或针对代码实现的 `execution_constraints`。
+- Handoff 不包含 13/14/15 职责、`planning_baseline_revision`、`active_change_revision`、`execution_constraints` 或 `incremental_execution_contract`，也不使用空值或虚构 revision 占位。
 - 不存在阻断本期规划结论本身的 OPEN。
+- Planning Context 存在已确认 `future_phase_inputs` 时，planning_only Handoff 已承接且没有为此生成 13/14/15。
 
 ```yaml
 event_seq:

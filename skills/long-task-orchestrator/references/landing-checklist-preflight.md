@@ -35,6 +35,9 @@ load_skill
 -> run Planning Handoff Intake Gate
 -> confirm handoff_type = execution_ready
 -> confirm requires_execution_handoff = true
+-> classify initial or incremental handoff
+-> validate planning baseline and active change revisions
+-> validate incremental execution contract and queue exclusivity
 -> confirm formal execution and acceptance record files exist
 -> confirm Source of Truth
 -> load execution_constraints
@@ -73,6 +76,10 @@ Runtime Bootstrap completed != execution_gate_open
 读取 Planning Handoff
 -> 确认 handoff_type
 -> 确认 requires_execution_handoff
+-> 读取 planning_baseline_revision
+-> 判定 initial / incremental handoff 并校验 active_change_revision
+-> 读取 incremental_execution_contract
+-> 校验六类 TASK 队列互斥、revision 可解析和 prohibited_actions
 -> 读取 assembled_documents
 -> 读取 handoff_role_mapping
 -> 读取 execution_constraints
@@ -86,6 +93,9 @@ Runtime Bootstrap completed != execution_gate_open
 
 - `handoff_type: execution_ready`。
 - `requires_execution_handoff: true`。
+- 顶层与 `incremental_execution_contract` 的 `planning_baseline_revision` 均存在且一致。
+- 初始 Handoff 的两处 `active_change_revision` 均不存在；增量 Handoff 的两处字段均存在且一致。
+- `execute_only`、`resume_only`、`reexecute_affected_part`、`context_only`、`completed_locked`、`cancelled` 六类队列两两互斥，且 TASK contract revision 可解析。
 - Handoff 状态有效且未失效。
 - Development Landing Checklist 真实存在且已确认；13 或等价正式落地清单已确认。
 - 14、15 或等价执行/验收框架路径真实存在。
@@ -101,6 +111,10 @@ Runtime Bootstrap completed != execution_gate_open
 ```text
 planning_only_or_execution_handoff_false -> STOP
 execution_constraints_missing -> STOP
+planning_baseline_revision_missing_or_conflicting -> STOP
+active_change_revision_missing_unexpected_or_conflicting -> STOP
+incremental_execution_contract_missing_or_invalid -> STOP
+execution_queue_overlap_or_unknown_task_revision -> STOP
 landing_checklist_missing_or_unconfirmed -> STOP
 P0_parameter_blocking_open -> STOP
 handoff_formal_path_mismatch -> STOP
@@ -297,6 +311,8 @@ dependency_governance_status = blocked
 - `context-lifecycle.md` 可读。
 - `system-topology.md` 可读。
 - Source of Truth 可派生 `task.md`。
+- Handoff 的 `incremental_execution_contract` 可唯一解析；完整 Source of Truth 只提供合同视图，不自动成为执行队列。
+- 只有 `execute_only`、`resume_only`、`reexecute_affected_part` 可形成可执行 Runtime Task；`context_only`、`completed_locked`、`cancelled` 必须保持不可执行。
 - 执行单元可追溯到 Source of Truth。
 - 每个执行单元已有稳定业务概念、实现承接策略、禁止实现命名和参数合同状态。
 - 执行顺序、依赖、所有权、共享边界、验证方式和完成证明具备生成依据。
@@ -307,6 +323,7 @@ dependency_governance_status = blocked
 ```text
 missing_source_of_truth -> STOP
 invalid_planning_handoff_intake -> STOP
+invalid_planning_revision_or_execution_selection -> STOP
 missing_execution_constraints -> STOP
 upstream_plan_blocked -> STOP
 plan_conflict -> STOP
@@ -334,6 +351,8 @@ unreadable_required_reference -> STOP
 ```text
 source_of_truth_confirmed
 planning_handoff_intake_passed
+planning_handoff_revision_consistency_passed
+incremental_execution_contract_loaded
 execution_constraints_loaded
 phase_runtime_directory_created
 runtime_state_instantiated

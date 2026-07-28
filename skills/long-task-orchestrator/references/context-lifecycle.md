@@ -7,6 +7,9 @@ runtime_epoch:
 context_version:
 based_on_plan:
 planning_handoff_source:
+planning_baseline_revision:
+active_change_revision:
+incremental_execution_contract_snapshot:
 execution_constraints_source:
 execution_constraints_status:
 implementation_contract_status:
@@ -68,20 +71,31 @@ formal_plan_changed_after_upstream_writeback -> INVALIDATE
 task_source_changed -> INVALIDATE
 base_dependency_changed -> INVALIDATE
 planning_handoff_changed -> INVALIDATE
+planning_baseline_revision_changed -> PRECISE_INVALIDATE
+active_change_revision_changed -> PRECISE_INVALIDATE
+incremental_execution_contract_changed -> PRECISE_INVALIDATE
 execution_constraints_changed -> INVALIDATE
 ```
 
-失效后：
+失效后先区分全局恢复失败与合法增量 Handoff。合法增量 Handoff 必须精确传播：
 
 ```text
 STOP
 -> 设置 invalidated_by
 -> 升级 context_version
--> 将受影响 task 设为 INVALIDATED
+-> 读取新 Handoff 的 revision 与六类执行队列
+-> 只将 reexecute_affected_part 和确实被替代/取消的运行片段设为 INVALIDATED
+-> 保持 execute_only 中 carried-forward pending TASK 的 TODO 与原合同
+-> 保持 resume_only 中未受影响的可靠检查点
+-> 保持 completed_locked 的 DONE、EXEC 与验证证据
+-> 保持 context_only 不可执行
+-> 保持 cancelled 历史且禁止执行
 -> 重新加载当前有效 Planning Handoff 与 Source of Truth
 -> 重新生成 Runtime Context
--> 重新生成受影响 task
+-> 只生成或修订允许队列中的受影响 task
 ```
+
+`runtime_recovery_failed`、无法解析 revision 或队列冲突仍按保守全停处理；但不得因为存在新的 Change Set 就无条件失效整个期次。
 
 ## 首次 Runtime Bootstrap 与已有 Runtime 恢复
 
@@ -141,6 +155,9 @@ current_effective_phase_match
 current_effective_status_compatible
 active_patch_id_match
 planning_handoff_source_match
+planning_baseline_revision_match
+active_change_revision_presence_and_value_match
+incremental_execution_contract_snapshot_match
 execution_constraints_source_current
 execution_constraints_status_match
 implementation_contract_status_match
@@ -162,6 +179,8 @@ current-runtime-context
 = active task static contract
 ```
 
+其中 revision 与 execution disposition 也必须一致；初始 Handoff 的 `active_change_revision` 必须在四方同时不存在，增量 Handoff 必须在四方一致。
+
 依赖相关任务还必须满足：
 
 ```text
@@ -181,7 +200,7 @@ STOP
 -> do_not_resume_implementation
 ```
 
-不得任选冲突文件为新事实、根据聊天记忆或最后修改时间恢复、从代码反推合同，或自动覆盖冲突字段后继续。Planning Handoff 或 execution constraints 已变化时，按本文件失效流程提升 `context_version`、失效受影响任务并重新生成 Context 与任务。
+不得任选冲突文件为新事实、根据聊天记忆或最后修改时间恢复、从代码反推合同，或自动覆盖冲突字段后继续。Planning Handoff 或 execution constraints 已变化时，按本文件失效流程提升 `context_version`，精确失效受影响任务并只重新生成允许队列对应的 Context 与任务。
 
 ## 版本升级
 

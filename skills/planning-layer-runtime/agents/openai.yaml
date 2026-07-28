@@ -1,4 +1,4 @@
 interface:
   display_name: "规划层运行时"
-  short_description: "在开发前完成规划访谈、逐文档确认、正式交接与最终整体确认"
-  default_prompt: "使用 $planning-layer-runtime 完成开发前规划，并在正式交接前逐份确认文档和最终人话总结。"
+  short_description: "完成一期规划、文档审查、受控恢复、增量交接与发布后基线闭环"
+  default_prompt: "使用 $planning-layer-runtime 完成本期规划、文档审查或受控恢复，并对执行、测试中的变更先分类再做精确增量回流与交接。"

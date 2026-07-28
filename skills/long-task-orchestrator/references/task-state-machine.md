@@ -91,6 +91,7 @@ INVALIDATED -> DONE
 - 不与其他并行任务冲突。
 - 不存在高风险未确认项。
 - Planning Handoff Intake 与 execution constraints 有效。
+- 当前 TASK 位于 `execute_only`、`resume_only` 或 `reexecute_affected_part`，且 contract revision 与 Handoff 一致。
 - 实现承接策略已确认，稳定业务命名与禁止命名已记录。
 - 当前 TASK 的实现合同完整，参数状态无 `blocking_open`。
 - 涉及依赖变更时 Dependency Governance Gate 已通过。
@@ -164,6 +165,7 @@ INVALIDATED -> DONE
 
 - 正式计划变化。
 - Planning Handoff 或 execution constraints 变化。
+- Planning baseline/change revision 或 execution selection 变化且当前 TASK 确实受影响。
 - 接口/状态/权限/数据模型变化。
 - Runtime 恢复失败。
 - context-version 冲突。
@@ -176,8 +178,10 @@ INVALIDATED -> DONE
 停止执行
 -> 重新读取 Source of Truth
 -> 重新生成 Runtime Context
--> 重新确认 task
+-> 按新 Handoff 队列只重新确认受影响 task
 ```
+
+不得把 `completed_locked`、未受影响的 `resume_only` 或 carried-forward pending `execute_only` 无条件标记为 `INVALIDATED`。
 
 ## 4. task.md 结构
 
@@ -207,6 +211,10 @@ Static Task Definition 只包含静态字段。
 - 验证方式：
 - 完成证明：
 - Planning 追踪来源：
+- Planning Baseline Revision：
+- Active Change Revision：
+- TASK Contract Revision：
+- Execution Disposition：
 - 稳定业务概念：
 - execution_constraints 来源：
 - 实现承接策略：
@@ -222,6 +230,8 @@ Static Task Definition 只包含静态字段。
 字段规则：
 
 - Planning 追踪来源只引用 Planning ID 与路径，不作为实现命名来源。
+- Active Change Revision 在初始 Handoff 中必须省略；增量 Handoff 中必须与 Planning Handoff 一致。
+- Execution Disposition 只允许 `execute_only`、`resume_only`、`reexecute_affected_part`；`context_only`、`completed_locked`、`cancelled` 不得生成可执行 Static Task Definition。
 - 稳定业务概念不得使用期次、阶段、Sprint、版本或 Planning ID。
 - 实现承接策略只允许 `extend_existing_domain`、`reuse_shared_capability`、`create_stable_business_domain`。
 - `create_stable_business_domain` 时“新业务域架构依据”必填，且必须引用正式架构依据。

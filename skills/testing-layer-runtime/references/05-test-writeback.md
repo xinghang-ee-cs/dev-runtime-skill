@@ -2,9 +2,11 @@
 
 ## 回写目标目录
 
-`docs/计划安排/<当前期次>/testing-runtime/`
+`<phase_testing_runtime_directory>/`
 
-Testing Runtime 只写 Runtime 输出目录；不得修改 planning SoT 或业务产物。
+`<phase_testing_runtime_directory>` 必须由当前 Planning/Long Handoff、项目期次目录约定和既有 Runtime 事实解析为唯一 `writeback_target`，不是固定目录名。
+
+Testing Runtime 只写本期 Runtime 输出目录；不得修改 planning SoT 或业务产物。本期测试状态、事件、证据、队列、依赖、Change Triage 与恢复数据不得写入项目根目录 `.runtime/`；根 `.runtime/` 只允许该 Skill 明确定义的跨期项目级环境索引或稳定配置。
 
 ## 必须维护的文件
 
@@ -14,6 +16,7 @@ Testing Runtime 只写 Runtime 输出目录；不得修改 planning SoT 或业�
 - `test-evidence-index.md`：证据路径、截图路径、命令摘要、人工证据来源、long evidence 来源。
 - `manual-test-queue.md`：待人工执行、待补证据、已确认/未确认的人工测试操作；不是 case 清单，而是用户实际操作队列。同一用户操作只能出现一次；多个 case 可以挂载到同一个操作项下。
 - `test-execution-order.md`：测试顺序、依赖、阻塞关系。
+- `change-triage.md`：测试发现的分类、影响范围、当前合同是否仍有效和下游 disposition；不替代 Planning Change Set 或业务 SoT。
 
 ## Long Testing Handoff 回写
 
@@ -23,6 +26,9 @@ Testing Runtime 只写 Runtime 输出目录；不得修改 planning SoT 或业�
 long_testing_handoff:
   source:
   verified:
+  planning_baseline_revision:
+  active_change_revision: # 初始 Handoff 省略
+  executed_task_contract_revisions: []
   automated_passed:
   automated_failed:
   automated_skipped:

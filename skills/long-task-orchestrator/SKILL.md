@@ -1,13 +1,13 @@
 ---
 name: long-task-orchestrator
-description: 当 Agent 必须接收已确认且 execution_ready 的 planning handoff，按其中的执行约束、稳定业务命名、实现合同和承接位置执行一个至少包含 4 个实现单元的完整功能或模块时使用。负责从开发开始到 ready_for_local_test，或在确认 testing/用户缺陷反馈后 patch 到 ready_for_local_retest：实现、重构、数据迁移、自动化测试代码编写与执行、结果记录及 Long Testing Handoff；不负责补写 Planning 业务合同、人工测试、真实设备测试、云端验证、最终验收或上线放行。
+description: 当 Agent 必须接收已确认且 execution_ready 的初始或增量 planning handoff，按其中的基线 revision、增量执行队列、执行约束、稳定业务命名、实现合同和承接位置执行一个至少包含 4 个实现单元的完整功能或模块时使用。负责从开发开始到 ready_for_local_test，或在确认 testing/用户缺陷反馈后 patch 到 ready_for_local_retest：实现、重构、数据迁移、自动化测试代码编写与执行、结果记录及 Long Testing Handoff；不负责补写 Planning 业务合同、人工测试、真实设备测试、云端验证、最终验收或上线放行。
 ---
 
 # 长任务编排器
 
 ## 用途
 
-接收已确认的 `execution_ready` Planning Handoff，将正式开发任务转换为 Runtime Task，按既定架构、合同、参数和命名边界完成实现与开发期自动化验证，回写执行事实并形成 Long Testing Handoff。
+接收已确认的 `execution_ready` 初始或增量 Planning Handoff，只把其 `incremental_execution_contract` 明确允许的 TASK 转换为 Runtime Task，按既定架构、合同、参数和命名边界完成实现与开发期自动化验证，回写执行事实并形成 Long Testing Handoff。
 
 不得重新访谈业务需求、自行补充用户可见业务规则、修改 Planning 正式需求、替 Planning 决定未确认业务参数，或接管最终验收、服务器/生产验证、发布批准及 Testing Skill 工作流。Planning Handoff 不完整或冲突时，停止当前实现并写回上游。
 
@@ -32,6 +32,8 @@ skill_loaded
 runtime_kernel_loaded
 source_of_truth_confirmed
 planning_handoff_intake_passed
+planning_handoff_revision_consistency_passed
+incremental_execution_contract_loaded
 execution_constraints_loaded
 phase_runtime_directory_created
 runtime_state_instantiated
@@ -174,6 +176,9 @@ load_skill
 -> run Planning Handoff Intake Gate
 -> confirm handoff_type = execution_ready
 -> confirm requires_execution_handoff = true
+-> classify initial or incremental handoff
+-> validate planning baseline and active change revisions
+-> load incremental_execution_contract
 -> confirm formal execution and acceptance record files exist
 -> confirm Source of Truth
 -> load execution_constraints
@@ -212,6 +217,7 @@ load_skill_runtime
 -> read Phase Runtime Directory/current-runtime-context.md
 -> read Phase Runtime Directory/checkpoint-runtime.md
 -> read current valid Planning Handoff
+-> compare Planning Handoff revisions and execution queues with Runtime snapshot
 -> read Phase Runtime Directory/project-execution-baseline.md
 -> read current-stage Source of Truth
 -> read Phase Runtime Directory/task.md
@@ -261,6 +267,9 @@ long-task-orchestrator 只能承接 Planning 已确认的 `execution_ready` Hand
 读取 Planning Handoff
 -> 确认 handoff_type
 -> 确认 requires_execution_handoff
+-> 读取并校验 planning_baseline_revision
+-> 判定 initial / incremental handoff
+-> 读取并校验 incremental_execution_contract
 -> 读取 assembled_documents
 -> 读取 handoff_role_mapping
 -> 读取 execution_constraints
@@ -271,7 +280,7 @@ long-task-orchestrator 只能承接 Planning 已确认的 `execution_ready` Hand
 -> 通过后才进入环境检查和 task.md 生成
 ```
 
-合法入口必须同时满足 `requires_execution_handoff: true` 与 `handoff_type: execution_ready`，并确认 Handoff 有效、Development Landing Checklist 真实存在且已确认、14/15 或等价框架路径真实存在、`assembled_documents` 仅含真实路径、`handoff_role_mapping` 可解析、`execution_constraints` 存在、无 P0 `blocking_open`、任务可追溯且 Handoff 未失效。
+合法入口必须同时满足 `requires_execution_handoff: true` 与 `handoff_type: execution_ready`，并确认 Handoff 有效、`planning_baseline_revision` 合法、`incremental_execution_contract` 完整、Development Landing Checklist 真实存在且已确认、14/15 或等价框架路径真实存在、`assembled_documents` 仅含真实路径、`handoff_role_mapping` 可解析、`execution_constraints` 存在、无 P0 `blocking_open`、任务可追溯且 Handoff 未失效。
 
 以下任一条件必须停止，且不得生成 `task.md` 或开始 implementation：
 
@@ -279,12 +288,55 @@ long-task-orchestrator 只能承接 Planning 已确认的 `execution_ready` Hand
 handoff_type = planning_only
 requires_execution_handoff = false
 execution_constraints = missing
+planning_baseline_revision = missing_or_conflicting
+incremental_execution_contract = missing_or_invalid
+active_change_revision = missing_unexpected_or_conflicting
+execution_queue_overlap_or_unknown_task_revision
 Development Landing Checklist = missing_or_unconfirmed
 P0 parameter_status = blocking_open
 Handoff path != formal document path
 ```
 
 不得根据文件编号、现存 13 文件、聊天记忆、期次名称、`task.md` 或历史 Runtime 反向猜测 Handoff 类型。
+
+### Handoff Revision and Execution Selection Gate
+
+Long 必须把 Planning Handoff 分为两类，并执行不同的一致性校验：
+
+```text
+initial execution_ready:
+  top-level active_change_revision absent
+  incremental_execution_contract.active_change_revision absent
+
+incremental execution_ready:
+  top-level active_change_revision present
+  = incremental_execution_contract.active_change_revision
+```
+
+两类 Handoff 的顶层 `planning_baseline_revision` 都必须存在，并与 `incremental_execution_contract.planning_baseline_revision` 完全一致。`active_change_revision` 不得使用空字符串、`null`、`unknown`、`not_applicable` 或虚构占位值。
+
+`incremental_execution_contract` 必须包含：
+
+```yaml
+execute_only: []
+resume_only: []
+reexecute_affected_part: []
+context_only: []
+completed_locked: []
+cancelled: []
+prohibited_actions: []
+```
+
+六个 TASK 列表必须两两互斥，并能唯一解析到当前有效 TASK contract revision。Long 的任务选择规则固定为：
+
+- `execute_only`：生成或保留为待执行 Runtime Task；包括新增、替代、扩展任务以及原基线中未开始但仍有效的 carried-forward pending TASK。
+- `resume_only`：只恢复该 TASK 尚未完成且未失效的部分，不得从头重跑。
+- `reexecute_affected_part`：只失效并重做 Handoff 明确指出的受影响部分，保留未受影响事实与证据。
+- `context_only`：只供理解依赖和背景，不得生成可执行 Runtime Task。
+- `completed_locked`：保持完成状态并锁定历史，不得重跑、重新生成 EXEC 或覆盖完成证据。
+- `cancelled`：不得执行；保留已有历史和取消依据。
+
+`prohibited_actions` 是本次执行的硬约束，必须写入 Runtime 快照并逐项遵守。完整 Development Landing Checklist 或文档 13 只提供当前有效合同视图，不自动成为执行队列；不得把未出现在允许队列中的 TASK 加入 `task.md`。
 
 默认承接 `planning-layer-runtime` 的文档职责链路，而不是固定编号链路：
 
@@ -327,6 +379,7 @@ implementation_before_planning_handoff -> DO_NOT_IMPLEMENT
 
 ```text
 confirmed_source_of_truth -> Phase Runtime Directory/task.md
+incremental_execution_contract allowed queues -> Phase Runtime Directory/task.md executable scope
 Phase Runtime Directory/task.md -> Phase Runtime Directory/execution-events.md / validation-results.md / agent-decisions.md
 formal_execution_record -> planning handoff 指定的 Execution and Integration Record
 formal_acceptance_record_reference -> planning handoff 指定的 Acceptance and Retrospective Record（read-only）
@@ -361,6 +414,8 @@ Implementation Placement Gate
 -> Dependency Governance Gate（涉及依赖变更时）
 -> task.md Static Task Definition
 ```
+
+每个 Runtime Task 还必须记录 `planning_baseline_revision`、可选 `active_change_revision`、`task_contract_revision` 与 `execution_disposition`。只有 `execute_only`、`resume_only`、`reexecute_affected_part` 三类允许进入可执行状态；其余三类只保留为锁定/上下文/取消索引，或在已有 Runtime 中按 Handoff 约束收敛，不得被执行。
 
 承接策略只允许 `extend_existing_domain`、`reuse_shared_capability`、`create_stable_business_domain`，优先级依次如此。新建长期业务域必须具有正式架构依据和清晰、稳定、无重复的职责边界，否则停止并写回上游。
 
@@ -414,6 +469,9 @@ Phase Runtime Directory/long-runtime-testing-summary.md
 必须包含：
 
 ```yaml
+planning_baseline_revision:
+active_change_revision: # 初始 Handoff 省略
+executed_task_contract_revisions: []
 automated_passed:
 automated_failed:
 automated_skipped:
@@ -427,6 +485,8 @@ owner_runtime: testing-layer-runtime
 字段规则：
 
 - `automated_passed`：记录 long 已执行且通过的自动化验证，必须包含 evidence 引用。
+- `planning_baseline_revision` 与可选 `active_change_revision`：标识本次实现实际消费的 Planning Handoff revision；初始 Handoff 必须省略 `active_change_revision`。
+- `executed_task_contract_revisions`：逐项记录本轮实际执行、恢复或局部重做的 TASK 与 contract revision，不得包含 `context_only`、`completed_locked` 或 `cancelled`。
 - `automated_failed`：记录失败的自动化验证，必须包含失败摘要和 evidence 引用。
 - `automated_skipped`：记录未执行或不可用的自动化验证，必须包含原因。
 - `manual_required`：记录 testing-layer-runtime 后续负责的人工测试、真实设备测试、服务器/云端验证、外部能力验证、最终验收或上线前验证。
@@ -600,6 +660,19 @@ long-task-orchestrator 不负责执行或等待：
 
 当 testing-layer-runtime、人工本地测试或用户截图反馈确认存在开发缺陷时，long-task-orchestrator 可以重新进入 patch runtime。
 
+进入 Patch Runtime 前必须先消费上游的 Execution/Test Change Triage 结果，或按同一分类协议形成可审计判定：
+
+```text
+implementation_defect + current Planning contract remains valid -> fix_in_execution
+test_defect -> return_to_testing
+planning_gap -> reopen_current_planning
+requirement_change -> reopen_current_planning
+design_drift changing architecture/API/data/permission/state/UI/acceptance contract -> reopen_current_planning
+deferred_improvement -> defer_or_reject_per_confirmed_disposition
+```
+
+只有 `fix_in_execution` 可以进入 Patch Runtime。需要 `reopen_current_planning` 时必须停止实现，交回 planning-layer-runtime 生成新的增量 Handoff；不得用 Patch 掩盖 Planning 缺口、需求变化或合同变化。
+
 触发条件：
 
 ```text
@@ -615,6 +688,7 @@ Patch Runtime 必须复用主执行门禁，顺序固定：
 ```text
 confirm_patch_source
 -> confirm_patch_scope
+-> confirm_change_triage_disposition = fix_in_execution
 -> confirm_existing_runtime_valid
 -> reload_current_planning_handoff
 -> recheck_execution_constraints
@@ -663,7 +737,7 @@ Patch Runtime 不得：
 - 自行补充业务参数或超出 `explicitly_delegated` 范围。
 - 绕过 Dependency Governance Gate。
 
-若缺陷证明上游 SoT 存在缺口，只能记录 `write-back_required` 并等待用户或上游流程确认。
+若缺陷证明上游 SoT 存在缺口、需求已变化或设计漂移改变正式合同，必须记录 Change Triage 证据并切回 planning-layer-runtime；只有新的增量 `execution_ready` Handoff 通过 revision 与队列校验后，Long 才能继续受影响范围。
 
 ## Patch Completion Rule
 

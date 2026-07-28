@@ -10,9 +10,9 @@
 
 | Skill | 适用任务 | 边界 |
 | --- | --- | --- |
-| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | 开发前梳理需求并产出已确认的规划交接。 | 不写生产代码，不执行测试。 |
-| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | 根据已确认规划实现至少 4 个实现单元，执行自动化验证，并交接到 `ready_for_local_test`。 | 不负责人工验收和上线批准。 |
-| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | 继承 long 的自动化证据，管理人工、设备、服务器、外部能力和最终验收。 | 不修改业务代码，不批准生产上线。 |
+| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | 梳理需求、冻结执行基线、产出初始/增量交接，并在 Change Triage 准入后精确重入规划。 | 不写生产代码，不执行测试。 |
+| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | 按带 revision 的执行队列完成至少 4 个实现单元，保护未受影响和已完成工作，执行自动化验证并交接到 `ready_for_local_test`。 | 不负责人工验收，也不吸收未分流的合同变化。 |
+| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | 继承带 revision 的 long 自动化证据，管理人工、设备、服务器、外部能力和最终验收，并把发现分流到 Testing、Long 或 Planning。 | 期次状态只写绑定的 writeback target；不修改业务代码，不批准生产上线。 |
 | [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | 按 10 种真实工作场景路由改动检查、根因诊断、确认修复、完整性核查、审计、重构评估、合并检查、hotfix 和规范治理。 | 场景 1–9 单次完成；只有规范治理使用交互式七步。项目运行态位于 `.runtime/ai-code-inspection/`。它不是发布或安全门禁。 |
 
 正常开发链路：
@@ -27,6 +27,8 @@ planning-layer-runtime
 ```
 
 `ai-code-inspection` 是独立流程，可单独用于代码检查、根因诊断、确认修复、需求完整性核查、审计、重构评估、合并准备、hotfix 或规范治理。
+
+Planning Execution Baseline 冻结后，已接受的需求或合同变化通过追加式 Change Set 和增量 Handoff 流转。Long 只消费被选中的执行队列，Testing 先分类再回流；默认不会重开或重跑整个期次。
 
 ## 部署到 Agent 项目
 

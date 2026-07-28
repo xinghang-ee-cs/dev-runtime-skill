@@ -8,6 +8,7 @@
 
 - preflight 已通过
 - Planning Handoff Intake Gate 已通过
+- Planning Handoff revision consistency 与 incremental execution selection 已通过
 - `execution_constraints` 已从当前有效 Planning Handoff 读取
 - `task.md` 已生成
 - Runtime 上下文有效
@@ -24,6 +25,8 @@
 
 ```text
 select_next_executable_unit
+-> confirm_task_is_in_execute_resume_or_reexecute_queue
+-> confirm_task_contract_revision_matches_handoff
 -> confirm_dependencies
 -> confirm_execution_constraints_current
 -> confirm_implementation_contract_complete
@@ -42,6 +45,19 @@ select_next_executable_unit
 
 当当前执行结果达到 `SKILL.md` 的 Long Runtime Completion Boundary 时，不得执行 `continue_next_unit`。
 
+任务选择不得扫描完整 Development Landing Checklist 后自行决定。选择语义固定为：
+
+```text
+execute_only -> 从 TODO 开始执行
+resume_only -> 从已有可靠检查点继续未完成部分
+reexecute_affected_part -> 只失效并重做明确受影响部分
+context_only -> NEVER_EXECUTE
+completed_locked -> NEVER_RERUN_OR_REGENERATE_EXEC
+cancelled -> NEVER_EXECUTE
+```
+
+若当前 Runtime 中已有 TASK 与新 Handoff 队列不一致，先执行 `context-lifecycle.md` 的精确失效传播，不得把整个期次或全部 TASK 重置。
+
 Patch 分支：
 
 ```text
@@ -49,6 +65,7 @@ if testing_feedback_patch_confirmed:
   enter_patch_runtime
   -> confirm_patch_source
   -> confirm_patch_scope
+  -> confirm_change_triage_disposition_is_fix_in_execution
   -> confirm_existing_runtime_valid
   -> reload_current_planning_handoff
   -> recheck_execution_constraints
@@ -78,6 +95,7 @@ Patch 停止条件：
 
 ```text
 patch_scope_untraceable -> STOP
+patch_change_triage_requires_planning_reentry -> STOP_AND_RETURN_TO_PLANNING
 patch_introduces_new_requirement_without_user_confirmation -> STOP
 patch_requires_SoT_change_without_writeback -> STOP
 patch_crosses_P0_without_boundary_confirmation -> STOP
@@ -114,7 +132,7 @@ STOP_IMPLEMENTATION
 
 适用于新增未规划模块、以期次或 Planning ID 命名实现资产、修改 API/权限/状态机/数据模型/租户边界/用户可见规则/关键参数、引入外部能力或正式业务域，以及改变验收口径。禁止记录偏差后继续开发。
 
-若上游正式计划更新，按 `context-lifecycle.md` 失效 Runtime Context、提升 `context_version`、使受影响 TASK 进入 `INVALIDATED`，重读 Handoff/SoT 后重新生成 Context 与 TASK。
+若上游正式计划更新，按 `context-lifecycle.md` 校验新的 baseline/change revision，精确失效受影响 TASK，提升 `context_version`，保留 `completed_locked` 与未受影响事实，重读 Handoff/SoT 后只重建允许队列对应的 Context 与 TASK。
 
 ## Worker/SubAgent 编排
 

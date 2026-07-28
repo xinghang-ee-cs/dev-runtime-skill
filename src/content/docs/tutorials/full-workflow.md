@@ -15,11 +15,11 @@ import { Steps } from '@astrojs/starlight/components';
 
 2. **形成执行交接**
 
-   规划层定义实现范围、约束、风险和“需要证明什么”。在用户确认前，不进入实现。
+   规划层定义实现范围、约束、风险和“需要证明什么”，冻结 Planning Execution Baseline，并生成带 `planning_baseline_revision` 和增量执行合同的交接。在用户确认前，不进入实现。
 
 3. **执行实现与自动化验证**
 
-   `long-task-orchestrator` 读取唯一的 Source of Truth，完成预检、实现、迁移以及项目要求的自动化测试，并记录验证证据。
+   `long-task-orchestrator` 校验初始/增量 Handoff revision，只消费 `execute_only`、`resume_only`、`reexecute_affected_part`，保护 `context_only`、`completed_locked` 和 `cancelled`，再完成实现、迁移和自动化验证。
 
 4. **到达开发交接状态**
 
@@ -27,7 +27,7 @@ import { Steps } from '@astrojs/starlight/components';
 
 5. **组织人工和真实环境测试**
 
-   `testing-layer-runtime` 继承 long 的有效自动化结果，再安排人工、真实设备、服务器、云端或外部能力验证。
+   `testing-layer-runtime` 核对 Planning/Long revision，继承有效自动化结果，再安排人工、真实设备、服务器、云端或外部能力验证。所有期次状态和证据写入绑定的 phase testing runtime，不写入根 `.runtime/`。
 
 6. **整理发布移交材料**
 
@@ -52,7 +52,8 @@ planning-layer-runtime
 - 规划未确认：停留在规划层，不用一句“开始开发”绕过确认。
 - 实现预检失败：报告阻塞项，不隐式打开 execution gate。
 - 自动化失败：由 long 保留失败状态和证据，不交给 testing 掩盖。
-- 人工测试发现缺陷：确认反馈后交回 long 修复，再生成 `ready_for_local_retest` 交接。
+- 人工测试发现偏差：先执行 Change Triage。实现缺陷交回 Long；测试缺陷留在 Testing；规划缺口、需求变化或合同级设计漂移重入 Planning。
+- Planning 重入：追加 Change Set，只修订受影响合同并生成增量 Handoff；已完成和未受影响工作保持锁定或继续。
 - 发布条件不满足：测试层记录阻塞并移交，不自行批准上线。
 
 :::tip[保持单一负责人]

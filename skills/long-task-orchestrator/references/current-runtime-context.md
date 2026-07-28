@@ -20,6 +20,9 @@ runtime_mode:
 based_on_plan:
 recovery_source:
 planning_handoff_source:
+planning_baseline_revision:
+active_change_revision:
+incremental_execution_contract_snapshot:
 execution_constraints_source:
 execution_constraints_status:
 implementation_contract_status:
@@ -66,6 +69,16 @@ runtime_mode: main
 based_on_plan: <confirmed Development Landing Checklist path>
 recovery_source: <confirmed Development Landing Checklist path>
 planning_handoff_source: <current valid Planning Handoff path>
+planning_baseline_revision: <Planning Execution Baseline revision>
+active_change_revision: <incremental Handoff revision; omit this key for initial Handoff>
+incremental_execution_contract_snapshot:
+  execute_only: []
+  resume_only: []
+  reexecute_affected_part: []
+  context_only: []
+  completed_locked: []
+  cancelled: []
+  prohibited_actions: []
 execution_constraints_source: <field/path reference in Planning Handoff>
 execution_constraints_status: <passed | failed | invalidated>
 implementation_contract_status: <passed | blocked | pending>
@@ -118,6 +131,9 @@ ready_for_local_test_since: 首次进入 ready_for_local_test 的时间
 ready_for_local_retest_since: 最近一次进入 ready_for_local_retest 的时间
 open_blockers: 当前仍有效阻塞项
 open_manual_required: 交给 testing-layer-runtime 的人工/真实环境验证项
+planning_baseline_revision: 当前实际消费的 Planning Execution Baseline revision
+active_change_revision: 仅增量 Handoff 存在；初始 Handoff 必须省略字段而非写空值
+incremental_execution_contract_snapshot: 当前 Handoff 六类 TASK 队列和 prohibited_actions 的恢复快照
 formal_acceptance_record: 只读路径指针，不授权 Long 创建或写入正式验收记录
 acceptance_status: Long 中固定为 not_started
 acceptance_owner_runtime: 固定为 testing-layer-runtime
@@ -127,6 +143,7 @@ acceptance_owner_runtime: 固定为 testing-layer-runtime
 
 ```text
 checkpoint-runtime.md and current-runtime-context.md must agree on current_effective_phase
+checkpoint-runtime.md and current-runtime-context.md must agree with Planning Handoff revisions and execution queue snapshot
 dependency_governance_status must agree with Preflight Result, checkpoint, baseline, and active task
 project_execution_baseline_file remains null during first bootstrap until the Baseline instance is written and marked current
 once written, project_execution_baseline_file must point to current Phase Runtime Directory
@@ -144,6 +161,8 @@ capability_governance_confirmed = <path or not_applicable>
 planning_capability_gate_passed_or_not_applicable = false
 planning_capability_binding_gate_passed_or_not_applicable = false
 planning_handoff_intake_passed = false
+planning_handoff_revision_consistency_passed = false
+incremental_execution_contract_loaded = false
 execution_constraints_loaded = false
 phase_runtime_directory_created = false
 runtime_state_instantiated = false
@@ -167,6 +186,15 @@ project_execution_baseline_file: <phase_runtime_directory>/project-execution-bas
 based_on_plan: <development_landing_checklist_path>
 recovery_source: <development_landing_checklist_path>
 planning_handoff_source: <planning_handoff_path>
+planning_baseline_revision: <planning-baseline-revision>
+incremental_execution_contract_snapshot:
+  execute_only: [<TASK-ID@contract-revision>]
+  resume_only: []
+  reexecute_affected_part: []
+  context_only: []
+  completed_locked: []
+  cancelled: []
+  prohibited_actions: []
 execution_constraints_source: <Planning Handoff path>#execution_constraints
 execution_constraints_status: passed
 implementation_contract_status: passed

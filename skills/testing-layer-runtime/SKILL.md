@@ -1,6 +1,6 @@
 ---
 name: testing-layer-runtime
-description: 本项目本地 Skill，用于在 long-task-orchestrator 完成 ready_for_local_test 后管理测试生命周期：读取 planning 的测试范围与 long 的自动化测试交接，继承已通过自动化结果，规划测试顺序，指导人工/真实设备/云端/外部能力/最终验收，并在完整上线时整理发布/安全门禁移交材料。Use when Codex needs to manage phase testing, manual acceptance, real-device validation, server verification, external capability validation, final acceptance, test evidence/writeback, or release handoff. Do not use it to re-run long-owned vitest/jest/integration/api-test/playwright automation unless an allowed reuse exception applies.
+description: 通用测试治理 Skill，用于在 long-task-orchestrator 完成 ready_for_local_test 后管理期次测试生命周期：读取 planning 测试范围与带 revision 的 long 自动化交接，继承已通过自动化结果，规划测试顺序，指导人工/真实设备/云端/外部能力/最终验收，对测试发现做 Execution/Test Change Triage，并在完整上线时整理项目发布/安全流程移交材料。Use when Codex needs to manage phase testing, manual acceptance, real-device validation, server verification, external capability validation, final acceptance, test evidence/writeback, change triage, or release handoff. Do not use it to re-run long-owned vitest/jest/integration/api-test/playwright automation unless an allowed reuse exception applies.
 ---
 
 # Testing Layer Runtime
@@ -13,7 +13,7 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 
 ## Skill 边界
 
-`planning-layer-runtime` 截止到开发开始前，负责需求、范围、数据模型、权限模型、UI、验收标准、风险和 P0/P1/P2。允许产出 `11-测试方案与验收用例.md`，但只定义“测什么”，禁止定义“怎么测、谁来测、测试顺序、执行状态、测试结果”。
+`planning-layer-runtime` 负责冻结执行前合同，并在执行/测试发现被分类为 planning gap、accepted requirement change 或改变正式合同的 design drift 时受控重入；它允许产出项目指定的 Test and Acceptance Plan，但只定义“测什么”，禁止定义“怎么测、谁来测、测试顺序、执行状态、测试结果”。
 
 `long-task-orchestrator` 截止到 `ready_for_local_test`，负责开发、重构、迁移、自动化测试代码、单元测试、业务测试、自动化执行和自动化测试结果记录。`vitest`、`jest`、`integration`、`api-test`、`playwright` 默认属于 long。
 
@@ -25,12 +25,30 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 
 - 项目环境事实源（如 `docs/environment.md`、README、CI 配置或用户指定文档）：项目本地、云端、数据库、OpenAPI、Playwright、git 工具事实源。
 - `testing-handoff.md` 或 `long-runtime-testing-summary.md`：long 自动化测试事实源，优先级高于重新执行。
-- `docs/计划安排/**/11-测试方案与验收用例.md`：只读取测试范围与验收对象。
+- Planning Handoff 指定的 Test and Acceptance Plan：只读取测试范围与验收对象，不按固定编号或目录猜测路径。
 - `references/01-test-runtime-core.md`：职责边界、Long Testing Handoff、Test Planning Phase、依赖顺序和停止条件。
 - `references/02-test-environment-gates.md`：自动化结果继承、人工/真实设备、服务器、release handoff 环境规则。
 - `references/03-evidence-format.md`：证据、截图、Manual Guidance 和最终报告格式。
 - `references/04-destructive-boundaries.md`：破坏性测试、服务器测试、上线测试和安全告警边界。
 - `references/05-test-writeback.md`：状态、阶段报告、证据索引、`test-execution-order.md` 和阻塞项回写规则。
+
+## Project Path Binding
+
+首次进入目标项目时，必须根据 Planning Handoff、Long Testing Handoff、项目现有规划目录约定和真实文件绑定以下占位符：
+
+```text
+<phase_test_plan_path>
+<long_testing_handoff_path>
+<phase_testing_runtime_directory>
+<formal_acceptance_record_path>
+```
+
+- `<phase_testing_runtime_directory>` 是本期 `writeback_target`，不是固定目录名。
+- 优先使用 Long Testing Handoff 或 Planning Handoff 明确声明的期次与写回位置；未声明时，才从已确认的当前规划目录和项目约定派生。
+- 目标路径无法唯一确认、跨期冲突或写入权限不足时，进入 Test Intake Mode 并阻断写回。
+- 本期测试状态、事件、证据索引、人工队列、依赖顺序和恢复数据只能写入 `<phase_testing_runtime_directory>`。
+- 项目根目录 `.runtime/` 只允许保存该 Skill 明确定义的跨期项目级环境索引或稳定配置；不得保存某一期测试状态、证据、队列、游标或恢复快照。
+- 不得沿用来源项目的项目名、期次名、绝对路径、固定文档编号或历史 Runtime 位置。
 
 ## Long Testing Handoff
 
@@ -44,6 +62,9 @@ long-runtime-testing-summary.md
 Long Runtime 必须提供：
 
 ```yaml
+planning_baseline_revision:
+active_change_revision: # 初始 Handoff 省略
+executed_task_contract_revisions: []
 automated_passed:
 automated_failed:
 automated_skipped:
@@ -57,7 +78,7 @@ Testing Runtime 必须继承 `automated_passed`，并把继承状态记录为：
 reused_from_long
 ```
 
-若 long handoff 缺失、字段不完整或证据不存在，进入 Test Intake Mode 并报告缺口；不得用测试层重复执行来掩盖 handoff 缺失。
+Testing 必须核对 Long Handoff 的 baseline/change revision 与其所引用 Planning Handoff 一致，且 `executed_task_contract_revisions` 不包含 `context_only`、`completed_locked` 或 `cancelled`。若 long handoff 缺失、字段不完整、revision 冲突或证据不存在，进入 Test Intake Mode 并报告缺口；不得用测试层重复执行来掩盖 handoff 缺失或过期交接。
 
 ## Automated Result Reuse Rule
 
@@ -85,7 +106,7 @@ reused_from_long
 
 - 进入任何测试模式前，必须解析 `current_test_epoch`。
 - `current_test_epoch` 来源优先级：long handoff 的 `source_of_truth` / `runtime_epoch` / formal execution record；planning test plan 路径中的期次目录；用户明确指定的期次。
-- `writeback_target` 固定为 `docs/计划安排/<current_test_epoch>/testing-runtime/`。
+- `writeback_target` 必须绑定为 `<phase_testing_runtime_directory>`，并与当前期次 Handoff、项目目录约定和既有 Runtime 事实一致。
 
 动作：
 
@@ -104,12 +125,41 @@ reused_from_long
 - 禁止把 long 已通过自动化重新跑一遍再声称 testing 通过。
 - 禁止在 `writeback_status != updated` 时推进到下一个测试项。
 
+## Execution/Test Change Triage
+
+测试发现不能直接等同于开发 Bug。任何会导致返工、改变测试依据或需要上游确认的发现，必须先在 `<phase_testing_runtime_directory>/change-triage.md` 记录：
+
+```yaml
+change_decision:
+  source_stage: testing
+  finding_type: <implementation_defect | test_defect | planning_gap | requirement_change | design_drift | deferred_improvement>
+  observed_result:
+  expected_source:
+  is_current_plan_still_valid:
+  affected_ids: []
+  planning_reentry_required:
+  reentry_documents: []
+  change_level:
+  disposition: <fix_in_execution | fix_in_test | reopen_current_planning | defer_to_next_phase | reject_change>
+```
+
+分流规则：
+
+- 当前 Planning 合同仍有效、实现未满足合同：`implementation_defect -> fix_in_execution`，为 long-task-orchestrator 形成可追溯 defect handoff；只阻断受影响测试。
+- 测试脚本、测试数据、环境准备、证据映射或 Testing Runtime 自身错误：`test_defect -> fix_in_test`；只能修改测试层获准资产和 Runtime，不得借此改业务代码或 Planning SoT。
+- Planning 缺少必要合同：`planning_gap -> reopen_current_planning`。
+- 用户接受的新需求或验收变化：`requirement_change -> reopen_current_planning`。
+- 架构、API、数据、权限、状态、UI/体验或验收合同需要改变：`design_drift -> reopen_current_planning`。
+- 不进入本期的改善项：按确认结果 `defer_to_next_phase` 或 `reject_change`。
+
+`reopen_current_planning` 必须停止受影响测试并把 triage 证据交给 planning-layer-runtime；只有新的增量 Planning Handoff、Long 实现及对应 Long Testing Handoff 完成后，受影响测试才能恢复。未受影响且依赖仍成立的测试与已完成证据不得无条件失效或重跑。
+
 ## 执行模式与策略
 
 执行模式：
 
 - Test Intake Mode：测试来源、long handoff、环境或用例范围不清楚时使用。
-- Test Planning Phase：根据 `11-测试方案与验收用例.md` 和 Long Testing Handoff 生成 `test-execution-order.md`，输出自动化已完成、自动化失败、待人工验证、待服务器验证、待上线验证。
+- Test Planning Phase：根据 Planning Handoff 指定的 Test and Acceptance Plan 和 Long Testing Handoff 生成 `test-execution-order.md`，输出自动化已完成、自动化失败、待人工验证、待服务器验证、待上线验证。
 - Test Governance Mode：管理人工测试、真实设备测试、外部能力验证和证据闭环。
 - Server Verification Mode：部署完成后验证服务器独有事实。
 - Release Handoff Mode：完整上线测试时整理发布/安全门禁移交信息；若项目提供专门 release/security skill 或流程，则切换过去。
@@ -126,8 +176,8 @@ reused_from_long
 ## 执行顺序
 
 1. 定位当前期次和 `writeback_target`。
-2. 读取 Long Testing Handoff；缺失时进入 Test Intake Mode 并报告 handoff 缺口。
-3. 读取 `11-测试方案与验收用例.md`，只提取”测什么”。
+2. 读取 Long Testing Handoff，校验 baseline/change revision 与 TASK contract revision；缺失或冲突时进入 Test Intake Mode 并报告 handoff 缺口。
+3. 读取 Planning Handoff 指定的 Test and Acceptance Plan，只提取”测什么”。
 4. 进入 Test Planning Phase，先继承 `automated_passed`，标记 `reused_from_long`。
 5. 对 `automated_failed`、`automated_skipped`、`manual_required`、服务器验证和上线验证建立分类与阻塞关系。
 6. 基于已继承、失败、跳过、人工、服务器和上线验证范围，生成或更新 `test-execution-order.md`。
@@ -138,13 +188,15 @@ reused_from_long
 11. 推进到下一个测试项前，必须通过 Test Progression Gate。
 12. 只执行依赖已通过的人工/真实设备/服务器验证。
 13. 每次用户反馈并完成 Runtime 回写后，若仍存在下一个可执行人工操作，必须主动引导下一个操作；若存在阻塞、证据不足、破坏性确认、服务器信息缺失或测试完成，则说明当前状态和下一步。
-14. 完成非上线验证后输出验收结论；完整上线时进入 Release Handoff Mode。
+14. 每个失败、偏差或新反馈先执行 Execution/Test Change Triage；按 disposition 在 Testing 修正、交回 Long、重入 Planning、延期或拒绝。
+15. 完成非上线验证后输出验收结论；完整上线时进入 Release Handoff Mode。
 
 ## 硬边界
 
 - 不修改业务产物。
 - 不修改 planning SoT 或当前项目文档；只写 Runtime 输出目录。
 - 不从 testing 反向定义需求、范围、P0/P1/P2、UI 或验收标准。
+- 不把 `implementation_defect`、`test_defect`、`planning_gap`、`requirement_change` 与 `design_drift` 混为同一种 Bug，也不绕过 triage 直接返工。
 - 不重新执行 long 已通过且有证据的 `vitest`、`jest`、`integration`、`api-test`、`playwright`。
 - 不把纯 UI 图对照、页面截图差异或视觉验收生成独立人工测试用例；UI 状态只能作为业务用例附属证据，或由自动化快照/组件测试覆盖。
 - 不把测试入口删除、测试快捷操作删除或测试专用接口删除生成到某一期的独立测试用例；这类事项只在完整上线/最终发布门禁中移交项目定义的发布/安全流程。

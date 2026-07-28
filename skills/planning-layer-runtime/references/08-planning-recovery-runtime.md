@@ -13,6 +13,7 @@
 - Recovery Event reuse
 - Runtime Audit Logging
 - Decision Snapshot Recovery Boundary
+- 已通过 Execution/Test Change Triage 的精确 Planning Reentry
 
 禁止：
 
@@ -23,6 +24,8 @@
 - Runtime 自动优化自身
 - Runtime 自动修改规则
 - Runtime 自动删除规则
+- 对 implementation_defect 或 test_defect 触发 Planning Recovery
+- 未经范围准入把新增需求吸收到当前期次
 
 ## 2. 恢复运行时（Recovery Runtime）
 
@@ -43,7 +46,7 @@ Recovery Runtime 只允许：
 
 ## 3. 恢复触发条件（Recovery Trigger）
 
-以下情况触发 Recovery：
+以下情况只在当前 Planning 合同确实失效时触发 Recovery：
 
 - PROJECT-CURRENT-BASELINE_CHANGED
 - FLOW-CONTRACT_CHANGED
@@ -68,7 +71,7 @@ Recovery Runtime 只允许：
 - 接口契约修改
 - 文档确认状态回退
 - UI/交互确认状态回退
-- 测试失败
+- CHANGE_TRIAGE_PLANNING_REENTRY_REQUIRED
 - Validation Gate 失败
 - Runtime Gate 失败
 - Capability Binding 失效
@@ -81,6 +84,8 @@ Recovery Runtime 只允许：
 - 当前文档或确认对象无法确定
 - 用户中途插入其他问题
 - 同时存在多个草案
+
+执行、联调、测试或验收发现的普通失败本身不是 Recovery Trigger。进入本 Runtime 前必须已经形成符合 `04-planning-format-spec.md` 的 `change_decision`；`implementation_defect`、`test_defect` 和规划仍有效的 `design_drift` 不进入本 Runtime。只有 `planning_gap`、已通过范围准入的 `requirement_change` 或真正改变设计合同的 `design_drift` 才允许触发。
 
 ### 3.1 当前交互恢复来源
 
@@ -104,6 +109,10 @@ Recovery Runtime 只允许：
 -> 恢复 execution_handoff_decision
 -> 检查 decision_status
 -> 与 Planning Context 中的 execution_handoff_decision 核对
+-> 恢复 planning_execution_baseline_reference
+-> 恢复 active_change 的 revision / change_status / decision_ref
+-> 仅按 decision_ref 读取 decision-log 中对应 Change Set Decision Snapshot
+-> 核对 Change Set 与 Recovery Output 受影响范围
 -> 恢复 document_assembly
 -> 核对实际已生成正式文档的状态
 -> 核对 Document Assembly Plan
@@ -136,6 +145,11 @@ Planning Context 中已确认的 `execution_handoff_decision` 是权威语义来
 - Handoff 中的 `requires_execution_handoff`、`handoff_type` 必须与 Planning Context 一致。
 - Document Assembly Plan 中的 `execution_handoff_decision` 必须与 Planning Context 逐字段一致；它只是恢复当前装配计划的同步字段，不是第二个决策来源。
 - `current-interaction.yaml` 与 Planning Context 不一致，或 Document Assembly Plan 与恢复镜像不一致时，必须阻止恢复推进，回到 Planning Context 与本期恢复镜像修正。
+- 增量恢复必须同时具备 `planning_execution_baseline_reference` 与 `active_change.decision_ref`。只读取 `decision_ref` 指向的当前 Change Set 快照，不扫描完整 decision-log 推导当前 revision。
+- `active_change.change_status` 为 `closed` 或 `superseded` 时不得作为当前执行范围恢复；存在连续 Change Set 时只恢复当前 active revision，并通过快照中的 previous/supersedes 引用保留历史关系。
+- `decision_ref` 必须使用 `<phase_planning_runtime_directory>/decision-log.md#decision_id=<DEC-ID>`，并唯一命中同时包含 Change Set 与 Recovery Output 的 Decision Snapshot。只命中文件、标题或时间戳时不得继续恢复。
+- 当前 Snapshot 必须是相对冻结 Baseline 的累计有效增量；它已经包含仍有效前序 Change Set 的影响范围。Recovery 不读取 R2、R3 历史拼装当前状态，也不因 active 指针前移推断旧 revision 已 `closed` 或 `superseded`。
+- 15 尚不存在时，从 `current-interaction.yaml.future_phase_inputs` 恢复已确认 Planning Context 的最小镜像；同步到 15 或 planning_only Handoff 后转读正式承载。Baseline 已冻结但 14/15 缺失时，恢复为框架派生阻断，不得恢复到 `handoff_prepared` 或执行入口。
 
 `current-interaction.yaml` 是短期恢复来源，但不是正式 SoT、历史日志或长期聊天记录。不得新增 `recovery-state`、`feedback-runtime`、`confirmation-runtime` 或 `context-compression-runtime`。
 
@@ -163,7 +177,8 @@ blocking:
 - 不允许长篇解释。
 - 不允许 AI 推理内容。
 - 不允许自然语言总结。
-- 与当前用户反馈有关的恢复结果写回现有 `current-interaction.yaml` 字段；不得为 Recovery Output 新增独立持久化文件。
+- 与当前用户反馈有关的最小处理状态写回现有 `current-interaction.yaml` 字段；active Change Set 的完整 Recovery Output 必须与完整 Change Set 一起写入 `decision_ref` 指向的同一 Decision Snapshot。不得复制到 `current-interaction.yaml`，也不得为 Recovery Output 新增独立持久化文件。
+- `affected_documents`、`affected_tasks`、`affected_validation` 是后续 Document Assembly、TASK 修订、14/15 框架修订和增量 Handoff 的硬约束；未列入者不得被重建、重置或重新执行。
 
 ## 5. SoT 失效传播（SoT Invalid Propagation）
 
@@ -174,6 +189,8 @@ blocking:
 - Acceptance 失效
 - 任务承接准备失效
 - Capability Validation 失效
+
+传播只作用于与 active Change Set 的 `added_ids / modified_ids / superseded_ids` 存在依赖关系的对象；`unaffected_ids` 必须保持有效。禁止把“存在上游变化”解释为整期全量失效。
 
 示例：
 
@@ -223,9 +240,9 @@ SCN changed
 MODULE boundary changed
 -> related PAGE / UI-MOD / UX-SCN reopen
 
-global style changed
+global style changed（仅 replace_current 或受影响的 extend_current）
 -> related PROMPT-PAGE / PROMPT-MODULE / PROMPT-UX reopen
--> visual assets marked review_pending
+-> only affected visual assets marked review_pending
 
 FLOW / DOMAIN 变化
 -> 06 invalid
@@ -279,11 +296,15 @@ RISK / DEP / OPEN 变化
 -> 相关 15 预置验收项需要重新审查
 
 TASK 合同变化
--> 14 对应预置执行项失效
--> 15 对应预置验收项失效
--> 尚未填写真实事实的 14、15 标记 framework_rebuild_required
--> 未填写实际事实的部分按新 TASK 合同重建
+-> 只使 active Change Set 对应的 14 预置执行项失效
+-> 只使对应 15 预置验收项失效
+-> 受影响且尚未填写真实事实的 14、15 占位标记 framework_rebuild_required
+-> 未填写实际事实的受影响部分按新 TASK revision 重建或追加
 -> 已由后续阶段写入的实际事实不得被 planning recovery 自动删除、覆盖或伪造
+-> 未受影响 TASK / EXEC / TEST 保持原 ID、合同与状态
+-> completed_locked TASK 不得重新进入执行队列
+-> carried_forward pending TASK 保持 active，并继续进入新 Handoff.execute_only
+-> 正在执行且未受影响 TASK 继续进入 resume_only
 -> Handoff 需要在 Execution and Acceptance Framework Derivation Gate 通过后基于真实路径重新生成
 
 验收标准、风险关闭条件或发布门禁变化
@@ -291,15 +312,12 @@ TASK 合同变化
 -> 必须更新 15 框架后才能继续使用
 ```
 
-禁止：
-
-```text
-局部偷偷修复
-```
+禁止静默修复或全量重跑；必须记录 Change Set，并只处理明确受影响范围。
 
 规则：
 
-- 不得继续沿用旧 task、旧测试映射或旧 handoff。
+- 不得继续沿用已被 `superseded` 或 `invalid` 的受影响 task、测试映射或 handoff；未受影响和 `completed_locked` 内容必须继续保留。
+- 旧 Handoff 被 `superseded` 只表示旧执行边界失效，不得因此丢失原 Baseline 中仍有效的未完成 TASK；新 Handoff 必须重新分类并完整承接 carried-forward pending 与未受影响 in-progress TASK。
 - 必须重新读取当前有效 SoT，再继续后续文档。
 - Recovery 必须复用已有 Runtime Event Log 与现有事件类型。
 - 禁止新增日志目录、独立事件系统或独立 Recovery SoT。
@@ -307,11 +325,14 @@ TASK 合同变化
 - 视觉资产变化若导致主操作、进入条件、异常处理、旧入口处理或用户路径变化，必须回到 03；若影响合法业务旅程，则继续回到 01/02。
 - 不得继续沿用旧接口兼容结论。
 - 06/07/08 恢复时必须先读取当前有效 SoT，再恢复后续文档。
-- 不得继续沿用旧测试映射、旧任务拆分、旧能力结论或旧架构绑定。
+- 不得继续沿用已失效的受影响测试映射、任务合同、能力结论或架构绑定；未受影响结论不得被无条件重审。
 - 09/10/11 恢复时必须先读取当前有效 SoT，再继续下游文档或运行时。
 - 12/13/14/15 恢复时只处理 planning skill 内部的框架失效与重审标记，不定义其他 skill 的恢复行为。
 - 14、15 未填写实际事实的预置项可以标记为 `framework_rebuild_required` 并按新合同重建；已经由后续阶段填写的事实不得由 planning recovery 自动删除、覆盖、伪造或回退。
 - Recovery 不得出现“先有 14、15 才能确认 13”的恢复路径；14、15 只在 13 已确认后派生或重建未填写的预置项。
+- Recovery Output 与 active Change Set 不一致时不得继续；必须收窄到两者交集或先修正影响分析，禁止扩大到完整 00–15。
+- 原 TASK 结论错误时保留历史并设置 `contract_status: superseded`、`execution_disposition: cancelled`，再创建 `relation_to_previous: replaces | supersedes` 的替代 TASK；局部扩展时创建增量 TASK；正在执行的 TASK 只允许 `resume` 或 `reexecute_affected_part`。
+- TASK 保护必须分开：completed 未受影响项为 `completed_locked`；尚未开始且未受影响项为 carried-forward pending 并允许 `execute`；正在执行且未受影响项允许 `resume`；纯背景项才是 `context_only`。
 
 ### 5.1 执行交接分支变化传播
 
@@ -382,6 +403,7 @@ revalidation_required:
 - 禁止新增独立 Recovery Event System。
 - Recovery Trigger 只允许追加一条 Decision Snapshot。
 - Resume Gate 不得依赖历史 Decision Log。
+- Resume Gate 必须确认 Planning Execution Baseline 未被覆盖、Change Set revision 唯一、受影响清单已闭合、未受影响与已有真实事实均受保护，且增量 Handoff 可以明确允许执行范围。
 
 ## 7. 运行时审计层（Runtime Audit Layer）
 
@@ -577,6 +599,7 @@ Recovery Runtime 可以使用 Decision Snapshot，但只允许：
 - 追加 Recovery Trigger 决策快照
 - 在 Runtime Debugging 中读取 `planning-runtime/decision-summary.md`
 - 在用户主动回传日志时读取相关片段
+- 按本期 `current-interaction.yaml.active_change.decision_ref` 精确读取当前 Change Set Decision Snapshot
 
 禁止：
 
@@ -594,7 +617,7 @@ Recovery Runtime 可以使用 Decision Snapshot，但只允许：
 - `.runtime/planning-layer-runtime/` 是 Bootstrap Context，不是 Runtime Recovery Source。
 - 当前交互恢复先读取 `current-interaction.yaml`：文档目标再读取正式文档状态，最终总结目标读取总结版本与 `planning_status`；业务事实与失效传播仍以当前 SoT、当前 Gate 和当前 Recovery Output 为准。
 - 不得用 `.runtime/planning-layer-runtime/` 中的历史信息恢复正式业务状态。
-- Decision Snapshot 只能辅助复盘，不得成为恢复依据。
+- 历史 Decision Snapshot 只能辅助复盘，不得成为恢复依据；唯一例外是 `active_change.decision_ref` 精确指向的当前 Change Set 快照，它与 Planning Execution Baseline revision 共同恢复当前有效增量范围，但仍不替代正式 SoT。
 
 ## 13. 低熵规则（Low Entropy Rule）
 

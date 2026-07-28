@@ -19,9 +19,9 @@ Testing Runtime 的目标是管理测试生命周期：
 
 `planning-layer-runtime`：
 
-- 截止到开发开始前。
+- 负责冻结开发开始前的规划合同，并在 Execution/Test Change Triage 要求时受控重入。
 - 负责需求、范围、数据模型、权限模型、UI、验收标准、风险、P0/P1/P2。
-- 可产出 `11-测试方案与验收用例.md`，但只定义“测什么”。
+- 可产出 Planning Handoff 指定的 Test and Acceptance Plan，但只定义“测什么”。
 - 禁止定义“怎么测、谁来测、测试顺序、测试执行状态、测试结果”。
 
 `long-task-orchestrator`：
@@ -40,24 +40,29 @@ Testing Runtime 的目标是管理测试生命周期：
 
 按优先级读取：
 
-1. `testing-handoff.md`
-2. `long-runtime-testing-summary.md`
-3. `docs/计划安排/**/11-测试方案与验收用例.md`
+1. Planning/Long Handoff 指定的 `testing-handoff.md`
+2. Planning/Long Handoff 指定的 `long-runtime-testing-summary.md`
+3. Planning Handoff 指定的 Test and Acceptance Plan 真实路径
 4. 用户指定的用例 ID、功能范围、变更范围或验收目标
 
-`11-测试方案与验收用例.md` 只用于识别测试范围，不得从中继承执行顺序、测试状态或测试结果。
+Test and Acceptance Plan 只用于识别测试范围，不得从中继承执行顺序、测试状态或测试结果；不得依赖固定编号或固定目录猜测路径。
 
 ## Long Testing Handoff
 
 Testing Runtime 启动时必须优先读取 long 测试交接文件。Long Runtime 必须提供：
 
 ```yaml
+planning_baseline_revision:
+active_change_revision: # 初始 Handoff 省略
+executed_task_contract_revisions: []
 automated_passed:
 automated_failed:
 automated_skipped:
 manual_required:
 coverage:
 ```
+
+启动时必须确认 Long Testing Handoff 的 `planning_baseline_revision`、可选 `active_change_revision` 与其引用的当前 Planning Handoff 一致，并确认 `executed_task_contract_revisions` 只来自 `execute_only`、`resume_only` 或 `reexecute_affected_part`。revision 缺失、冲突、过期或包含 `context_only`、`completed_locked`、`cancelled` 时，Test Intake Gate 不得通过。
 
 字段含义：
 
@@ -116,6 +121,8 @@ writeback_status: updated
 ```text
 current_test_epoch:
 writeback_target:
+planning_baseline_revision:
+active_change_revision:
 long_testing_handoff:
 planning_test_scope:
 manual_required:
@@ -133,7 +140,7 @@ Test Intake Gate 之后必须进入 Test Planning Phase。
 
 输入：
 
-- `11-测试方案与验收用例.md`
+- Planning Handoff 指定的 Test and Acceptance Plan
 - Long Testing Handoff
 
 输出：
@@ -154,6 +161,41 @@ Test Intake Gate 之后必须进入 Test Planning Phase。
 - 对服务器和 release 事项只建立验证/移交项。
 - 不生成纯 UI 对照、页面截图差异或视觉验收的独立人工测试项。
 - 不生成某一期的测试入口删除、测试快捷操作删除或测试专用接口删除测试项；这些只在最终上线门禁中移交。
+
+## Execution/Test Change Triage Gate
+
+测试执行、人工反馈或证据核对出现偏差时，必须先形成 `change_decision`，再决定归属：
+
+```yaml
+change_decision:
+  source_stage: testing
+  finding_type:
+  observed_result:
+  expected_source:
+  is_current_plan_still_valid:
+  affected_ids: []
+  planning_reentry_required:
+  reentry_documents: []
+  change_level:
+  disposition:
+```
+
+| finding_type | 判定 | disposition |
+| --- | --- | --- |
+| `implementation_defect` | 当前 Planning 合同仍有效，实现结果偏离合同 | `fix_in_execution` |
+| `test_defect` | 测试脚本、测试数据、环境、证据映射或 Testing Runtime 错误 | `fix_in_test` |
+| `planning_gap` | 当前 Planning 缺少执行或验收所需合同 | `reopen_current_planning` |
+| `requirement_change` | 用户接受的新需求、范围或验收变化 | `reopen_current_planning` |
+| `design_drift` | 需要改变架构、API、数据、权限、状态、UI/体验或验收合同 | `reopen_current_planning` |
+| `deferred_improvement` | 不改变本期当前有效合同的后续改善 | `defer_to_next_phase` 或 `reject_change` |
+
+处理规则：
+
+- `fix_in_execution`：写入 `<phase_testing_runtime_directory>/change-triage.md` 并形成 defect handoff，交由 long-task-orchestrator patch；Testing 不改业务代码。
+- `fix_in_test`：只在 Testing 获准的测试资产和 Runtime 范围修正，按 attempt 与证据规则重测。
+- `reopen_current_planning`：停止受影响测试，将 triage 证据交给 planning-layer-runtime；等待新的增量 Planning Handoff、Long 实现和 Long Testing Handoff。
+- `defer_to_next_phase` / `reject_change`：记录确认依据和对当前验收的影响，不得静默忽略。
+- 只失效 `affected_ids` 及依赖传播真实命中的测试；未受影响的测试、已完成证据和 Long 自动化继承结果保持有效，除非 revision 或依赖事实证明它们也受影响。
 
 ## Manual Operation De-duplication Gate
 
@@ -412,6 +454,8 @@ Testing Runtime 必须优先使用 `manual-test-queue.md` 中 `MANUAL-OP` 的 `d
 - 服务器目标、账号、URL、部署版本或数据范围不清楚。
 - 发现安全风险、越权、数据泄露、异常流量或可被蓄意破坏的行为。
 - `writeback_target` 缺失。
+- Planning/Long Handoff revision 缺失、冲突或过期。
+- 测试发现尚未完成 Change Triage，或 disposition 要求 Planning 重入但尚无新增量 Handoff。
 - Runtime 回写失败。
 - 存在 `interrupted_pending_reconcile` 项且无法通过已有证据恢复。
 - 当前项的 Per-Test Durable Writeback 检查点写入失败。

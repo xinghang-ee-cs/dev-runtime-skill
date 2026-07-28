@@ -573,6 +573,7 @@ BLOCKER 未解除前：
 - 只要本期需要生成 13 TASK，就必须同时装配并确认 11、12，以及 TASK 引用的全部上游 SoT。
 - 15 不得作为可独立装配的孤立文档；只能由已确认的 13 连同 14 一起自动派生。
 - `assembled_documents` 与 `handoff_role_mapping` 只能包含实际已生成的文档和角色，不得为了“看起来完整”伪造路径或角色。
+- Planning Execution Baseline 冻结后的 Document Assembly 必须以 active Change Set 和 Recovery Output 的 `affected_documents / affected_tasks / affected_validation` 为边界，只装配或重建受影响内容；未受影响文档不得重新生成或重新确认。
 
 handoff 角色：
 

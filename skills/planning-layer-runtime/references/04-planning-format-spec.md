@@ -116,6 +116,18 @@ execution_handoff_decision:
   decision_source:
   decision_status:
 
+planning_execution_baseline_reference:
+  phase_id:
+  revision:
+
+active_change:
+  change_revision:
+  admission_result:
+  change_status:
+  decision_ref:
+
+future_phase_inputs: []
+
 document_assembly:
   planned_roles:
     - <本期计划装配的职责名>
@@ -159,6 +171,7 @@ planning_status:
 document
 execution_handoff_decision
 final_summary
+scope_change_decision
 ```
 
 `stage` 至少支持：
@@ -168,6 +181,7 @@ pre_generation_confirmation
 draft_confirmation
 execution_handoff_confirmation
 final_summary_confirmation
+scope_expansion_admission
 ```
 
 `feedback_type` 只允许：
@@ -209,6 +223,10 @@ planning_handoff_complete
 - Planning Conversation 中已确认的 Planning Context 是 `execution_handoff_decision` 的权威语义来源；本文件只是短期恢复镜像，不是第二套 Planning Context、业务 SoT、完整对话或推理记录。
 - `document_assembly.planned_roles` 只记录本期计划装配的职责，不预造文件路径；`generated_documents` 只加入已经真实生成的本期文档及其 `role / path / status`，路径必须真实存在；不得复制正式文档正文、完整 `assembled_documents` 或 Handoff Package。
 - `document_assembly` 只保存 `planned_roles`、已经真实生成的 `generated_documents`、`current_document` 与 `assembly_status`，用于恢复当前装配进度，不替代正式 `assembled_documents` 或 Document Assembly Plan。
+- `planning_execution_baseline_reference` 只在执行基线冻结后保存 `phase_id / revision` 的最小恢复引用；完整 Baseline 正文只存在于 13。
+- `active_change` 只保存当前 `change_revision / admission_result / change_status / decision_ref`；`decision_ref` 必须使用 `<phase_planning_runtime_directory>/decision-log.md#decision_id=<DEC-ID>` 精确指向本期既有 Change Set Decision Snapshot。该 Snapshot 同时承载完整 Change Set 与按 08 格式生成的 Recovery Output；不得在 `current-interaction.yaml` 复制它们、Baseline、TASK 或执行事实。
+- `change_status` 只允许 `candidate`、`confirmed`、`applied_to_planning`、`handoff_prepared`、`closed`、`superseded`。新变化到达时不得直接覆盖尚未关闭的 `active_change`。
+- `future_phase_inputs` 只是在 15 尚不存在时对已确认 Planning Context 同名字段的最小恢复镜像，条目格式复用本文件后述唯一格式；它不是第二个 Planning Context。同步到 15 或 planning_only Handoff 后，以正式承载为准，并清空已转移正文或只保留同步状态。
 - 每一期只使用本期 `<phase_planning_runtime_directory>/current-interaction.yaml`；不得跨期共用或覆盖，不得把本期状态写入 Skill、`.runtime/planning-layer-runtime/`、项目根目录或其他期次目录。
 - 向用户发出任何会影响流程状态的确认问题前，必须先写完整 `active_interaction`；不得等用户回复后再从聊天记忆推断确认对象。
 - 文档确认时，`target_id` 使用真实文档路径。
@@ -220,6 +238,111 @@ planning_handoff_complete
 - `raw_user_input` 只允许在 `recorded`、`validated`、`needs_clarification` 状态保留；进入 `applied`、`already_effective` 或 `rejected` 后必须清空，只保留 `normalized_summary`、类型、目标、结果与下一步。
 - 同一反馈不得同时确认当前目标并消费下一目标。
 - Planning 真正完成后清空待处理反馈，并将 `planning_status` 设为 `planning_handoff_complete`。
+
+### 1.3 Planning Execution Baseline / Change Format
+
+Planning Execution Baseline 完整正文的唯一承载是：
+
+```text
+<phase_planning_directory>/13-开发任务合同与落地清单.md
+```
+
+首次生成 13 只读取已确认且适用的 01–12；用户确认 13 后，才在同一文件中追加并冻结以下区块。Handoff 已生成、14/15 已派生或任一 TASK 已开始时，也必须引用同一冻结基线：
+
+```yaml
+planning_execution_baseline:
+  phase_id:
+  revision:
+  frozen_at:
+  source_documents: []
+  active_task_contracts: []
+  acceptance_scope: []
+  frontend_baseline_binding:
+```
+
+冻结后不得静默覆盖。13 的当前有效 TASK 视图可以通过 Change Set 增量更新，但历史冻结快照只能保留或追加新 revision，不得覆盖旧 revision。`revision` 只用于 Planning 与证据追踪，不得进入代码、数据库、API、权限、配置、目录、类名或其他长期实现命名。
+
+执行、联调、测试或验收发现问题时，先在现有 14 偏差/阻断/回写区或 15 测试结果/复盘区承载以下判定；不得创建独立 Change Log：
+
+```yaml
+change_decision:
+  source_stage:
+  finding_type:
+  observed_result:
+  expected_source:
+  is_current_plan_still_valid:
+  affected_ids: []
+  planning_reentry_required:
+  reentry_documents: []
+  change_level:
+  disposition:
+```
+
+`finding_type` 只允许 `implementation_defect`、`test_defect`、`planning_gap`、`requirement_change`、`design_drift`、`deferred_improvement`。`disposition` 只允许 `fix_in_execution`、`fix_in_test`、`reopen_current_planning`、`defer_to_next_phase`、`reject_change`。
+
+冻结后准入本期的完整 Change Set 历史，只能作为追加式 Decision Snapshot 写入：
+
+```text
+<phase_planning_runtime_directory>/decision-log.md
+```
+
+Change Set 是范围准入、影响分析与增量执行选择的 Runtime 证据，不是业务 SoT，不代替受影响的 00–15，不复制其正文，也不保存 AI 私有推理。每个快照使用：
+
+```yaml
+change_set:
+  base_revision:
+  change_revision:
+  previous_change_revision:
+  supersedes_change_revision:
+  admission_result:
+  change_status:
+  change_source:
+  change_reason:
+  added_ids: []
+  modified_ids: []
+  superseded_ids: []
+  unaffected_ids: []
+  affected_documents: []
+  affected_tests: []
+  affected_tasks: []
+  execution_delta:
+    executable_tasks: []
+    reopened_tasks: []
+    carried_forward_pending_tasks: []
+    context_only_tasks: []
+    completed_unchanged_tasks: []
+    prohibited_rerun_tasks: []
+```
+
+保护范围：`unaffected_ids` 不得因为存在 Change Set 被无条件 reopen；`context_only_tasks` 不得执行；`completed_unchanged_tasks` 不得重新执行；`prohibited_rerun_tasks` 不得重新执行或重新生成 EXEC。
+
+允许处理范围：`executable_tasks`、`reopened_tasks`、`carried_forward_pending_tasks` 可以按明确 TASK contract revision 与 Handoff 队列执行，不得扩大影响范围。禁止把整个 `execution_delta` 解释为保护或禁止执行范围。
+
+`execution_delta` 的六个列表必须两两互斥，同一 TASK 只能出现一次。未受影响且已完成者进入 `completed_unchanged_tasks`；`prohibited_rerun_tasks` 只记录未被其他列表归类、但依据明确合同或既有事实禁止重跑的 TASK，不得与 `completed_unchanged_tasks` 重复。
+
+`previous_change_revision` 用于连续 Change Set 链；只有新 Change Set 使旧 Change Set 失效时才填写 `supersedes_change_revision`，并把旧快照状态追加为 `superseded`。所有旧快照保留，不覆盖。
+
+每个当前 active Change Set Snapshot 的 `added_ids / modified_ids / superseded_ids / unaffected_ids / affected_* / execution_delta` 都必须表达“相对冻结 Baseline 的累计有效增量”，包含仍有效的前序 revision 结果和当前 revision 变化。`previous_change_revision` 只保留链关系，Recovery 不得通过扫描旧快照补齐当前范围。
+
+当新 revision 继续承接旧 revision 而非替代它时，旧 revision 保留其真实最后状态；active 指针前移不自动把旧 revision 推断为 `closed` 或 `superseded`。只有对应执行与验收真实完成时才追加 `closed`，只有被后续变化明确替代时才追加 `superseded`。
+
+Change Set 与 `active_change.change_status` 共用同一状态枚举：`candidate`、`confirmed`、`applied_to_planning`、`handoff_prepared`、`closed`、`superseded`。
+
+15 尚不存在时，延期需求暂由已确认 Planning Context 承载：
+
+```yaml
+future_phase_inputs:
+  - source:
+    summary:
+    defer_reason:
+    related_current_phase_ids: []
+    expected_next_phase_value:
+    status:
+```
+
+`status` 只允许 `candidate`、`confirmed`、`transferred_to_15`、`handed_off`。15 后续真实派生时，把已确认项同步到 15 下一期输入区并标记 `transferred_to_15`；最终为 planning_only 时写入其 Handoff 并标记 `handed_off`，不得为此提前生成 13、14、15 或独立 Backlog。
+
+在 15 尚不存在期间，Planning Context 是上述内容的临时权威来源，`current-interaction.yaml.future_phase_inputs` 只做中断恢复镜像。若 Baseline 已冻结但 14/15 尚未真实派生，视为框架派生未完成：不得生成 `execution_ready` Handoff，也不得把 active Change Set 标记为 `handoff_prepared`。
 
 ## 2. 一级标题
 
@@ -650,6 +773,41 @@ cleanup
 - 交互合同确认：页面承接的 SCN、页面状态、主次操作、禁用操作、异常恢复和旧入口处理。
 - 视觉资产确认：风格图、完整页面图、局部模块图、UX 交互图是否收到、审阅、确认或需要重做。
 
+05 开始前必须记录：
+
+```yaml
+style_inheritance_decision:
+  mode:
+  baseline_source:
+  inherited_scope: []
+  changed_scope: []
+  change_reason:
+  affected_assets: []
+  user_confirmation:
+```
+
+`mode` 只允许 `inherit_current`、`extend_current`、`replace_current`，默认 `inherit_current`。`baseline_source` 必须指向 `PROJECT-CURRENT-BASELINE.md` 中已确认的当前前端体验事实或其权威来源。继承模式下不要求机械新建 PROMPT-STYLE。
+
+Handoff 的前端体验绑定使用以下唯一子格式，不复制 05、09、11 或 13 正文：
+
+```yaml
+frontend_experience_binding:
+  applicable:
+  baseline_source:
+  style_mode:
+  reference_pages: []
+  required_existing_components: []
+  allowed_extensions: []
+  prohibited_redefinitions: []
+  confirmed_design_assets: []
+  consistency_tests: []
+```
+
+- 存在 UI TASK 或前端体验变化时 `applicable: true` 且所有适用字段必填；否则为 `false`，其余字段为空或省略。
+- `style_mode` 必须等于 05 的 `style_inheritance_decision.mode`；`baseline_source` 引用当前前端体验基线或已确认替换目标。
+- `confirmed_design_assets` 只能引用真实存在且已 `visual_confirmed` 的资产；`consistency_tests` 只引用 11 中相关 TEST-ID。
+- `required_existing_components` 要求优先复用现有组件；`allowed_extensions` 只列允许新增部分；`prohibited_redefinitions` 禁止重写全局导航、主题、公共组件和未受影响页面。
+
 ### PROMPT-STYLE-XXX：<全局风格统一性提示词>
 
 必须覆盖：
@@ -672,6 +830,8 @@ cleanup
 
 - PROMPT-STYLE 不生成某个具体业务页面。
 - PROMPT-STYLE 是 PROMPT-PAGE、PROMPT-MODULE、PROMPT-UX 的共同风格前缀。
+- 只有 `replace_current`，或 `extend_current` 确实需要新增跨页面风格规则时，才生成或修订 PROMPT-STYLE；`inherit_current` 直接使用已确认的 inherited frontend baseline reference。
+- `replace_current` 必须列出受影响 PAGE / UI-MOD / UX-SCN / PROMPT / ASSET，并使相关资产进入重新审查；不得伪装成普通新增页面。
 
 ### PAGE-XXX：<页面名称>
 
@@ -1909,6 +2069,15 @@ TASK 格式：
 ```markdown
 ### TASK-XXX：<任务名称>
 
+task_revision:
+  contract_revision:
+  introduced_in_revision:
+  contract_status:
+  relation_to_previous:
+  previous_task_id:
+  previous_contract_revision:
+  execution_disposition:
+
 任务类型：
 - implementation
 - legacy_cutover
@@ -1994,7 +2163,28 @@ Task Ready Gate：
 - 必须覆盖的 TEST：
 - 应进入 14 的预期验证项：
 - 发现偏差时的回写目标：
+
+前端体验绑定（UI TASK 适用）：
+- 当前前端体验基线：
+- 参考页面：
+- 已确认设计资产：
+- 允许扩展：
+- 禁止重定义：
 ```
+
+`contract_status` 只允许 `active`、`completed`、`superseded`、`cancelled`；`relation_to_previous` 只允许 `new`、`unchanged`、`extends`、`replaces`、`supersedes`；`execution_disposition` 只允许 `execute`、`resume`、`reexecute_affected_part`、`context_only`、`completed_locked`、`cancelled`。
+
+增量规则：
+
+- 新增 TASK：`active + new + execute`。
+- 未受影响且尚未完成：`active + unchanged + execute`；未开始者进入 `carried_forward_pending_tasks`，正在执行者由 Handoff `resume_only` 承接。
+- 未受影响且已完成：`completed + unchanged + completed_locked`。
+- 原能力局部扩展时，新建 `active + extends + execute` 的增量 TASK，并以 `previous_task_id` 指向原 TASK；原 TASK 保持历史状态，不重置。
+- 原合同错误时，旧 TASK 使用 `contract_status: superseded` 与 `execution_disposition: cancelled`；新 TASK 使用 `active + replaces + execute` 或 `active + supersedes + execute` 并指向旧 TASK。不得使用 `relation_to_previous: superseded` 表示旧 TASK 状态。
+- 已取消 TASK 使用 `cancelled + cancelled`；旧 EXEC 和实际事实仍保留。
+- `previous_contract_revision` 在 `relation_to_previous: new` 时为空；同一 TASK ID 修订合同时必须指向该 TASK 的上一 `contract_revision`。此时只扩充尚未完成范围使用 `extends`，事实核实后继续未受影响部分用 `resume`，已完成部分失效时用 `reexecute_affected_part`；不得用 `unchanged` 掩盖受影响修订。
+- 新 TASK 指向其他 TASK 时，`previous_task_id` 填被关联 TASK，`previous_contract_revision` 填其被关联合同 revision；同一 TASK 修订时 `previous_task_id` 填自身 TASK-ID。两者不得悬空或指向不存在的合同。
+- 正在执行的 TASK 必须区分已完成、保留、取消和受影响部分，只允许 `resume` 或 `reexecute_affected_part`，且只能进入一个 Handoff 队列。
 
 Task Ready Gate 必须明确：
 
@@ -2052,6 +2242,7 @@ Task Completion Contract 必须明确：
 - Task Contract Gate 只校验 13 自身及其上游 01–12。
 - 14、15 的预先存在不得作为 13 确认前置。
 - 13 被用户确认并回写 `状态: 已确认` 后，才触发 14、15 框架派生。
+- 首次确认同时在 13 中冻结 `planning_execution_baseline`；后续完整 13 是当前有效合同目录与历史快照承载，不等于全部待执行队列，实际执行范围以 Handoff 的增量执行合同为准。
 
 ### 13 to 14 / 15 Framework Derivation Rule
 
@@ -2066,6 +2257,7 @@ Task Completion Contract 必须明确：
 -> 输出 13 人话总结
 -> 用户确认 13
 -> 回写 13：已确认
+-> 冻结 Planning Execution Baseline
 -> 自动触发 14、15 框架派生
 -> 自动生成 14 与 15 的正式框架
 -> 对 14、15 运行 Execution and Acceptance Framework Derivation Gate
@@ -2086,6 +2278,7 @@ Task Completion Contract 必须明确：
 - 自动生成后只向用户输出简洁说明：已生成执行记录框架与验收框架，当前只预置待填事实位置，不代表开发完成、测试通过、可发布或已发布。
 - 框架状态必须和实际事实状态分离。
 - 14、15 自动派生后不得写入 `文档状态：已确认`。
+- 已有冻结基线时，派生只处理 active Change Set 的新增或受影响 TASK / TEST / 空白占位；不得全量重建 14/15。
 
 ### 14 Execution Record Framework Format
 
@@ -2104,6 +2297,8 @@ Task Completion Contract 必须明确：
 8. 外部能力、环境与真实验证待补项
 9. 测试交接区
 ```
+
+执行基线必须引用：Planning Execution Baseline revision、TASK contract revision、active Change Set 和当前允许执行范围。
 
 文档必须包含：
 
@@ -2127,7 +2322,7 @@ Task Completion Contract 必须明确：
 = 实际开发已经开始或完成
 ```
 
-每个 TASK 必须自动预置：
+首次派生为本期允许执行的每个 TASK 预置；增量派生只为新增、替代或受影响 TASK 追加：
 
 ```markdown
 ### EXEC-<TASK-ID>
@@ -2138,6 +2333,10 @@ Task Completion Contract 必须明确：
 
 执行基线：
 - 任务版本：
+- Planning Execution Baseline revision：
+- TASK contract revision：
+- active Change Set：
+- 当前允许执行范围：
 - 上游 SoT：
 
 预期实现目标：
@@ -2168,6 +2367,13 @@ Task Completion Contract 必须明确：
 
 不得把“待填写”替换成推测性的实际结果。
 所有 EXEC、TEST、CAP、发布与基线事实初始只能是 `not_started` 或空白待填；不得因框架生成而使用“通过、失败、已验收、可发布、已发布、生产已更新、基线已更新”等状态。
+
+追加式规则：
+
+- 新增 TASK 只追加新的 EXEC；局部扩展保留旧 EXEC 并追加增量 EXEC；替代 TASK 保留旧 EXEC 并追加 replacement EXEC。
+- 未受影响 TASK 不修改、不重建、不重置状态。
+- 已填写的实际执行、验证、联调和偏差事实不得删除、覆盖、回退为 `not_started` 或绑定到不同 task revision。
+- Planning Recovery 只能重建受影响且尚未填写真实事实的预置框架。
 
 ### 15 Acceptance and Retrospective Framework Format
 
@@ -2244,6 +2450,8 @@ planning skill 只允许预填：
 - 15 只能在 13 已确认后与 14 一起自动派生。
 - 15 初始验收状态只能是 `not_started` 或空白待填。
 - 15 不得因框架生成写入通过、失败、已验收、真实环境已通过、可发布、已发布、生产已更新或 PROJECT-CURRENT-BASELINE 已更新。
+- 已有实际 TEST、CAP、验收、发布或基线更新事实时不得覆盖、删除或回退；Change Set 只允许追加受影响验收项或修订尚未填写的占位。
+- 实际发布确认后，15 才记录 PROJECT-CURRENT-BASELINE 更新结果；Planning 框架生成不能执行该更新。
 
 ### 12/13/14/15 State Separation Rule
 

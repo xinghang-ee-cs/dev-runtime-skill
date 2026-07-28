@@ -1,4 +1,4 @@
 interface:
   display_name: "Long Task Orchestrator"
   short_description: "Run constrained dev, validation, and patches."
-  default_prompt: "Use $long-task-orchestrator only after an execution_ready Planning Handoff to complete constrained implementation or patch work and automated validation handoff, while never creating or writing the formal acceptance record."
+  default_prompt: "Use $long-task-orchestrator only after a valid initial or incremental execution_ready Planning Handoff. Validate baseline/change revisions, execute only the permitted incremental queues, preserve completed and unaffected work, and hand off automated evidence without creating or writing the formal acceptance record."

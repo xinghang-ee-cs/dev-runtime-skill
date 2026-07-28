@@ -21,6 +21,9 @@ current_effective_status:
 active_patch_id:
 current_sot:
 planning_handoff_source:
+planning_baseline_revision:
+active_change_revision:
+incremental_execution_contract_snapshot:
 execution_constraints_status:
 implementation_contract_status:
 active_placement_decision:
@@ -46,6 +49,16 @@ current_effective_phase: <preflight.pending | execution.in_progress | validation
 current_effective_status: <current status>
 active_patch_id: <patch id or null>
 planning_handoff_source: <current valid Planning Handoff path>
+planning_baseline_revision: <Planning Execution Baseline revision>
+active_change_revision: <incremental Handoff revision; omit this key for initial Handoff>
+incremental_execution_contract_snapshot:
+  execute_only: []
+  resume_only: []
+  reexecute_affected_part: []
+  context_only: []
+  completed_locked: []
+  cancelled: []
+  prohibited_actions: []
 execution_constraints_status: <passed | failed | invalidated>
 implementation_contract_status: <passed | blocked | pending>
 active_placement_decision: <extend_existing_domain | reuse_shared_capability | create_stable_business_domain | null>
@@ -123,6 +136,15 @@ current_effective_phase: execution.in_progress
 current_effective_status: active
 active_patch_id: null
 planning_handoff_source: <planning_handoff_path>
+planning_baseline_revision: <planning-baseline-revision>
+incremental_execution_contract_snapshot:
+  execute_only: [<TASK-ID@contract-revision>]
+  resume_only: []
+  reexecute_affected_part: []
+  context_only: []
+  completed_locked: []
+  cancelled: []
+  prohibited_actions: []
 execution_constraints_status: passed
 implementation_contract_status: passed
 active_placement_decision: extend_existing_domain

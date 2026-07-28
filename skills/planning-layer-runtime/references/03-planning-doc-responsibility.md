@@ -42,17 +42,17 @@ planning handoff 给执行 skill 时，必须显式输出职责到路径的映�
 | 02 | 梳理 | 核心业务实体、业务关系、生命周期、业务域权限关系、旅程对象支撑 | 实体、关系、归属、生命周期、Journey-Object Map、Access Context、对象处理矩阵、负向对象关系 | 00、01 | 03、04、06、08 | UI行为、接口格式、数据库实现、改变 01 的入口/前置/终态 |
 | 03 | 梳理 | 定义 SCN：把已确认 FLOW 展开为用户实际进入、操作、看见、失败、恢复、退出的场景 | 关联 FLOW、关联对象与资格前置、参与角色、合法进入条件、用户起点、用户动作、系统处理、用户可见结果、正常完成分支、前置缺失分支、权限不足分支、外部能力失败分支、用户取消分支、恢复/退出/人工协助路径、禁止的用户路径、需要承接的 PAGE / UI-MOD / UX-SCN | 01、02 | 04、05、06、10、11 | 主业务旅程定义、业务终态定义、权限资格定义、状态迁移定义、接口契约定义 |
 | 04 | 梳理 | 定义 MODULE：系统能力模块与隔离边界 | 模块类型、关联 FLOW、关联 SCN、模块业务责任、模块非责任、模块输入业务事实、模块输出业务能力、上游模块依赖、下游消费方、模块隔离边界、旧流程/旧语义隔离责任、优先级、业务旅程—场景—模块覆盖矩阵 | 01、02、03 | 05、06、07、09、12 | 用户页面、按钮、接口、字段、状态枚举、技术目录、代码实现 |
-| 05 | 梳理 | 定义 PAGE、UI-MOD、UX-SCN、设计提示词和设计资产索引；启动 UI/UX 交互设计流程 | 交互合同确认、视觉资产确认、PAGE、UI-MOD、UX-SCN、PROMPT-STYLE、PROMPT-PAGE、PROMPT-MODULE、PROMPT-UX、设计资产索引、FLOW—SCN—MODULE—PAGE—设计资产覆盖矩阵 | 03、04 | 07、10、11、12、13 | 改变业务流程、角色资格、对象关系、状态语义、权限规则、API、数据字段、状态迁移、代码实现、伪造设计资产 |
+| 05 | 梳理 | 继承、扩展或替换当前前端体验，并定义 PAGE、UI-MOD、UX-SCN、必要设计提示词和设计资产索引 | style_inheritance_decision、交互合同确认、视觉资产确认、PAGE、UI-MOD、UX-SCN、已确认继承基线引用或 PROMPT-STYLE、必要的 PROMPT-PAGE / MODULE / UX、设计资产索引、覆盖矩阵 | Project Current Baseline、03、04 | 07、09、10、11、12、13 | 无整体改版依据时重定义全局风格、改变业务流程/资格/状态/权限/API、伪造设计资产 |
 | 06 | 梳理 | 业务事实与状态合法性的唯一 SoT | 核心业务数据事实、业务事件、状态分类、状态枚举、状态唯一来源、是否持久化、允许迁移、非法迁移、迁移守卫、成功后的新事实、阻断事实、回滚或重试规则、旧对象/旧状态隔离映射、数据域治理边界、下游 API / PERM / TEST 映射 | 01、02、04 | 07、08、09、10、11 | 页面按钮、弹窗、接口路径、权限矩阵、数据库物理表结构、表名、字段类型、长度、索引、外键、SQL、ORM Schema、迁移脚本 |
 | 07 | 梳理 | 前后端读写、拒绝和恢复语义的 Canonical API Contract | API-ID、Contract Type、关联 FLOW/SCN/MODULE/PAGE、业务意图、触发业务事件、合法访问上下文、所需业务资格、状态与事实前置、请求允许/禁止字段、成功结果、拒绝结果、幂等与并发、旧流程边界、Canonical Physical Binding、关联 TEST | 02、04、06 | 08、09、10、11、12、13 | 完整角色权限矩阵、页面布局、视觉呈现、数据库实现细节 |
 | 08 | 梳理 | 后端不可绕过的访问决策、数据范围、拒绝分类、异常协助与历史访问策略 | PERM-ID、关联 FLOW/API/DOMAIN/STATE、动作、资源、允许主体、允许范围、业务资格、业务状态前置、数据域前置、允许结果、拒绝类型、拒绝原因码、只读边界、人工协助边界、旧流程禁止来源、关联 TEST | 02、06、07 | 09、10、11、12、13 | 接口参数、接口响应字段、页面按钮样式、业务状态枚举、数据库实现 |
-| 09 | 梳理 | 项目内部架构、依赖方向、逻辑承接位置、实现承接策略、语义隔离、切换与回退决策 | 架构当前基线、目标逻辑架构、模块依赖方向、ARCH 决策记录、FLOW / MODULE / STATE / API / PERM 的逻辑承接位置、实现承接策略、稳定业务概念、优先承接的现有逻辑域、Canonical Contract—Architecture Binding、允许复用的技术基础、禁止复用的旧语义、Legacy Semantic Firewall、数据域/部署/发布架构边界、切换策略、回退策略、对 10/11/13 的输入、架构风险移交项 | Project Current Baseline、01、02、04、06、07、08 | 10、11、12、13 | 具体文件路径、目录、类名、表名、代码、SDK 初始化、环境变量名称、任务拆分、期次/阶段/版本命名、实际实施结果、正式 RISK-ID/风险等级/风险闭环 |
+| 09 | 梳理 | 项目内部架构、依赖方向、逻辑承接位置、实现承接策略、前端体系承接、语义隔离、切换与回退决策 | 架构当前基线、目标逻辑架构、实现承接策略、前端布局/主题/组件复用与允许扩展边界、Canonical Contract—Architecture Binding、Legacy Semantic Firewall、数据域/部署/发布边界、对 10/11/13 的输入 | Project Current Baseline、01、02、04、05、06、07、08 | 10、11、12、13 | 无 replace_current 决策时重写全局导航/主题/组件体系，具体文件/代码/表名/期次命名、实际实施结果、正式 RISK-ID |
 | 10 | 梳理 | 外部能力选型与接入决策合同，决定是否需要、选什么、为什么选、具备什么边界与前提、未满足什么就不得进入开发或发布 | CAP-ID、服务的 FLOW / MODULE / SCN、候选能力来源、最终选型或候选状态、选型理由、官方事实来源、SDK / API / Provider 版本事实、适用端与运行环境要求、鉴权/权限/Scope/网络/额度/限流/计费/合规约束、能力边界、不支持范围、失败影响、Capability Development-Entry Evidence Gate、Capability Realization Requirement、Capability Acceptance Requirement、关联 ARCH / TEST / RISK | 01、03、04、09 | 11、12、13 | Adapter 文件位置、SDK 初始化代码、具体调用代码、环境变量命名或具体变量名、配置文件路径、代码读取方式、部署命令、接口字段实现、数据库实现、开发任务拆分、实际接入过程、实际测试结果、上线结论 |
-| 11 | 梳理 | 测试设计、业务测试顺序、自动化策略、验收用例与证明要求 | TEST-ID、测试类型、关联 REQ/FLOW/SCN/DOMAIN/STATE/API/PERM/CAP/PAGE、测试目标、业务前置、逻辑测试步骤、预期业务/状态/接口/用户可见结果、反向/禁止路径、自动化等级、真实环境要求、预期证据要求、FLOW—测试覆盖矩阵 | 01、02、03、05、06、07、08、09、10 | 12、13、后续测试与验收承接方 | 测试代码、测试命令、fixture 脚本、测试执行调度、失败重试命令、实际执行状态、实际证据内容、测试通过或失败结果、需求新增、接口新增、实现方案 |
+| 11 | 梳理 | 测试设计、业务测试顺序、前端一致性验证、自动化策略、验收用例与证明要求 | TEST-ID、关联业务合同、逻辑测试步骤、预期结果、反向路径、前端布局/组件/状态/适配一致性检查、自动化等级、真实环境与证据要求、覆盖矩阵 | 01、02、03、05、06、07、08、09、10 | 12、13、后续测试与验收承接方 | 测试代码/命令/fixture/调度、实际状态或结果、需求新增、实现方案 |
 | 12 | 梳理 | 正式 RISK / DEP / OPEN 的唯一 SoT，归并 01–11 的风险信号、依赖和待决策事项 | 唯一正式 RISK-ID、DEP-ID、OPEN-ID，风险等级、影响范围、阻断阶段、处理策略、关闭条件、依赖验证来源、最晚解除阶段、OPEN 回写目标、确认主体、状态 | 01、02、03、04、05、06、07、08、09、10、11 | 13，以及 13 确认后派生的 14、15 | 已确认业务规则、状态、接口、权限、UI 事实、重复 RISK-ID、替上游关闭 OPEN |
-| 13 | 梳理 | 开发任务合同与落地清单；只接收已确认、可执行、可验证的规划结论 | TASK-ID、任务类型、Priority、承接 FLOW/SCN/MODULE、执行输入、任务目标、实现命名与承接边界、实现合同完整性、允许复用技术基础、禁止复用旧语义、逻辑影响面、候选影响文件、任务前置、并行边界、Task Ready Gate、完成合同、回写目标 | 01、02、03、04、05、06、07、08、09、10、11、12 | 13 确认后自动派生 14、15 | 新增业务规则、变更验收标准、关键 OPEN 未关闭时生成任务、把 Planning ID 推导为实现命名、把候选文件路径写成实现事实、具体表名/类名/模块目录/迁移名、验证命令、测试执行状态、测试结果、要求 14/15 预先存在 |
-| 14 | 派生框架 / 执行承载 | 由 planning skill 在 13 确认后自动生成的执行记录框架；预置任务执行、验证、偏差、阻断、回写和交接位置 | 文档边界、执行基线、TASK 执行状态矩阵、预期执行合同、实际执行记录区、自动化验证索引区、偏差/阻断/回写请求区、外部能力/环境/真实验证待补项、测试交接区、每个 TASK 的 EXEC 空白项、框架状态、事实状态初始值 | 13，以及 13 引用的 11、12 | 后续执行承接方、后续测试与验收承接方 | 实际代码改动、实际文件修改、实际实现完成、自动化测试通过、接口已联调、真实外部能力可用、真机验证完成、最终验收通过、可发布、已发布 |
-| 15 | 派生框架 / 验收承载 | 由 planning skill 在 13 确认后与 14 一起自动生成的验收与复盘框架；预置验收对象、门禁、证据位置和基线更新条件 | 文档边界、验收基线、FLOW 验收矩阵、TEST 实际结果区、CAP 真实环境验证区、RISK / DEP 关闭判定区、P0/P1/P2 发布门禁区、发布判定与发布事实区、PROJECT-CURRENT-BASELINE 更新条件与结果区、复盘、下一期输入、框架状态、事实状态初始值 | 11、12、13、14 | 后续测试与验收承接方、Project Current Baseline 更新条件 | 通过、失败、已验收、真实环境已通过、可发布、已发布、生产已更新、PROJECT-CURRENT-BASELINE 已更新、反向定义业务/状态/接口/权限/测试标准、作为孤立文档独立装配 |
+| 13 | 梳理 | 开发任务合同、当前有效 TASK 视图与冻结 Planning Execution Baseline 的唯一正文；冻结后只追加受影响 TASK revision | TASK-ID、task_revision、当前有效 TASK 视图、执行处置、前端绑定、Ready Gate、完成合同、Planning Execution Baseline 冻结区块 | 首次：已确认且适用的 01–12；增量：既有 Baseline、active Change Set、本次受影响 SoT、Recovery Output | 首次确认后派生 14/15；增量时只更新受影响框架与 Handoff | 首次生成依赖尚不存在的 Baseline、覆盖历史基线快照、把完整 13 当作全部执行队列、删除 TASK 历史或写实际结果 |
+| 14 | 派生框架 / 执行承载 | 由 planning skill 在 13 确认后派生并追加式维护的执行事实承载框架 | Planning Execution Baseline revision、TASK contract revision、active Change Set revision、允许执行范围、TASK 状态矩阵、EXEC、偏差/阻断/回写和测试交接位置 | 13、11、12、既有 14 真实事实 | 后续执行与测试承接方 | 重复定义 Baseline/Change Set 正文，覆盖/删除/重置真实事实，为未受影响 TASK 重建 EXEC，把旧事实绑定到新 TASK revision |
+| 15 | 派生框架 / 验收承载 | 验收、发布、复盘和下一期输入的事实承载框架；Planning 只维护未填写的受影响占位 | 验收基线、实际 TEST/CAP/RISK/DEP/发布事实区、PROJECT-CURRENT-BASELINE 更新条件与结果、复盘、deferred_improvement/下一期输入 | 11、12、13、14、既有 15 真实事实 | 后续验收承接方、发布后的 Project Current Baseline | 覆盖真实验收/发布事实、把框架状态冒充实际结果、提前更新生产基线 |
 
 ## 2.1 00/01/02 强化职责
 
@@ -233,10 +233,11 @@ UI 设计流程启动文档
 
 ```text
 03 SCN + 04 MODULE 已确认
+-> 读取 PROJECT-CURRENT-BASELINE 的当前前端体验基线
+-> 确认 inherit_current / extend_current / replace_current
 -> 生成 05 文档草案
--> 输出设计范围、页面优先级、资产计划
--> 主动生成全局风格统一性提示词
--> 用户确认或提供风格参考
+-> 确认交互合同、设计范围、页面优先级和资产计划
+-> 引用已确认继承基线，或仅在需要时生成/更新全局风格要求
 -> 按 P0 FLOW / SCN 顺序逐页生成完整页面提示词
 -> 用户生成或提供页面 UI 图
 -> 回写设计资产索引
@@ -246,6 +247,8 @@ UI 设计流程启动文档
 -> 只有现有图无法说明交互时，生成 UX 交互设计图提示词
 -> 回写 UX 资产索引与覆盖状态
 ```
+
+`style_inheritance_decision.mode` 只允许 `inherit_current`、`extend_current`、`replace_current`；默认 `inherit_current`。用户未明确要求整体改版时，不得重新定义全局风格。`extend_current` 只能补充当前体系缺失的组件或适配能力；`replace_current` 必须有用户明确要求或当前体系无法承接的证据，并重新审查受影响页面提示词、模块提示词、UX 提示词和设计资产。
 
 默认一次只推进一个最高优先级页面或资产；用户明确要求批量时才可一次输出多条提示词。
 
@@ -420,6 +423,8 @@ PROJECT-CURRENT-BASELINE.md
 - 09 只定义内部是否需要某类能力端口、依赖方向和隔离边界；具体 Provider 选型属于 10。
 - 外部能力尚未由 10 选型确认时，09 只能定义 `CAPABILITY PORT`、`ARCHITECTURE REQUIREMENT` 和 `ADAPTER BOUNDARY`，不得把具体 Provider 绑定标记为 `confirmed`。
 - 09 不拥有正式 `RISK-ID`、风险等级和风险闭环；架构风险只移交 12。
+- 09 必须承接 05 的 `style_inheritance_decision`，明确是否复用现有组件、布局和主题体系，允许增加哪些稳定公共组件，并禁止页面内重复实现已有公共能力。
+- 没有 `replace_current` 决策时，09 禁止重写全局导航、主题或组件体系。
 
 ### 10-外部能力选型与接入决策
 
@@ -506,6 +511,7 @@ PROJECT-CURRENT-BASELINE.md
 - 再证明该 FLOW 不能被非法状态、越权、旧对象、旧审批、错误输入或环境污染绕过。
 - 自动化测试通过不等于真实环境能力已验收。
 - 视觉评审通过不等于接口、权限、状态与旧流程隔离已证明。
+- 前端一致性测试必须验证布局体系、同类组件与交互行为、主次操作、空/错/加载/禁用/反馈状态、移动与桌面适配是否继承 05；还必须识别无规划依据的全页重绘和重复创建已有组件。
 
 下游写回规则：
 
@@ -582,8 +588,27 @@ OPEN 的关闭
 正式定位：
 
 ```text
-将已确认、可执行、可验证的规划结论整理为任务合同、依赖关系、并行边界、完成证明要求与后续执行记录框架的输入。
+将已确认、可执行、可验证的规划结论整理为当前有效 TASK 视图；首次确认后在同一 13 中冻结 Planning Execution Baseline 历史快照，后续只追加受影响 TASK revision。
 ```
+
+唯一归属与生命周期：
+
+```text
+首次生成 13
+-> 只读取已确认且适用的 01–12
+-> 生成当前有效 TASK 视图
+-> 用户确认 13
+-> 在 13 中冻结 Planning Execution Baseline 区块
+
+增量修订 13
+-> 读取既有 Planning Execution Baseline
+-> 读取 active Change Set Decision Snapshot
+-> 读取本次受影响的已确认 SoT 与 Recovery Output
+-> 只更新当前有效 TASK 视图并追加 TASK revision
+-> 不覆盖旧 Baseline 快照
+```
+
+`当前有效 TASK 视图 != Planning Execution Baseline 历史冻结快照`。首次生成 13 时不存在 Baseline 上游；只有增量修订才允许读取既有 Baseline 和 active Change Set。
 
 13 只能接收：
 
@@ -623,6 +648,11 @@ OPEN 的关闭
 - `blocking_open` 未关闭时对应 TASK 不得 Ready；P0 主流程仍有 `blocking_open` 时不得准备正式交接。
 - `explicitly_delegated` 必须写明执行层决策范围、项目既有规范、允许边界、验证方式和不得影响的业务结果，禁止只写“实现时决定”。
 - Task Completion 不等于最终验收、真实环境能力通过、已发布或 PROJECT-CURRENT-BASELINE 已更新。
+- UI TASK 必须绑定当前前端体验基线、参考页面、已确认设计资产、允许扩展和禁止重定义内容；所需资产仍须达到 `visual_confirmed` 才能 Ready。
+- Planning Execution Baseline 冻结后，未受影响 TASK 保持 ID、合同与执行状态；已完成者为 `completed_locked`，不得重新生成 EXEC 或进入执行队列。
+- 未受影响、尚未开始且仍属于原执行基线的 TASK 保持 `active + unchanged + execute`，进入 `carried_forward_pending_tasks` 并继续由 Handoff `execute_only` 承接，不得降为 `context_only`。
+- 未受影响且正在执行的 TASK 保持 `active + unchanged + resume`；只作为背景或依赖参考的 TASK 才允许 `context_only`。
+- 增量能力创建新 TASK；扩展旧能力创建指向原 TASK 的增量 TASK；错误合同保留原 TASK 并创建替代 TASK；正在执行的 TASK 只标记继续或重做受影响部分，不得整体重置。
 
 #### 实现合同参数的文档归属
 
@@ -663,6 +693,7 @@ planning skill 在 13 被确认后必须自动创建 14 的正式框架。
 
 planning skill 可以预填：
 
+- Planning Execution Baseline revision、TASK contract revision、active Change Set revision 和当前允许执行范围。
 - 当前规划版本和关键 SoT 引用。
 - TASK 执行状态矩阵。
 - 每个 TASK 的目标与完成合同。
@@ -703,6 +734,8 @@ planning skill 禁止预填：
 - 框架已经生成，预置项已经完整。
 - 用户不需要单独确认 14。
 - 真实执行事实尚未填写。
+
+增量规则：新增 TASK 只追加新的 EXEC；局部扩展保留旧 EXEC 并追加增量 EXEC；TASK 被替代时保留旧 EXEC 并追加 replacement EXEC；未受影响 TASK 不修改、不重建、不重置。Planning Recovery 只重建尚未填写真实事实的受影响占位。
 
 ### 15-验收结果与复盘
 
@@ -757,6 +790,8 @@ planning skill 禁止预填：
 - 用户不需要单独确认 15。
 - 真实验收、发布和基线事实尚未填写。
 
+15 已存在真实 TEST、验收或发布事实时，Planning 只能追加或修订受影响且尚未填写的框架位置；不得删除、覆盖、回退或把旧事实错误绑定到新 TASK revision。允许延期且不阻断本期验收的 `deferred_improvement` 写入既有“下一期输入”。
+
 ### 13 确认后的框架生成规则
 
 13 被用户确认并回写 `状态: 已确认` 后，planning skill 必须自动生成 14 和 15 的正式框架。
@@ -769,6 +804,7 @@ planning skill 禁止预填：
 - 14、15 自动生成后不得写入 `文档状态：已确认`。
 - 14、15 只能写入 `框架生成状态：generated`、`框架完整性：complete`、`用户独立确认：not_required`、`实际事实状态：not_started`。
 - 14、15 不填写任何实际执行、验证、验收、真实环境或发布事实。
+- 增量派生只处理 active Change Set 影响的 TASK、TEST 和未填写占位；未受影响和已有真实事实的内容保持原样。
 - 14、15 不得反向定义业务、状态、接口、权限或测试标准。
 - 14、15 的实际事实只能由后续执行或验收承接方填写。
 - 14、15 不触发“每次只能生成一份正式文档”的限制。
@@ -797,7 +833,7 @@ planning skill 禁止预填：
 
 ## 4. 阶段分界
 
-00 到 13 在适用时属于流程梳理阶段，planning-layer-runtime 的职责截止于开发开始前；`planning_only` 不要求生成 13。
+00 到 13 在适用时属于流程梳理阶段；首次 Handoff 后 Planning 不参与执行，但可在 Execution/Test Change Triage 判定需要时受控重入，只修订受影响的规划合同并生成增量 Handoff。`planning_only` 不要求生成 13。
 
 14、15 在 planning-layer-runtime 中只属于 13 确认后派生的框架承载文档。
 
@@ -823,3 +859,6 @@ Handoff 承接规则：
 - 禁止自行推断职责。
 - 禁止缺失 role 时继续 implementation。
 - `handoff_role_mapping` 属于规划交接输出，不属于业务 SoT。
+- Handoff 只引用 13 中 Planning Execution Baseline revision、decision-log 中 active Change Set revision 和必要 TASK contract revision，不复制其正文。
+- 存在 UI TASK 或前端体验变化时，Handoff 必须携带前端体验绑定；不存在时明确 `applicable: false`。
+- 增量 Handoff 必须完整承接原基线中仍有效的未完成 TASK，包括未受影响但尚未开始的 carried-forward pending TASK。

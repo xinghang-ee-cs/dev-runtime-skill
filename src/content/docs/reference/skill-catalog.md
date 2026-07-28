@@ -7,19 +7,20 @@ description: 四个 Runtime Skill 的用途、入口和规则源文件。
 
 ## planning-layer-runtime
 
-- 用途：开发前的需求访谈、范围确认、架构和验收设计。
+- 用途：需求访谈、范围确认、架构和验收设计、Planning Execution Baseline 冻结、初始/增量 Handoff，以及 triage 准入后的精确规划重入。
 - 入口：[`skills/planning-layer-runtime/SKILL.md`](https://github.com/xinghang-ee-cs/dev-runtime-skill/blob/main/skills/planning-layer-runtime/SKILL.md)
 - 不负责：写业务代码、执行测试、填写真实测试结果。
 
 ## long-task-orchestrator
 
-- 用途：执行已确认且包含至少 4 个实现单元的功能或模块。
+- 用途：校验初始/增量 Handoff revision，按增量执行队列实现已确认且包含至少 4 个实现单元的功能或模块，并保护未受影响和已完成事实。
 - 入口：[`skills/long-task-orchestrator/SKILL.md`](https://github.com/xinghang-ee-cs/dev-runtime-skill/blob/main/skills/long-task-orchestrator/SKILL.md)
 - 不负责：人工测试、真实设备验证、最终验收和上线批准。
 
 ## testing-layer-runtime
 
-- 用途：long 交接后的人工、设备、云端、外部能力和最终验收测试。
+- 用途：核对并继承 long 交接后的自动化证据，管理人工、设备、云端、外部能力和最终验收测试，并对发现做 Execution/Test Change Triage。
+- 运行态：所有期次状态、证据、队列和恢复数据写入项目绑定的 `<phase_testing_runtime_directory>`；根 `.runtime/` 不保存期次实例。
 - 入口：[`skills/testing-layer-runtime/SKILL.md`](https://github.com/xinghang-ee-cs/dev-runtime-skill/blob/main/skills/testing-layer-runtime/SKILL.md)
 - 不负责：默认重跑 long 已通过的自动化、修改业务代码或批准上线。
 
