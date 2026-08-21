@@ -6,7 +6,7 @@
 
 ## 0. 交互目标与用户反馈事务
 
-`execution_handoff_decision` 第一次需要在发问前持久化时，按 `04-planning-format-spec.md` 的内联格式在当前项目本期目录直接创建或更新：
+Planning Document Mode 必须复用 Discovery 首轮已经按 `04-planning-format-spec.md` 创建的：
 
 ```text
 <phase_planning_runtime_directory>/current-interaction.yaml
@@ -14,7 +14,9 @@
 
 不得从 Skill 目录复制文件。
 
-如果本期目录尚未合法确定，不得把状态暂存到 Skill、`.runtime/planning-layer-runtime/`、项目根目录或其他期次目录；继续 Planning Conversation，直到期次归属可以合法确定。进入 Planning Document Mode 时复用该文件，不得再创建第二个 Planning Context、交接状态或文档装配状态文件。
+如果进入 Planning Document Mode 时该文件不存在，说明逐轮 Discovery 持久化前置未完成，必须回到 `07-planning-conversation-runtime.md#321-discovery-round-transaction` 恢复；不得临时补造一个只含执行交接或文档状态的文件。不得再创建第二个 Planning Context、交接状态或文档装配状态文件。
+
+Discovery 问答事务由 `07` 维护；本文件从执行交接分支确认与文档交互开始继续复用同一 `active_interaction / latest_feedback` 字段，不重复定义 Discovery 生命周期。
 
 ### 0.1 发问前持久化确认目标
 
@@ -79,6 +81,7 @@ active_interaction:
 -> 绑定当前对象
 -> 判断反馈类型
 -> 校验是否允许应用
+-> 若反馈包含会影响规划的可公开核验事实，执行由 07 编排的 Discovery Fact Research Gate，核验并持久化最小来源
 -> 应用到对应文档或阶段
 -> 标记反馈处理结果
 -> 再决定是否进入下一步
@@ -103,6 +106,8 @@ active_interaction:
 - “讲一下”“第 X 份说了什么”记为 `ask_explanation`；只解释目标文档，不改变草案状态。
 - 用户补充事实记为 `supplement`；先判断事实归属的 SoT，再决定是否回写。
 - 用户纠正记为 `correct`；回写真正拥有该事实的上游 SoT，并按 `08-planning-recovery-runtime.md` 检查下游失效。
+- `supplement` 或 `correct` 涉及产品当前能力、版本限制、公开规范、法律监管或其他可核验事实时，必须在反馈已记录后先按 `07` 调研；可靠公开证据可以消除事实提问，但不得未经用户确认改变业务适用性、当前范围或已确认 SoT。
+- 调研发现的新功能或替代方案只作为候选；确认延期时写入 Requirement Pool，确认纳入时回到真正拥有该事实的上游 Planning Context / SoT 并执行失效传播。
 - “先暂停”记为 `pause`；“回到上一份”记为 `return_to_previous`，均不得隐式确认当前草案。
 - 无法可靠分类时记为 `unknown` 与 `needs_clarification`。
 
@@ -325,7 +330,7 @@ Role-Based Document Explanation Gate 发生在正式文档生成后。
 
 规则：
 
-- 正式 SoT 文档中必须保留 `REQ`、`FLOW`、`SCN`、`DOMAIN`、`MODULE`、`CAP`、`PAGE`、`UI-MOD`、`UX-SCN`、`PROMPT-*`、`ASSET`、`STATE`、`API`、`PERM`、`TASK`、`RISK`、`DEP`、`OPEN`、`EXEC`、`TEST` 等 ID。
+- 正式 SoT 文档中必须保留 `REQ`、`FLOW`、`SCN`、`DOMAIN`、`MODULE`、`CAP`、`PAGE`、`UI-MOD`、`UX-SCN`、`PROMPT-*`、`ASSET`、`STATE`、`API`、`PERM`、`TASK`、`RISK`、`DEP`、`OPEN`、`EXEC`、`TEST` 等 ID；引用跨期需求时可以补充 `POOL-ID`，但不得把它当作本期 `REQ-ID`。
 - 用户态解释中不得把 ID 作为主要确认对象。
 - 用户态不得直接问"REQ-001 是否准确？""API-001 是否没问题？""CAP-MAP-001 是否确认？""TASK-001 是否可以执行？"。
 - 用户态必须把 ID 对应的具体内容翻译出来，让使用者确认内容本身。

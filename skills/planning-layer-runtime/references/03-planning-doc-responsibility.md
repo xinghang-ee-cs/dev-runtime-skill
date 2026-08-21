@@ -52,7 +52,7 @@ planning handoff 给执行 skill 时，必须显式输出职责到路径的映�
 | 12 | 梳理 | 正式 RISK / DEP / OPEN 的唯一 SoT，归并 01–11 的风险信号、依赖和待决策事项 | 唯一正式 RISK-ID、DEP-ID、OPEN-ID，风险等级、影响范围、阻断阶段、处理策略、关闭条件、依赖验证来源、最晚解除阶段、OPEN 回写目标、确认主体、状态 | 01、02、03、04、05、06、07、08、09、10、11 | 13，以及 13 确认后派生的 14、15 | 已确认业务规则、状态、接口、权限、UI 事实、重复 RISK-ID、替上游关闭 OPEN |
 | 13 | 梳理 | 开发任务合同、当前有效 TASK 视图与冻结 Planning Execution Baseline 的唯一正文；冻结后只追加受影响 TASK revision | TASK-ID、task_revision、当前有效 TASK 视图、执行处置、前端绑定、Ready Gate、完成合同、Planning Execution Baseline 冻结区块 | 首次：已确认且适用的 01–12；增量：既有 Baseline、active Change Set、本次受影响 SoT、Recovery Output | 首次确认后派生 14/15；增量时只更新受影响框架与 Handoff | 首次生成依赖尚不存在的 Baseline、覆盖历史基线快照、把完整 13 当作全部执行队列、删除 TASK 历史或写实际结果 |
 | 14 | 派生框架 / 执行承载 | 由 planning skill 在 13 确认后派生并追加式维护的执行事实承载框架 | Planning Execution Baseline revision、TASK contract revision、active Change Set revision、允许执行范围、TASK 状态矩阵、EXEC、偏差/阻断/回写和测试交接位置 | 13、11、12、既有 14 真实事实 | 后续执行与测试承接方 | 重复定义 Baseline/Change Set 正文，覆盖/删除/重置真实事实，为未受影响 TASK 重建 EXEC，把旧事实绑定到新 TASK revision |
-| 15 | 派生框架 / 验收承载 | 验收、发布、复盘和下一期输入的事实承载框架；Planning 只维护未填写的受影响占位 | 验收基线、实际 TEST/CAP/RISK/DEP/发布事实区、PROJECT-CURRENT-BASELINE 更新条件与结果、复盘、deferred_improvement/下一期输入 | 11、12、13、14、既有 15 真实事实 | 后续验收承接方、发布后的 Project Current Baseline | 覆盖真实验收/发布事实、把框架状态冒充实际结果、提前更新生产基线 |
+| 15 | 派生框架 / 验收承载 | 验收、发布、复盘和下一期输入引用的事实承载框架；Planning 只维护未填写的受影响占位 | 验收基线、实际 TEST/CAP/RISK/DEP/发布事实区、PROJECT-CURRENT-BASELINE 更新条件与结果、复盘、Requirement Pool 引用 | 11、12、13、14、既有 15 真实事实 | 后续验收承接方、发布后的 Project Current Baseline | 覆盖真实验收/发布事实、复制延期需求正文形成第二来源、把框架状态冒充实际结果、提前更新生产基线 |
 
 ## 2.1 00/01/02 强化职责
 
@@ -790,7 +790,7 @@ planning skill 禁止预填：
 - 用户不需要单独确认 15。
 - 真实验收、发布和基线事实尚未填写。
 
-15 已存在真实 TEST、验收或发布事实时，Planning 只能追加或修订受影响且尚未填写的框架位置；不得删除、覆盖、回退或把旧事实错误绑定到新 TASK revision。允许延期且不阻断本期验收的 `deferred_improvement` 写入既有“下一期输入”。
+15 已存在真实 TEST、验收或发布事实时，Planning 只能追加或修订受影响且尚未填写的框架位置；不得删除、覆盖、回退或把旧事实错误绑定到新 TASK revision。允许延期且不阻断本期验收的 `deferred_improvement` 必须先写入 `<requirement_pool_path>`，15 的“下一期输入”只追加对应 `POOL-ID` 引用。
 
 ### 13 确认后的框架生成规则
 

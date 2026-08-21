@@ -164,10 +164,11 @@ replace_current_phase_scope
 规则：
 
 - 执行尚未开始且基线未冻结时，可以按影响范围修正规划，只重审受影响部分。
-- 执行已开始后，独立新增能力默认 `defer_to_next_phase`；15 已存在时写入其下一期输入区，15 尚不存在时写入 Planning Context 的 `future_phase_inputs`。
+- 执行已开始后，独立新增能力默认 `defer_to_next_phase`；用户确认延期后必须立即写入唯一 `<requirement_pool_path>`，不得等待 15、Handoff 或本期结束。
 - `defer_to_next_phase` 不改变当前执行基线，不创建本期 Change Set、不修改本期 TASK，也不重建当前 Handoff。
-- 后续实际派生 15 时，将已确认 `future_phase_inputs` 同步到 15；最终为 `planning_only` 时放入 planning_only Handoff，不得为了记录延期需求提前生成 13、14、15 或独立 Backlog。
-- 若 Planning Execution Baseline 已冻结而 14/15 尚未真实派生，该状态只能视为框架派生未完成的阻断中间态；可以继续在 Planning Context 记录 `future_phase_inputs`，但不得把 Change Set 推进到 `handoff_prepared`，也不得生成 `execution_ready` Handoff 或开始执行。
+- 后续实际派生 15 时，只在其“下一期输入”中引用 `<requirement_pool_path>#POOL-ID`；最终为 `planning_only` 时 Handoff 同样只引用池条目，不得复制需求正文，也不得为了记录延期需求提前生成 13、14、15。
+- 若 Planning Execution Baseline 已冻结而 14/15 尚未真实派生，该状态只能视为框架派生未完成的阻断中间态；可以写入 Requirement Pool，但不得把 Change Set 推进到 `handoff_prepared`，也不得生成 `execution_ready` Handoff 或开始执行。
+- Requirement Pool 写入成功不等于需求已进入下一期范围。下一期仍须按 `07-planning-conversation-runtime.md` 与用户当前输入比较并重新确认。
 - 新增内容确实阻断当前 P0 FLOW 且不纳入就无法达到本期验收目标时，优先评估 `absorb_as_current_phase_delta`；仍必须完成影响分析，不得因此扩大为整期重跑。
 - 必须留在本期且基线已冻结时，只能 `absorb_as_current_phase_delta` 并形成 Change Set。
 - 本期方向根本改变时才使用 `replace_current_phase_scope`，必须明确原任务保留、取消、替换和重新执行范围。

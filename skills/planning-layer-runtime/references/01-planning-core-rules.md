@@ -45,11 +45,13 @@
 - 当前前端体验基线只记录已经真实生效的体验事实和权威来源，不复制完整 CSS、Token、组件代码或设计资产；禁止新建第二份项目级设计基线文件。
 - 实际发布后，才允许依据 15 的发布事实更新生产当前状态与当前前端体验事实；已验收未发布仍只属于交付状态。
 - 一期关闭后，该期 00–15 进入历史只读；只允许受控修正事实错误，独立新增需求默认从最新 `PROJECT-CURRENT-BASELINE.md` 启动下一期。
+- 下一期除最新 `PROJECT-CURRENT-BASELINE.md` 外，还必须读取 `<requirement_pool_path>` 做相关性与冲突判断；池条目只能作为历史需求佐证，不能冒充已实现事实或自动成为本期范围。
 
 一期必须保持以下事实链，不得用最新完整文档覆盖历史执行事实：
 
 ```text
 当前项目事实
+-> Requirement Pool 中与本期输入相关的历史佐证
 -> 本期规划基线
 -> Planning Execution Baseline
 -> Change Set（仅冻结后发生变更时）
@@ -60,13 +62,14 @@
 
 ## 2.1 规划数据保存边界
 
-Planning 运行数据按职责只允许落在三个位置：
+Planning 相关数据按职责只允许落在四个位置：
 
 | 位置 | 只允许保存 | 禁止保存 |
 | --- | --- | --- |
 | `skills/planning-layer-runtime/` | 静态规则、路由、格式规范、职责说明、行为规则与必要 agents 配置 | 运行实例、运行文件复制源、项目、用户、环境、期次、反馈、进度、真实 Event / Decision / Audit 数据 |
 | `<phase_planning_runtime_directory>/` | 当前交互状态与本期 Event / Decision / Audit 证据 | 跨期用户画像、跨期环境档案、正式业务事实的替代副本 |
 | 项目根目录 `.runtime/planning-layer-runtime/` | 跨期稳定的用户交互倾向、项目与开发环境、启动入口 | 期次需求、业务事实、完整聊天、一次性情绪、凭证、运行日志 |
+| `<requirement_pool_path>` | 用户已确认延期、尚待后续期次判断的需求 | 当前项目事实、当前期正式范围、已消费需求、TASK、执行状态、聊天记录或正式 SoT 正文 |
 
 规则：
 
@@ -80,11 +83,13 @@ Planning 运行数据按职责只允许落在三个位置：
 - `.runtime/planning-layer-runtime/` 和期次 `planning-runtime/` 默认按本地私有数据处理；Skill 打包、分享或上传不得携带这两个项目目录。
 - 未得到用户明确要求时，用户倾向、电脑环境和用户原始反馈不得进入公开仓库；项目已有团队共享策略优先，确需共享时只允许共享脱敏后的稳定项目信息。
 - `.runtime/planning-layer-runtime/user-profile.yaml` 同时承载长期交互习惯和规划协作偏好，禁止新增第二个长期偏好文件。
-- 项目运行文件按需创建：进入该期 Planning Document Mode 时创建 `current-interaction.yaml`；Event、Decision、Audit 和各类 Summary 只在对应事件、快照、审计或压缩需求真实发生时创建；无内容文件不得为了目录完整性创建。
+- 项目运行文件按需创建：进入 `discovery_start` 且本期路径合法绑定后，必须在第一条实质性业务问题前创建 `current-interaction.yaml`；Event、Decision、Audit 和各类 Summary 只在对应事件、快照、审计或压缩需求真实发生时创建；无内容文件不得为了目录完整性创建。
 - `13-开发任务合同与落地清单.md` 是 Planning Execution Baseline 完整正文的唯一承载；首次 13 只读取已确认且适用的 01–12，确认后才在 13 中追加冻结基线区块。
 - 完整 Change Set 历史只作为追加式 Decision Snapshot 写入既有 `planning-runtime/decision-log.md`；它是范围准入与增量选择的 Runtime 证据，不是业务 SoT，不得复制完整 00–15 正文。
-- `current-interaction.yaml` 只保存 Planning Execution Baseline revision、当前 active Change revision、状态与 `decision_ref` 的最小恢复引用，不保存完整 Baseline、Change Set、TASK 或执行事实。
+- `current-interaction.yaml` 保存逐轮 Discovery 检查点，以及 Planning Execution Baseline revision、当前 active Change revision、状态与 `decision_ref` 的最小恢复引用；不保存完整聊天、完整 Baseline、Change Set、TASK 或执行事实。
 - 14、15 和 Handoff 只引用 Planning Execution Baseline revision、active Change Set revision 与必要 TASK contract revision，不重复定义其正文。
+- `<requirement_pool_path>` 是跨期待处理需求的唯一入口。已确认延期项必须立即写入；15 的下一期输入和 Handoff 只引用 `POOL-ID`，不得复制需求正文形成第二来源。
+- Requirement Pool 不是当前项目基线或正式业务 SoT。条目只有经新一期 Discovery 重新核对、确认纳入，并进入当前 Planning Context / 正式 SoT 后，才成为本期事实。
 
 ## 3. 最高优先级规则
 
@@ -99,6 +104,8 @@ Planning 运行数据按职责只允许落在三个位置：
 - 未确认内容不得写成事实。
 - 所有关键实体必须具备唯一 ID。
 - 所有关键结论必须可追踪到来源。
+- 可以从项目证据或公开权威资料核验的客观事实必须先查证；不得把公开事实、当前能力、版本限制或规范内容当作业务问题要求用户回忆。
+- 调研证据不能替代用户对内部事实、业务取舍、范围和适用性的确认；公开资料发现的新功能只作为候选，不得自动扩展本期范围。
 - 禁止多个文件定义同一事实。
 - 禁止混淆计划、验收、已开发未发布和已上线生产状态。
 - 状态流必须显式定义。
@@ -131,7 +138,7 @@ Planning 运行数据按职责只允许落在三个位置：
 以下 ID 及其包含的期次、阶段、版本或迭代标识，只用于 Planning 追踪：
 
 ```text
-REQ FLOW SCN DOMAIN MODULE STATE API PERM ARCH CAP TASK TEST RISK DEP OPEN EXEC
+REQ POOL FLOW SCN DOMAIN MODULE STATE API PERM ARCH CAP TASK TEST RISK DEP OPEN EXEC
 ```
 
 允许用途：
@@ -273,6 +280,7 @@ Project Current Baseline
 - 验收结果不能替代测试方案。
 - 执行记录不能替代任务清单。
 - Planning Execution Baseline 冻结后，Change Set 只能增量修订受影响合同，不得覆盖既有执行事实。
+- Requirement Pool 只参与新一期 Discovery 的输入核对，不得直接插入冻结后的执行队列或替代 Change Set 准入。
 - 14、15 中已经由后续阶段填写的事实不得被 Planning 删除、覆盖、重置或重新绑定。
 - 未受影响但尚未开始、仍属于原执行基线的 active TASK 必须继续承接，不得因为产生 Change Set 或替换旧 Handoff 而从执行队列丢失。
 
@@ -494,6 +502,8 @@ Planning Runtime 最终输出（仅以下四项）：
 3. assembled_documents
 4. handoff_role_mapping
 ```
+
+Requirement Pool 的创建、更新或消费删除属于 Planning 过程中的跨期输入维护，不增加第五种正式输出，也不替代上述四项。
 
 时机规则：
 

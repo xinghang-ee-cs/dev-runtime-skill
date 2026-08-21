@@ -101,9 +101,12 @@ Recovery Runtime 只允许：
 
 ```text
 读取本期 current-interaction.yaml
+-> 恢复 discovery_checkpoint revision / last_applied_round_id / active_question
+-> 恢复 unresolved_items 的 resolution_route 与 research_findings
 -> 恢复 active_interaction
 -> 恢复未完成 latest_feedback
 -> 校验反馈与 active_interaction 的目标绑定
+-> discovery_question：核对问题 ID、回答状态、事实写入与下一未决项
 -> document：检查目标正式文档当前状态
 -> final_summary：检查总结版本与 planning_status
 -> 恢复 execution_handoff_decision
@@ -133,6 +136,19 @@ Recovery Runtime 只允许：
 
 禁止根据压缩后的对话摘要、最近提到的文档编号、“下一步是第 X 份”、编号大小或模型记忆推断当前确认对象。
 
+Discovery 恢复规则：
+
+- `latest_feedback` 仍为 `recorded` 或 `validated` 时，先把该回答应用到原 `discovery_question`，更新事实、未决项和 checkpoint revision；不得重问或跳到下一问题。
+- `active_question.answer_status: awaiting_answer` 且无未完成反馈时，向用户自然恢复该问题；不得根据压缩摘要另选问题。
+- `last_applied_round_id` 已完成但 checkpoint revision 未更新，或事实写入与 feedback 结果不一致时，阻止推进并恢复该轮持久化事务。
+- 下一问题必须来自已持久化 `unresolved_items` 与当前最大不确定项；已为 `confirmed` 的事实不得重复询问。
+- `resolution_route: project_evidence | web_research` 的未决项先恢复对应核验事务，不得改成用户问题；已持久化且仍在时效范围内的 `verified` 结论直接复用。
+- 调研结论为 `stale`、`conflicting`、`insufficient`，或所涉版本、价格、法规、平台能力可能已变化时，先重新核验并覆盖更新同一 `research_id`；不得根据压缩摘要或旧聊天结论猜测。
+- 公开来源暂时不可访问时保留已有来源定位并标记需要重新核验；不得删除结论后要求用户回忆公开事实。用户补充唯一内部证据时按项目内来源重新校验。
+- 调研发现的功能候选只有在用户已确认适用、延期或不适用后才能恢复为对应结论；延期项仍以 Requirement Pool 为唯一正文来源。
+- 恢复到非第一次 Planning 的第一阶段时，只读取 `relevant_requirement_pool_refs` 命中的池条目；若尚未执行 Requirement Pool Intake Gate，则按 07 执行，不得扫描 00–15 猜测延期需求。
+- `same` 条目已确认进入当前 Planning Context 后仍存在于池中时，完成消费删除再推进；`conflict` 条目尚未按用户最新确认更新时，恢复到冲突确认；`unrelated` 条目不加载正文。
+
 Planning Context 中已确认的 `execution_handoff_decision` 是权威语义来源，本期 `current-interaction.yaml` 是短期恢复镜像。恢复时：
 
 - `decision_status: confirmed` 且与 Planning Context 一致时，按该分支恢复，不得重新推断。
@@ -149,9 +165,9 @@ Planning Context 中已确认的 `execution_handoff_decision` 是权威语义来
 - `active_change.change_status` 为 `closed` 或 `superseded` 时不得作为当前执行范围恢复；存在连续 Change Set 时只恢复当前 active revision，并通过快照中的 previous/supersedes 引用保留历史关系。
 - `decision_ref` 必须使用 `<phase_planning_runtime_directory>/decision-log.md#decision_id=<DEC-ID>`，并唯一命中同时包含 Change Set 与 Recovery Output 的 Decision Snapshot。只命中文件、标题或时间戳时不得继续恢复。
 - 当前 Snapshot 必须是相对冻结 Baseline 的累计有效增量；它已经包含仍有效前序 Change Set 的影响范围。Recovery 不读取 R2、R3 历史拼装当前状态，也不因 active 指针前移推断旧 revision 已 `closed` 或 `superseded`。
-- 15 尚不存在时，从 `current-interaction.yaml.future_phase_inputs` 恢复已确认 Planning Context 的最小镜像；同步到 15 或 planning_only Handoff 后转读正式承载。Baseline 已冻结但 14/15 缺失时，恢复为框架派生阻断，不得恢复到 `handoff_prepared` 或执行入口。
+- 延期需求只从 `<requirement_pool_path>` 恢复；`current-interaction.yaml.discovery_checkpoint.relevant_requirement_pool_refs`、15 和 Handoff 只提供 `POOL-ID` 定位，不得包含第二份需求正文。Baseline 已冻结但 14/15 缺失时，仍恢复为框架派生阻断，不得恢复到 `handoff_prepared` 或执行入口。
 
-`current-interaction.yaml` 是短期恢复来源，但不是正式 SoT、历史日志或长期聊天记录。不得新增 `recovery-state`、`feedback-runtime`、`confirmation-runtime` 或 `context-compression-runtime`。
+`current-interaction.yaml` 是短期恢复来源，但不是正式 SoT、历史日志、长期聊天记录或研究报告。`discovery_checkpoint` 只保存结构化最小事实、未决项和调研结论，不得扩展为完整访谈历史或网页档案。不得新增 `recovery-state`、`feedback-runtime`、`confirmation-runtime` 或 `context-compression-runtime`。
 
 ## 4. 恢复输出（Recovery Output）
 
@@ -665,6 +681,8 @@ planning-runtime/current-interaction.yaml
 ```
 
 该文件可覆盖更新并作为当前交互恢复来源，不属于 append-only Project Runtime Evidence。
+
+其中 `discovery_checkpoint` 是逐轮覆盖更新的结构化恢复检查点；不得把完整对话、逐字回答或每轮 AI 解释追加成新的日志体系。
 
 规则：
 

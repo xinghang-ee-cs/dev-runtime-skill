@@ -1,6 +1,6 @@
 ---
 name: planning-layer-runtime
-description: 交互式规划层运行时。用于读取目标项目当前基线、开展规划访谈、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
+description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
 ---
 
 # 规划层运行时（Planning Layer Runtime）
@@ -13,14 +13,14 @@ description: 交互式规划层运行时。用于读取目标项目当前基线�
 
 只读取当前任务需要的文件：
 
-- `references/00-planning-user-discovery.md`：用户发现访谈、业务事实发现、专业词翻译和 Discovery Sufficiency Gate。
-- `references/01-planning-core-rules.md`：规划层核心约束、完整一期事实链、Planning Execution Baseline 与 Change Set 唯一承载边界、项目当前基线与前端体验事实、期次关闭、Planning 追踪 ID 与实现命名隔离。
+- `references/00-planning-user-discovery.md`：用户发现访谈、逐轮发现检查点、本地与公开事实调研、功能候选补充、业务事实发现、专业词翻译和 Discovery Sufficiency Gate。
+- `references/01-planning-core-rules.md`：规划层核心约束、跨期需求池边界、完整一期事实链、Planning Execution Baseline 与 Change Set 唯一承载边界、项目当前基线与前端体验事实、期次关闭、Planning 追踪 ID 与实现命名隔离。
 - `references/02-planning-change-levels.md`：变更影响分级、期内范围扩展准入、多 Change Set 生命周期、冻结基线后的增量执行选择与 carried-forward pending 任务保护。
 - `references/03-planning-doc-responsibility.md`：文档清单、职责、上游 SoT、下游输出和禁止内容。
-- `references/04-planning-format-spec.md`：AI Runtime 文件位置、ARCH 实现承接策略、TASK 命名与实现参数状态、`current-interaction.yaml`、ID、引用和验收结构。
+- `references/04-planning-format-spec.md`：AI Runtime 文件位置、需求池格式、ARCH 实现承接策略、TASK 命名与实现参数状态、`current-interaction.yaml`、ID、引用和验收结构。
 - `references/05-planning-priority-system.md`：规划优先级、严重性、发布阻塞与下游验证门禁语义。
 - `references/06-planning-capability-governance.md`：外部能力、SDK、OpenAPI、MCP、AI 提供方、官方 SoT、证据门禁与 Runtime 门禁治理。
-- `references/07-planning-conversation-runtime.md`：Planning Conversation 行为运行层；维护完整一期生命周期、三个变更门禁编排、Planning Execution Baseline 冻结、Implementation Naming / Contract Completeness Gate、增量 Handoff 完整性、前端体验绑定和期次关闭。
+- `references/07-planning-conversation-runtime.md`：Planning Conversation 行为运行层；编排逐轮持久化、事实调研、需求池核对、完整一期生命周期、三个变更门禁、Planning Execution Baseline 冻结、Implementation Naming / Contract Completeness Gate、增量 Handoff 完整性、前端体验绑定和期次关闭。
 - `references/08-planning-recovery-runtime.md`：上下文压缩与中断恢复、Change Triage 后的精确 Planning Recovery、失效传播、恢复门禁、Runtime Audit 日志与用户隔离。
 - `references/09-execution-intent-guard.md`：Execution Boundary Kernel。所有输入的 execution intent 判定、阻断结果和语义转向规则的唯一事实来源。
 - `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、逐文档交互、13 开发前准备总结、最终人话总结确认和状态回写规则。
@@ -31,6 +31,7 @@ description: 交互式规划层运行时。用于读取目标项目当前基线�
 
 ```yaml
 planning_root: <项目正式规划根目录>
+requirement_pool_path: <planning_root>/REQUIREMENT-POOL.md
 phase_planning_directory: <当前规划期次或工作包目录>
 phase_planning_runtime_directory: <phase_planning_directory>/planning-runtime
 project_current_baseline_path: <项目当前事实基线文件>
@@ -40,8 +41,9 @@ project_current_baseline_path: <项目当前事实基线文件>
 
 - 优先复用目标项目已有规划目录、期次组织方式和当前事实文件。
 - 若项目尚无对应位置，只在本次职责确实需要时创建最小项目级路径，并将真实路径写入 `.runtime/planning-layer-runtime/project-profile.yaml` 或当前 Planning Context。
+- 优先复用项目正式规划根目录下已有的需求池等价文件；不存在时，`<requirement_pool_path>` 绑定为 `<planning_root>/REQUIREMENT-POOL.md`，仅在第一次真实写入延期需求时创建，不预建空文件。
 - 路径选择必须来自目标项目事实，不得默认使用本 Skill 来源项目的目录、期次名称或文档位置。
-- `<planning_root>`、`<phase_planning_directory>`、`<phase_planning_runtime_directory>` 与 `<project_current_baseline_path>` 仅是静态规则中的语义占位符；写入项目前必须解析为真实路径。
+- `<planning_root>`、`<requirement_pool_path>`、`<phase_planning_directory>`、`<phase_planning_runtime_directory>` 与 `<project_current_baseline_path>` 仅是静态规则中的语义占位符；写入项目前必须解析为真实路径。
 - 目标位置唯一且可从仓库事实确认时直接绑定；存在多个候选、缺少写入权限或会改变已有 SoT 归属时，停止并请求用户确认。
 - 路径绑定只改变产物落点，不改变 Planning Context、Document Assembly、Handoff、Gate、确认与恢复流程。
 
@@ -139,6 +141,23 @@ project_current_baseline_path:
 - Flow Contract 与 Journey-Object Map 格式见 `references/04-planning-format-spec.md`。
 - 基线、FLOW 和对象地图变化的失效传播见 `references/08-planning-recovery-runtime.md`。
 
+## Cross-Phase Requirement Pool
+
+跨期待处理需求的唯一项目级入口：
+
+```text
+<requirement_pool_path>
+```
+
+定位：
+
+- 保存已由用户确认、但明确不进入当前期次的需求。
+- 是下一期 Discovery 的历史需求佐证，不是项目当前事实、正式业务 SoT、Planning Context、TASK、Handoff 或执行 Backlog。
+- 延期决定一旦确认，必须在继续下一轮讨论前立即写入；不得等 15、Handoff、总结或本期结束时再补记。
+- 非第一次 Planning 启动时按 `references/07-planning-conversation-runtime.md` 读取并与用户当前想法做语义比较。
+- 同一需求在确认纳入当前期后删除对应池条目；冲突需求先按用户最新确认更新池条目，再继续范围判断；无关条目保持不变且不打扰当前对话。
+- 唯一格式、去重、更新、删除和引用规则见 `references/04-planning-format-spec.md`。
+
 ## Runtime Lifecycle
 
 高层生命周期：
@@ -147,8 +166,14 @@ project_current_baseline_path:
 Execution Boundary Kernel（09）
 -> Planning Intent routing（07）
 -> Load .runtime/planning-layer-runtime Bootstrap Context（按需）
--> Discovery / Planning Conversation（00 + 07）
+-> Bind requirement_pool_path 与本期工作包路径
+-> 创建本期 current-interaction.yaml，保存初始需求与 discovery_checkpoint
 -> Project Current State Gate（07）
+-> 非第一次 Planning 读取 Requirement Pool 并执行相关性 / 冲突检查
+-> 检查项目本地证据，并对可公开核验、会影响下一问的事实执行联网调研
+-> 将最小调研结论、来源与时效写入 discovery_checkpoint
+-> Discovery / Planning Conversation（00 + 07）
+-> 每轮先持久化用户回答，再补充必要事实调研并更新 discovery_checkpoint，最后提出下一问题
 -> 确认目标、范围与成果用途
 -> 形成 execution_handoff_decision 候选
 -> 在本期 current-interaction.yaml 持久化最小恢复镜像与确认目标
@@ -214,6 +239,7 @@ Planning Document Mode 的逐文档生成前确认、生成后解释、用户确
 ## Document And Governance Boundaries
 
 - 文档生成必须遵循 `references/03-planning-doc-responsibility.md`、`references/04-planning-format-spec.md`、`references/05-planning-priority-system.md` 和 `references/06-planning-capability-governance.md` 定义的责任边界、格式、优先级、能力治理和门禁。
+- 跨期延期需求必须写入唯一 `<requirement_pool_path>`；00–15、Planning Context、15 下一期输入和 Handoff 只能在需要时引用 `POOL-ID`，不得复制形成第二份待处理需求正文。
 - 使用 `references/02-planning-change-levels.md`，由 Planning Runtime 内部评估变更影响范围，用于决定 Planning Conversation 的探索深度。
 - 涉及外部能力、SDK、OpenAPI、MCP、AI 提供方、基础设施依赖或人工能力时，按 `references/06-planning-capability-governance.md` 执行。
 - 实际装配 13 时，13 按 `references/10-planning-document-interaction-runtime.md` 完成确认后，14 和 15 作为执行记录框架与验收框架自动派生；它们只预置待填写事实位置，不填写任何实际执行、验证、验收、真实环境或发布结论。
@@ -240,7 +266,7 @@ Planning Document Mode 的逐文档生成前确认、生成后解释、用户确
 <phase_planning_runtime_directory>/
 ```
 
-其中 `current-interaction.yaml` 保存当前阶段、`execution_handoff_decision` 的最小恢复镜像、最小文档装配进度、当前交互和最近一条反馈，是上下文压缩与工具中断后的短期恢复来源；Planning Context 仍是执行交接分支的权威语义来源。所有期次级运行数据只能写入当前项目对应的本期目录，不得写入 Skill、`.runtime/planning-layer-runtime/`、项目根目录或其他期次目录。
+其中 `current-interaction.yaml` 从 Discovery 首轮开始保存逐轮 `discovery_checkpoint`、最小调研结论与来源、当前阶段、`execution_handoff_decision` 的最小恢复镜像、最小文档装配进度、当前交互和最近一条反馈，是上下文压缩与工具中断后的短期恢复来源；Planning Context 仍是执行交接分支的权威语义来源。所有期次级运行数据只能写入当前项目对应的本期目录，不得写入 Skill、`.runtime/planning-layer-runtime/`、项目根目录或其他期次目录。
 
 Project Runtime Evidence 只用于事件记录、决策记录和审计记录；默认不加载。
 
