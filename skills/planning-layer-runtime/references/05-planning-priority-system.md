@@ -75,7 +75,7 @@ Priority 使用 `P0/P1/P2`。
 - 不影响核心业务闭环
 - 不影响上线门禁
 - 不影响安全、权限、数据正确性或关键验收
-- 可进入 backlog
+- 可进入 Requirement Pool
 
 是否阻塞上线：否
 
@@ -135,13 +135,13 @@ Priority 不等于 Severity。
 - 已完成的 P1 必须有下游验证结果
 - 未完成的 P1 必须记录延期原因
 - 未完成的 P1 必须确认不阻塞上线
-- 未完成的 P1 必须进入后续任务或 backlog
+- 未完成的 P1 必须进入后续任务；经用户确认延期时进入 Requirement Pool
 
 ### P2 Gate
 
 上线前允许延期：
 
-- P2 可进入 backlog
+- P2 可进入 Requirement Pool
 - P2 不得阻塞 P0
 - P2 不得伪装为 P1/P0
 - P2 延期必须保留来源和处理建议
@@ -165,13 +165,14 @@ Priority 不等于 Severity。
 
 - P0 必须全部通过或由 release gate 明确阻断。
 - P1 允许有限遗留。
-- P2 可进入 backlog。
+- P2 可进入 Requirement Pool。
 
 规则：
 
 - P0 验证失败时不得进入上线通过结论。
 - P1 遗留必须说明影响范围、延期原因和后续处理位置。
 - P2 遗留必须保留可追踪来源。
+- 任何延期进入 Requirement Pool 的 P1/P2 都必须使用 `<requirement_pool_path>#POOL-ID`；不得在 15 或 Handoff 复制形成第二份 backlog。
 - 验收结果必须按 Priority 汇总。
 - planning-layer-runtime 不记录测试执行状态或测试结果。
 

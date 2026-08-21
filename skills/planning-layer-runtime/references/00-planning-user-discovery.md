@@ -7,6 +7,10 @@
 - User Discovery Runtime
 - User Discovery Interview
 - Adaptive Interview
+- Incremental Discovery Persistence
+- Discovery Fact Research
+- Functional Supplement Discovery
+- Requirement Pool Intake Support
 - Project Current State Discovery
 - Business Discovery
 - Business Translation
@@ -256,6 +260,8 @@ Planning Conversation Mode 的目标不是让用户填写问题表，
 ```text
 User Context Gate
 -> Project Current State Gate
+-> Requirement Pool Intake Gate（非第一次 Planning）
+-> Discovery Fact Research Gate
 -> Business Discovery
 ```
 
@@ -282,6 +288,8 @@ User Context Gate
 - 禁止把 1 到 3 个问题执行成固定三问模板。
 - 优先问最影响返工的点。
 - 已确认业务事实进入 Planning Context 来源区。
+- 每轮业务事实必须先进入本期 `current-interaction.yaml.discovery_checkpoint`，持久化成功后才允许提出下一问题。
+- 可以从项目证据或公开资料核验的客观事实必须先查证，不得把本可自行回答的问题转交给用户。
 
 禁止直接进入：
 
@@ -290,6 +298,99 @@ User Context Gate
 - 状态机
 - API 设计
 - 架构设计
+
+## 4.1 Incremental Discovery Persistence Gate
+
+Discovery 不得依赖“全部问题问完后再统一整理”。本 Gate 复用本期既有：
+
+```text
+<phase_planning_runtime_directory>/current-interaction.yaml
+```
+
+启动顺序：
+
+```text
+绑定本期工作包与 planning-runtime 路径
+-> 创建或恢复 current-interaction.yaml
+-> 将用户初始需求写入 discovery_checkpoint.initial_intake_summary
+-> 将当前关键未知项路由为 project_evidence / web_research / user_confirmation
+-> 完成会影响首问的本地证据检查与公开调研，并持久化 research_findings
+-> 持久化第一条 discovery_question 交互目标
+-> 再提出第一个实质性业务问题
+```
+
+每轮唯一顺序：
+
+```text
+收到用户回答
+-> 立即写入 latest_feedback，并绑定已持久化的 discovery_question
+-> 校验问题、轮次与回答绑定
+-> 把回答归一为 confirmed / candidate / superseded 事实和 unresolved_items
+-> 更新 discovery_checkpoint.revision、last_applied_round_id 与 active_question.answer_status
+-> 清除已经应用的 raw_user_input
+-> 回读校验本轮事实已落盘
+-> 对会影响下一问的可核验未知项执行本地证据检查或联网调研
+-> 将最小调研结论、来源、时效与规划相关性写入 discovery_checkpoint
+-> 回读校验调研结果已落盘
+-> 计算下一最大不确定项
+-> 先持久化下一条 discovery_question
+-> 再向用户提问
+```
+
+规则：
+
+- `discovery_checkpoint` 是正在形成的最小 Planning Context 检查点，不是正式业务 SoT，也不是完整聊天记录。
+- 已确认事实、仍为候选的理解、已被纠正的事实和未决项必须区分；不得把用户未确认的归纳写成 `confirmed`。
+- 用户纠正已有事实时，必须标记原事实 `superseded` 或以稳定引用说明被替代关系，不得静默覆盖后继续提问。
+- 一条用户回答包含多个有效业务事实时可以拆成多条结构化事实，但都必须引用同一 `source_round_id`。
+- 当前轮持久化或回读校验失败时停止提出下一问题，用业务白话报告无法安全保存当前进度；不得继续依赖聊天记忆推进。
+- 不记录 CoT、长篇推理、完整 AI 回复或已经应用后的完整用户原文。
+- 本期目录尚未合法绑定时，不得开始实质性 Business Discovery；先完成最小路径绑定，不得把运行状态写入 Skill、项目根目录、其他期次或 `.runtime/planning-layer-runtime/`。
+
+延期需求在本轮被用户确认后，必须按 `04-planning-format-spec.md` 立即写入 `<requirement_pool_path>`，并在 `discovery_checkpoint.relevant_requirement_pool_refs` 只保存 `POOL-ID`；不得只留在聊天、未决项或最终总结中。
+
+## 4.2 Discovery Fact Research Gate
+
+第一阶段先把未知项按事实来源分类，再决定是否问用户：
+
+```text
+项目本地可观察事实 -> 读取当前基线、正式文档、仓库、配置或已有证据
+公开可核验事实 -> 联网搜索并打开权威公开来源
+组织内部事实或业务决策 -> 向用户确认
+```
+
+以下情况只要会改变问题、范围、风险、可行性或验收口径，默认触发公开调研：
+
+- 用户提到具体产品、平台、提供方、SDK、API、库、协议、标准或基础设施能力。
+- 版本兼容、当前能力、限制、配额、价格、弃用状态、发布时间或时效性信息。
+- 法律、监管、行业规范、平台审核规则或安全要求。
+- 用户反馈中出现可以公开验证的能力判断、事实纠正或功能性补充。
+- AI 对技术约束或公开事实没有足够把握，且答案会影响下一问。
+
+来源优先级：
+
+```text
+项目当前基线与项目内权威证据
+-> 官方文档、官方公告、政府或标准组织等一手来源
+-> 论文、规范原文或其他权威来源
+-> 必要时用于交叉验证的可靠二手来源
+```
+
+规则：
+
+- 先保存当前用户反馈，再调研；不得为了搜索而延迟、覆盖或丢失本轮回答。
+- 首轮也必须在写入 `initial_intake_summary` 后、提出第一条实质性问题前完成必要调研。
+- 技术事实优先使用官方文档、规范或原始论文；法律与监管事实优先使用政府或监管机构来源；需要当前信息时记录版本、发布日期或检查时间。
+- 搜索查询只包含解决事实问题所需的最小公开信息。禁止把用户原话、未公开项目名、业务数据、账号、凭证、内部路径、内网地址、客户信息或其他敏感上下文发送到公开搜索。
+- 已由可靠证据核实的客观事实只能写入 `research_findings`，不得因为已核实就复制成 `facts`；不再要求用户回答同一事实。用户只需要确认内部事实、偏好、业务取舍和该事实是否适用于当前决策。
+- 用户确认某条调研结论适用于本期业务后，才允许生成对应业务 `fact`，并通过 `source_research_id` 引用原调研结论；`fact` 记录的是业务适用或取舍结论，不得复写公开资料正文。
+- 多个权威来源冲突、证据不足、页面不可访问或信息可能过期时，不得伪装成已核实；写入对应证据状态，只在其会阻塞规划时向用户说明或询问可提供的内部证据。
+- 调研是问题生成的前置输入，不是一次性研究报告。只保留能减少无效提问或改变规划判断的最小结论和来源，不保存网页全文、长引文、搜索过程或推理过程。
+- 搜索到的新功能、替代方案、限制补偿或最佳实践只作为 `candidate` 功能补充，不得静默变成本期范围。只有会实质改变目标、范围、风险或验收时，才用一个业务问题请用户判断。
+- 用户确认候选功能放到后续期次时，立即写入 Requirement Pool；确认纳入当前期时转为当前事实并进入 Planning Context；用户认为无关时标记为不适用，不反复追问。
+- 不为内部流程、未公开经营数据、组织偏好、责任归属或拍板决定进行公开搜索；这些内容只能来自项目权威证据或用户确认。
+
+当一次反馈包含多个可核验事实时，可以合并成一次小范围调研，但每条结论必须保留自己的 `research_id` 和来源。联网能力不可用时，把受影响项保持为 `unresolved_items`，`resolution_route: web_research`，不得改问用户去回忆公开资料，除非用户可以提供唯一内部来源。
 
 ## 发现输出（Discovery Output）
 
@@ -306,11 +407,19 @@ discovered_business_facts:
   pain_points:
   collaboration_roles:
   completion_rules:
+
+researched_facts:
+  - research_id:
+    finding_summary:
+    evidence_status:
+    sources: []
+    planning_relevance:
 ```
 
 规则：
 
-- 仅记录已确认业务事实。
+- `discovered_business_facts` 仅记录已确认业务事实；`researched_facts` 只记录有最小来源的客观调研结论。两者不得把同一句客观资料复制成双份事实。
+- 输出必须从已持久化的 `discovery_checkpoint` 汇总；不得从压缩后的聊天摘要重新猜测。
 - 不记录推理过程。
 - 不记录规划语言。
 - 不记录系统设计结论。
@@ -431,6 +540,12 @@ Planning Conversation Mode
 是否涉及数据库结构或破坏性变更
 是否有 UI 操作路径
 哪些内容明确不做
+每轮有效回答已写入 discovery_checkpoint
+会影响规划的项目内可核验事实已先检查
+会影响规划的公开可核验事实已调研，或已明确记录无法调研的阻断原因
+调研结论包含最小来源、检查时间和证据状态
+调研发现的功能补充未被静默扩为当前范围
+已确认延期需求已写入 Requirement Pool
 ```
 
 输出：
@@ -445,6 +560,8 @@ discovery_sufficiency:
 规则：
 
 - `decision` 只允许 `continue_interview` 或 `run_completion_gate`。
+- 检查点缺少最近已完成轮次、存在未应用反馈，或最新回答尚未落盘时，`decision` 必须为 `continue_interview`，且只能先恢复持久化事务，不能继续提问。
+- 存在 `resolution_route: project_evidence | web_research` 的关键未决项且尚未完成对应核验时，先执行调研，不得以用户提问替代；确实无法调研时保留阻断原因。
 - 关键项缺失时，不得进入正式文档生成。
 - 缺失时不得把完整 checklist 抛给用户。
 - 缺少身份、职位、协作位置或决策权判断时，先回到 User Context Discovery，不得直接追问业务建模问题。

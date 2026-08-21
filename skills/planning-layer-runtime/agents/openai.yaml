@@ -1,4 +1,4 @@
 interface:
   display_name: "规划层运行时"
-  short_description: "完成一期规划、文档审查、受控恢复、增量交接与发布后基线闭环"
-  default_prompt: "使用 $planning-layer-runtime 完成本期规划、文档审查或受控恢复，并对执行、测试中的变更先分类再做精确增量回流与交接。"
+  short_description: "先查事实并逐轮保存发现，维护需求池，完成规划与增量交接"
+  default_prompt: "使用 $planning-layer-runtime 在第一阶段先核实项目证据与可查公开事实，逐轮保存本期需求发现，核对并维护跨期需求池，完成规划文档、受控恢复，以及执行或测试变更的精确增量回流与交接。"

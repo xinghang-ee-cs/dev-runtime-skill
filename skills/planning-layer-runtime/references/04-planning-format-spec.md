@@ -40,7 +40,7 @@
 
 按需创建规则：
 
-- `current-interaction.yaml`：`execution_handoff_decision` 第一次需要在发问前持久化时按需创建；不得等到进入 Planning Document Mode 后才创建，是唯一默认必需文件。
+- `current-interaction.yaml`：进入 `discovery_start` 且本期路径合法绑定后，在第一条实质性业务问题前创建；不得等到访谈结束、执行交接判断或 Planning Document Mode 才创建，是唯一默认必需文件。
 - `event-log.md`：第一次实际写入 Runtime Event 时创建。
 - `decision-log.md`：第一次实际存在 Decision Snapshot 时创建。
 - `audit-log.md`：真正触发 Runtime Audit 时创建；普通 Planning 不创建。
@@ -57,6 +57,14 @@
 .runtime/planning-layer-runtime/project-profile.yaml
 .runtime/planning-layer-runtime/context-index.yaml（仅在确有多个稳定上下文入口时）
 ```
+
+跨期待处理需求单独保存到：
+
+```text
+<requirement_pool_path>
+```
+
+默认绑定为 `<planning_root>/REQUIREMENT-POOL.md`，但项目已有等价文件时优先复用。Requirement Pool 是规划输入资产，不属于 `.runtime/planning-layer-runtime/`、期次 `planning-runtime/`、00–15 正文或执行 Backlog。
 
 其中：
 
@@ -109,6 +117,50 @@ last_updated:
 ```yaml
 current_phase:
 
+discovery_checkpoint:
+  status:
+  revision:
+  updated_at:
+  initial_intake_summary:
+  last_applied_round_id:
+  active_question:
+    question_id:
+    topic:
+    prompt_summary:
+    asked_at:
+    answer_status:
+  facts:
+    - fact_id:
+      topic:
+      summary:
+      confirmation_status:
+      source_round_id:
+      source_research_id:
+      supersedes_fact_id:
+  unresolved_items:
+    - item_id:
+      summary:
+      blocking:
+      resolution_route:
+      related_research_id:
+      next_question:
+  research_findings:
+    - research_id:
+      topic:
+      finding_summary:
+      evidence_scope:
+      evidence_status:
+      checked_at:
+      sources:
+        - source_type:
+          source_ref:
+          source_title:
+          source_version_or_date:
+      planning_relevance:
+      related_fact_ids: []
+      related_requirement_pool_refs: []
+  relevant_requirement_pool_refs: []
+
 execution_handoff_decision:
   requires_execution_handoff:
   handoff_type:
@@ -125,8 +177,6 @@ active_change:
   admission_result:
   change_status:
   decision_ref:
-
-future_phase_inputs: []
 
 document_assembly:
   planned_roles:
@@ -169,6 +219,7 @@ planning_status:
 
 ```text
 document
+discovery_question
 execution_handoff_decision
 final_summary
 scope_change_decision
@@ -178,6 +229,7 @@ scope_change_decision
 
 ```text
 pre_generation_confirmation
+discovery_answer
 draft_confirmation
 execution_handoff_confirmation
 final_summary_confirmation
@@ -219,6 +271,20 @@ planning_handoff_complete
 
 规则：
 
+- `discovery_checkpoint.status` 只允许 `in_progress`、`ready_for_completion_gate`、`compiled_into_planning_context`；`revision` 每成功应用一轮回答后单调递增。
+- Discovery Runtime ID 在本期内唯一且单调递增：问题使用 `DQ-<SEQ>`，回答轮次使用 `DR-<SEQ>`，结构化事实使用 `DF-<SEQ>`，未决项使用 `DU-<SEQ>`，调研结论使用 `RF-<SEQ>`；这些 ID 只属于 `current-interaction.yaml`，不得进入正式实现命名。
+- `active_question.answer_status` 只允许 `awaiting_answer`、`recorded`、`applied`、`superseded`；一条问题在 `awaiting_answer` 前必须已持久化 `question_id / topic / prompt_summary / asked_at`。
+- `facts[].confirmation_status` 只允许 `candidate`、`confirmed`、`superseded`。用户纠正事实时不得静默覆盖；旧事实标记 `superseded`，新事实使用新 `fact_id` 并填写 `supersedes_fact_id`。
+- `facts` 只保存用户表达、项目当前基线以及用户确认后的业务适用或取舍结论。公开或项目证据核实出的客观资料只进入 `research_findings`，不得直接复制进 `facts`。当用户确认某条调研结论适用于本期业务时，新业务事实填写 `source_research_id: <RF-ID>`；没有调研来源时省略该字段。
+- `unresolved_items[].resolution_route` 只允许 `project_evidence`、`web_research`、`user_confirmation`；可自行核验的项不得错误路由成 `user_confirmation`。关联既有调研时填写 `related_research_id`，否则留空或省略。
+- `research_findings[].evidence_scope` 只允许 `project_local`、`external_public`；`evidence_status` 只允许 `verified`、`conflicting`、`insufficient`、`stale`；`planning_relevance` 只允许 `evidence_only`、`candidate`、`confirmed_applicable`、`not_applicable`。
+- 每条 `research_findings` 只保存影响当前规划判断的最小结论与来源定位。项目内来源使用真实文件路径或稳定证据 ID；公开来源使用可追溯 URL，并在可得时记录版本或发布日期。禁止保存网页全文、长引文、搜索结果页、搜索词历史、用户敏感信息或 AI 推理。
+- `verified` 只表示来源足以支持客观结论，不等于用户已确认其业务适用性；会改变范围、取舍或验收的结论必须保持 `candidate`，直到用户确认后才转入对应业务事实或 Requirement Pool。
+- 调研发现的延期功能正文只进入 Requirement Pool；`research_findings.related_requirement_pool_refs` 与 `relevant_requirement_pool_refs` 只保存 `POOL-ID`。调研结论不得成为第二份延期需求正文。
+- 用户初始需求必须在第一条实质性业务问题前写入 `initial_intake_summary`；这里只保存结构化短摘要，不保存整段聊天。
+- 收到 Discovery 回答后，必须先把 `latest_feedback` 绑定到当时已持久化的 `discovery_question` 并写为 `recorded`，再更新事实与未决项。完成应用后清除 `raw_user_input`，更新 `last_applied_round_id`，回读校验成功后才允许写入下一条问题。
+- `discovery_checkpoint` 是当前期未完成 Planning Context 的最小恢复检查点，不是正式 SoT、Decision Log、完整 Planning Context 副本、访谈历史或研究报告。只保留会改变规划方向、范围、授权、流程或验收的事实、未决项与最小调研结论。
+- 已确认延期需求的正文只进入 `<requirement_pool_path>`；`relevant_requirement_pool_refs` 只记录 `POOL-ID`，不得复制需求池正文。
 - `execution_handoff_decision` 只保存恢复分支所需的最小镜像：`requires_execution_handoff` 只允许 `true | false`，`handoff_type` 只允许 `execution_ready | planning_only`，`decision_status` 只允许 `candidate | confirmed`；`decision_basis` 只写存在或不存在后续工程任务的原因，`decision_source` 只允许实际使用的 `user_confirmation`、`confirmed_planning_context`、`document_assembly_requirement`。
 - Planning Conversation 中已确认的 Planning Context 是 `execution_handoff_decision` 的权威语义来源；本文件只是短期恢复镜像，不是第二套 Planning Context、业务 SoT、完整对话或推理记录。
 - `document_assembly.planned_roles` 只记录本期计划装配的职责，不预造文件路径；`generated_documents` 只加入已经真实生成的本期文档及其 `role / path / status`，路径必须真实存在；不得复制正式文档正文、完整 `assembled_documents` 或 Handoff Package。
@@ -226,8 +292,9 @@ planning_handoff_complete
 - `planning_execution_baseline_reference` 只在执行基线冻结后保存 `phase_id / revision` 的最小恢复引用；完整 Baseline 正文只存在于 13。
 - `active_change` 只保存当前 `change_revision / admission_result / change_status / decision_ref`；`decision_ref` 必须使用 `<phase_planning_runtime_directory>/decision-log.md#decision_id=<DEC-ID>` 精确指向本期既有 Change Set Decision Snapshot。该 Snapshot 同时承载完整 Change Set 与按 08 格式生成的 Recovery Output；不得在 `current-interaction.yaml` 复制它们、Baseline、TASK 或执行事实。
 - `change_status` 只允许 `candidate`、`confirmed`、`applied_to_planning`、`handoff_prepared`、`closed`、`superseded`。新变化到达时不得直接覆盖尚未关闭的 `active_change`。
-- `future_phase_inputs` 只是在 15 尚不存在时对已确认 Planning Context 同名字段的最小恢复镜像，条目格式复用本文件后述唯一格式；它不是第二个 Planning Context。同步到 15 或 planning_only Handoff 后，以正式承载为准，并清空已转移正文或只保留同步状态。
 - 每一期只使用本期 `<phase_planning_runtime_directory>/current-interaction.yaml`；不得跨期共用或覆盖，不得把本期状态写入 Skill、`.runtime/planning-layer-runtime/`、项目根目录或其他期次目录。
+- 第一期和后续任意期次都必须逐轮写 Discovery 检查点；“这是第一次执行”不得成为延迟持久化的理由。
+- Discovery 发问前的唯一绑定格式为 `target_type: discovery_question`、`target_id: <DQ-ID>`、`stage: discovery_answer`、`version: <当前 checkpoint revision>`；`latest_feedback.target_id` 必须复制同一 `DQ-ID`。
 - 向用户发出任何会影响流程状态的确认问题前，必须先写完整 `active_interaction`；不得等用户回复后再从聊天记忆推断确认对象。
 - 文档确认时，`target_id` 使用真实文档路径。
 - 执行交接分支确认固定使用 `target_type: execution_handoff_decision`、`target_id: current_phase_execution_handoff_decision`、`stage: execution_handoff_confirmation`；必须先写入候选镜像和该交互目标，再向用户发问。
@@ -239,7 +306,80 @@ planning_handoff_complete
 - 同一反馈不得同时确认当前目标并消费下一目标。
 - Planning 真正完成后清空待处理反馈，并将 `planning_status` 设为 `planning_handoff_complete`。
 
-### 1.3 Planning Execution Baseline / Change Format
+### 1.3 Requirement Pool Format
+
+跨期待处理需求的唯一文件：
+
+```text
+<requirement_pool_path>
+```
+
+文件存在时，每个条目使用：
+
+```markdown
+# Requirement Pool
+
+本文档只保存用户已确认延期、尚待后续期次判断的需求。它不是项目当前事实、当前期范围、正式业务 SoT、TASK 或执行 Backlog。
+
+### POOL-<DOMAIN>-<SEQ>：<需求短标题>
+
+需求摘要：
+
+预期业务价值：
+
+语义比较键：
+- 涉及角色：
+- 涉及业务对象：
+- 涉及流程或场景：
+- 预期结果：
+- 硬约束：
+
+来源期次或工作包：
+
+来源类型：
+- discovery_deferred / scope_admission_deferred / acceptance_deferred
+
+延期原因：
+
+关联当前期 ID：
+
+首次确认时间：
+
+最近更新时间：
+
+最近确认来源：
+```
+
+文件与条目规则：
+
+- 文件不存在且没有真实延期需求时视为空池，不预建空文件；第一次确认延期后创建。
+- Requirement Pool 只保留尚未被当前期正式消费的条目，因此不使用 `done`、`closed`、`consumed` 等历史状态堆积已完成项。
+- `POOL-ID` 在项目规划根目录内稳定唯一。条目按需求语义去重；同一角色、业务对象、流程目标与硬约束指向同一件事时更新既有条目，不新增同义条目。
+- 只有用户已确认延期的需求才能写入。候选想法、AI 推测、当前期未决问题、已纳入当前期范围的需求、TASK、Bug、执行状态和完整聊天不得进入。
+- 延期决定确认后必须在继续下一轮提问、生成文档、准备 Handoff 或输出总结前写入并回读校验；不得等待本期结束时批量补记。
+- 15“下一期输入”和 Handoff 只引用 `<requirement_pool_path>#POOL-ID`，不得复制需求正文或维护第二份状态。
+
+非第一次 Planning 的语义比较只允许三种结果：
+
+```text
+same
+conflict
+unrelated
+```
+
+- `same`：主动提醒用户这是历史已确认延期需求，并把 `POOL-ID` 作为 Discovery 来源佐证；用户确认纳入当前期且对应事实已进入当前 Planning Context 后，删除该完整条目。
+- `conflict`：在继续范围探索前向用户说明池中旧需求、当前新表达和冲突影响；用户确认最新方向后，先原位更新该 `POOL-ID` 的需求摘要、比较键、来源与最近更新时间，不创建重复条目。仅在更新后的需求随后被当前 Planning Context 正式纳入时删除。
+- `unrelated`：不向用户展示，不影响当前探索，不更新、不删除，留待后续期次。
+
+消费和修改规则：
+
+- 正常消费必须删除整个已纳入条目，禁止保留“已完成需求墓地”。
+- 冲突处理必须先更新为用户最新确认需求；不得保留旧需求正文作为并列候选，也不得静默以当前输入覆盖。
+- 删除或更新前必须核对 `POOL-ID`、当前用户确认与当前 Planning Context 归属。未确认纳入时不得删除。
+- 同一次写入只修改命中的条目；不得重排、重写或清理无关需求。
+- 文件更新失败时停止消费、延期或下一轮 Planning 推进，不得只靠聊天记忆继续。
+
+### 1.4 Planning Execution Baseline / Change Format
 
 Planning Execution Baseline 完整正文的唯一承载是：
 
@@ -328,21 +468,7 @@ change_set:
 
 Change Set 与 `active_change.change_status` 共用同一状态枚举：`candidate`、`confirmed`、`applied_to_planning`、`handoff_prepared`、`closed`、`superseded`。
 
-15 尚不存在时，延期需求暂由已确认 Planning Context 承载：
-
-```yaml
-future_phase_inputs:
-  - source:
-    summary:
-    defer_reason:
-    related_current_phase_ids: []
-    expected_next_phase_value:
-    status:
-```
-
-`status` 只允许 `candidate`、`confirmed`、`transferred_to_15`、`handed_off`。15 后续真实派生时，把已确认项同步到 15 下一期输入区并标记 `transferred_to_15`；最终为 planning_only 时写入其 Handoff 并标记 `handed_off`，不得为此提前生成 13、14、15 或独立 Backlog。
-
-在 15 尚不存在期间，Planning Context 是上述内容的临时权威来源，`current-interaction.yaml.future_phase_inputs` 只做中断恢复镜像。若 Baseline 已冻结但 14/15 尚未真实派生，视为框架派生未完成：不得生成 `execution_ready` Handoff，也不得把 active Change Set 标记为 `handoff_prepared`。
+延期需求无论 15 是否存在，都立即进入唯一 `<requirement_pool_path>`。15 的“下一期输入”、planning_only Handoff 或 execution_ready Handoff 只记录本期产生或引用的 `POOL-ID` 与真实路径，不复制条目正文。不得为记录延期需求提前生成 13、14、15。
 
 ## 2. 一级标题
 
@@ -372,6 +498,7 @@ future_phase_inputs:
 
 ```text
 REQ-xxx
+POOL-xxx
 FLOW-xxx
 SCN-xxx
 DOMAIN-xxx
@@ -404,6 +531,7 @@ TEST-xxx
 - 不允许同义重复
 - 不允许自然语言替代
 - 本节 ID 全部是 `trace_only`，只用于 Planning 文档、执行/验收记录和变更证据追踪；不得转换为长期代码、数据库、API、权限、配置、迁移或测试套件命名。
+- `POOL-ID` 只用于跨期待处理需求引用，不得直接成为 REQ、TASK 或实现命名；需求纳入当前期后仍须生成本期自己的 `REQ-ID`，再删除已消费池条目。
 - ID 中的期次、阶段、Sprint 或版本标识不代表物理技术域；完整边界以 `01-planning-core-rules.md#32-planning-trace-id-boundary` 为唯一来源。
 - PROMPT 必须关联适用的 PAGE、UI-MOD 或 UX-SCN；PROMPT-STYLE 必须关联适用页面、模块或 UX 范围。
 - ASSET 在 `received`、`review_pending`、`visual_confirmed` 或 `superseded` 状态下必须关联实际收到的图或明确的外部引用。
@@ -2392,7 +2520,7 @@ Task Completion Contract 必须明确：
 8. 发布判定与发布事实区
 9. PROJECT-CURRENT-BASELINE 更新条件与结果区
 10. 复盘
-11. 下一期输入
+11. 下一期输入（只引用 Requirement Pool）
 ```
 
 文档必须包含：
@@ -2452,6 +2580,7 @@ planning skill 只允许预填：
 - 15 不得因框架生成写入通过、失败、已验收、真实环境已通过、可发布、已发布、生产已更新或 PROJECT-CURRENT-BASELINE 已更新。
 - 已有实际 TEST、CAP、验收、发布或基线更新事实时不得覆盖、删除或回退；Change Set 只允许追加受影响验收项或修订尚未填写的占位。
 - 实际发布确认后，15 才记录 PROJECT-CURRENT-BASELINE 更新结果；Planning 框架生成不能执行该更新。
+- 下一期输入只允许列出 `<requirement_pool_path>#POOL-ID` 和一句引用目的；需求正文、延期状态和消费状态只在 Requirement Pool 维护。
 
 ### 12/13/14/15 State Separation Rule
 

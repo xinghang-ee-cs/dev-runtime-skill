@@ -14,6 +14,7 @@ Planning Layer Runtime 支持两种模式：
 - 用户以自然语言启动规划时，默认进入 Planning Conversation Mode。
 - Planning Context 完整后，才允许进入 Planning Document Mode。
 - 用户直接要求生成文档但上下文不完整时，先进入 Planning Conversation Mode。
+- `discovery_start` 必须在第一条实质性业务问题前创建或恢复本期 `current-interaction.yaml`，先核实会影响首问的项目与公开事实，并逐轮持久化 Discovery；禁止等所有问题结束后统一补记。
 
 ### 1.1 Planning Intent Subtype and Planning Exploration Guard
 
@@ -210,7 +211,9 @@ Planning Conversation Mode 启动前，按需读取 `.runtime/planning-layer-run
 
 ```text
 User Context Gate（读取 / 复用 / 自然识别；不阻塞业务探索）
-→ Project Current State Gate + Business Discovery（按当前最大不确定性并行推进）
+→ Project Current State Gate + Requirement Pool Intake Gate（非第一次 Planning）
+→ Discovery Fact Research Gate
+→ Business Discovery（按当前最大不确定性推进）
 → Planning Conversation
 → Discovery Sufficiency Gate
 → Planning Completion Gate
@@ -259,6 +262,49 @@ current_frontend_experience_baseline_available_or_not_applicable
 - 不得用已有旧代码绕过业务规划结论。
 - 不得新建独立设计基线文件；当前前端体验事实只进入唯一 `PROJECT-CURRENT-BASELINE.md`。
 
+### 2.4 Requirement Pool Intake Gate
+
+非第一次 Planning 启动时，在进入范围收敛前必须读取：
+
+```text
+<requirement_pool_path>
+```
+
+文件不存在时按空池处理；不得为此创建空文件。读取遵守最小上下文原则：先读取条目标题和语义比较键，只展开与用户当前输入可能相关的条目。
+
+比较维度：
+
+```text
+涉及角色
+业务对象
+流程或场景
+预期业务结果
+硬约束
+```
+
+比较结果只允许：
+
+```text
+same
+conflict
+unrelated
+```
+
+处理规则：
+
+- `same`：在第一阶段自然提醒用户“这个需求之前已暂存”，说明对应历史需求和当前表达为何是同一件事，并把 `POOL-ID` 作为 Discovery 来源佐证；不得直接当作本期已确认范围。用户确认本期纳入且事实已进入当前 Planning Context 后，删除该池条目。
+- `conflict`：暂停受影响范围的推进，用业务白话并列说明旧需求、当前表达和会造成的流程/角色/结果冲突，只问一个决策问题。用户确认最新方向后，先原位更新同一 `POOL-ID` 为最新需求，再继续 Discovery；不得同时保留两条冲突需求。更新后的需求只有正式纳入当前 Planning Context 后才删除。
+- `unrelated`：保持条目不变，不向用户展示，不把它强行拉入当前期；留待后续期次。
+
+规则：
+
+- 语义相同不得只按关键词判断；任一关键硬约束相反时至少为 `conflict`。
+- Requirement Pool 是历史需求佐证，不是当前项目事实。它不得覆盖 Project Current Baseline，也不得绕过用户当前确认。
+- 同一当前需求最多命中一个语义主条目；存在多个重叠池条目时先在池内去重，再向用户说明。
+- 比较结果和引用写入 `discovery_checkpoint.relevant_requirement_pool_refs`；需求正文不复制到 `current-interaction.yaml`。
+- 池条目的新增、更新、删除必须在继续下一轮提问前写入并回读校验。失败时停止推进，不得靠聊天记忆假装已维护。
+- 第一次 Planning 也允许在讨论中把已确认延期需求写入 Requirement Pool；“非第一次”只决定启动时是否存在需要读取的历史条目。
+
 ## 3. 对话生命周期（Conversation Lifecycle）
 
 ### 3.1 对话阶段（Layer 1 可见）
@@ -266,7 +312,8 @@ current_frontend_experience_baseline_available_or_not_applicable
 默认阶段：
 
 ```text
-探索定位（自然理解、关键未知、一个推进问题）
+Discovery 检查点建立与 Requirement Pool 核对
+→ 探索定位（自然理解、关键未知、一个推进问题）
 → 当前状态确认
 → 目标确认
 → 范围确认
@@ -313,6 +360,56 @@ current_frontend_experience_baseline_available_or_not_applicable
 - Discovery Sufficiency Gate 通过前，不得进入 Planning Document Mode。
 - User Discovery Runtime 必须读取或检查 User Context Gate；若用户输入已包含明确业务目标或业务问题，不得等待 User Context Gate 字段补齐后才开始业务发现。
 
+#### 3.2.1 Discovery Round Transaction
+
+本节是 Planning Conversation Mode 中逐轮发现事务的唯一行为规则，字段格式以 `04-planning-format-spec.md` 为准。
+
+首次启动：
+
+```text
+解析 planning_root、phase_planning_directory 与 phase_planning_runtime_directory
+-> 创建或恢复 current-interaction.yaml
+-> 写入 initial_intake_summary
+-> 非第一次 Planning 执行 Requirement Pool Intake Gate
+-> 将未知项路由为 project_evidence / web_research / user_confirmation
+-> 检查会影响首问的本地证据和公开权威来源，并持久化 research_findings
+-> 写入第一条 active_interaction: discovery_question
+-> 再输出第一个实质性业务问题
+```
+
+用户每次回答后的唯一顺序：
+
+```text
+收到输入
+-> 在做下一步规划判断前写入 latest_feedback: recorded
+-> 绑定当前 discovery_question / question_id / checkpoint revision
+-> 校验并分类回答
+-> 更新 facts / unresolved_items / relevant_requirement_pool_refs
+-> 若确认延期，立即写入 Requirement Pool
+-> feedback applied，清除 raw_user_input
+-> discovery_checkpoint revision + 1
+-> 回读验证
+-> 对会影响下一问的 project_evidence / web_research 未决项执行核验
+-> 持久化 research_findings 并再次回读验证
+-> 选择下一个最大不确定项
+-> 持久化下一条 discovery_question
+-> 再回复用户
+```
+
+强规则：
+
+- 不允许连续问多轮后再批量写入。
+- 不允许先回复下一问题，再异步补记上一轮。
+- 不允许只保存“问到第几题”；必须保存足以恢复规划判断的结构化事实和未决项。
+- 可以自行核验的客观事实必须先按 `00-planning-user-discovery.md#42-discovery-fact-research-gate` 调研；只有内部事实、业务取舍、适用性或无法由证据解决的阻断项才形成用户问题。
+- 已核验的项目或公开资料只写 `research_findings`；不得混入 `facts` 冒充用户确认。用户确认业务适用性后生成的业务事实必须引用对应 `RF-ID`。
+- 调研发现的功能补充先保持候选；未经用户确认不得进入当前范围，确认延期时必须先写入 Requirement Pool。
+- 用户说“暂停”“稍后继续”时，也必须先应用当前回答并保存检查点，再结束本轮。
+- 写入或回读失败时不得继续提问、进入 Completion Gate 或生成文档。
+- 如果本期目录无法合法确定，只允许先完成路径绑定；不得开始会产生业务事实的实质性 Discovery。
+- 路径绑定只建立本期工作包的恢复位置，不等于命名第 X 期、定义期次主题或提前收口范围；Planning Exploration Guard 仍然生效。
+- Planning Context 完成后，把检查点标记为 `compiled_into_planning_context`；不得删除仍用于本期中断恢复的结构化事实。
+
 ### 3.3 Discovery Priority Rule
 
 Discovery 阶段的目标不是快速补齐 Planning Context 字段，而是优先理解用户当前表达中的最大业务不确定性。
@@ -324,6 +421,7 @@ Discovery 阶段的目标不是快速补齐 Planning Context 字段，而是优�
 当前业务目标
 当前阻塞点
 当前影响规划方向的不确定因素
+项目证据与公开调研仍无法解决的业务未知
 ```
 
 规则：
@@ -331,6 +429,7 @@ Discovery 阶段的目标不是快速补齐 Planning Context 字段，而是优�
 - 不得为了填充 Planning Context 模板主动遍历所有字段。
 - 不得连续询问角色、权限、数据、状态、模块、页面、接口等字段清单。
 - 只有某个缺失信息会改变规划方向、范围、授权边界或验收结果时，才主动追问。
+- `resolution_route: project_evidence | web_research` 的项先查证，不得直接追问用户；调研完成后只问剩余的内部决策或适用性问题。
 - 当用户已经给出业务问题时，首轮问题应围绕真实流程、当前卡点或结果影响，而不是身份标签或专业字段。
 - 每轮只问当前最能改变下一步判断的一个自然问题。
 
@@ -381,9 +480,15 @@ Planning Conversation Runtime 开始前必须优先读取：
 ```yaml
 user_profile
 discovered_business_facts
+discovery_checkpoint
+research_findings
 ```
 
 若事实已确认，禁止重复提问。
+
+恢复或继续对话时，以本期已持久化 `discovery_checkpoint` 为当前 Discovery 事实来源；压缩摘要只可辅助定位，不得覆盖检查点。
+
+已持久化且仍在时效范围内的 `verified` 调研结论允许复用；存在 `stale`、`conflicting`、`insufficient` 或版本/规则可能已变化时先重新核验，不得重复询问用户公开事实。
 
 仅允许：
 
@@ -424,6 +529,9 @@ discovered_business_facts
 
 ### 4.3 输出规则
 
+- 用户可见回复前必须完成本轮 Discovery Round Transaction；尚未落盘的回答不得只存在于即将发送的自然语言理解中。
+- 用户可见回复中的“自然理解”和“当前未知”必须可追溯到当前 `discovery_checkpoint`；不得与已持久化事实冲突。
+- 若回复包含下一问题，必须先将该问题写为 `active_interaction.target_type: discovery_question`、`stage: discovery_answer`，再输出问题。
 - 内部轮次状态仅用于日志、恢复、上下文管理。
 - 用户可见回复才是给用户看的内容。
 - 用户态回复必须像正常协作对话。
@@ -735,7 +843,8 @@ UI/交互：
 风险：
 验收：
 待确认项：
-future_phase_inputs:
+调研事实与来源：
+Requirement Pool 相关引用：
 涉及文档：
 执行交接判断：
   execution_handoff_decision:
@@ -754,7 +863,9 @@ future_phase_inputs:
 - 当前项目状态必须区分生产当前、已开发未发布、已验收未发布和计划目标。
 - 涉及 UI 时，当前前端体验基线必须引用 `PROJECT-CURRENT-BASELINE.md` 的当前事实和权威来源，不复制设计资产。
 - FLOW 只记录 Planning Conversation 已确认或待确认的业务旅程，不替代 01 的正式 Flow Contract。
-- 15 尚不存在时，已确认的延期输入暂由 `future_phase_inputs` 承载；后续派生 15 时同步到其下一期输入区，planning_only 时进入 Handoff。不得为记录延期项提前生成 13、14、15。
+- 已确认延期需求必须立即写入 `<requirement_pool_path>`；Planning Context 只保存与本期讨论有关的 `<requirement_pool_path>#POOL-ID` 引用，不复制需求正文。不得为记录延期项提前生成 13、14、15。
+- Planning Context 必须从 `discovery_checkpoint` 汇总；最近一轮回答未落盘、存在未应用反馈或检查点无法回读时不得标记 COMPLETE。
+- Planning Context 只纳入与本期结论有关的最小调研事实、来源、版本或检查时间；不得复制网页正文、搜索过程或未经确认的功能候选。客观证据可支持事实，业务适用性与范围仍须按 Discovery 规则确认。
 - `execution_handoff_decision` 属于现有 Planning Context，不新增第二套 Planning Context、Runtime 文件、日志或状态机。
 - `requires_execution_handoff` 只允许 `true` 或 `false`；`handoff_type` 必须分别对应 `execution_ready` 或 `planning_only`。
 - `decision_source` 只记录实际来源：`user_confirmation`、`confirmed_planning_context`、`document_assembly_requirement`；可按实际情况记录一项或多项。
@@ -779,6 +890,8 @@ Planning Context 标记 `COMPLETE` 前，必须先完成以下唯一顺序：
 
 ```text
 Planning Conversation 已确认目标、范围与成果用途
+-> discovery_checkpoint 的全部反馈已应用并通过回读校验
+-> 从检查点汇总 Planning Context，并标记 compiled_into_planning_context
 -> 形成 execution_handoff_decision 候选
 -> 写入本期 current-interaction.yaml 最小恢复镜像
 -> 持久化 execution_handoff_confirmation 交互目标
@@ -910,7 +1023,7 @@ Planning Context COMPLETE
 - 不生成 13、14、15。
 - 不运行 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 或 Execution and Acceptance Framework Derivation Gate。
 - Handoff 不包含 `Development Landing Checklist`、`Execution and Integration Record`、`Acceptance and Retrospective Record`，也不包含针对代码执行的 `execution_constraints`。
-- Planning Context 存在已确认 `future_phase_inputs` 时，Handoff 必须保留这些输入并标记 `handed_off`；不得为此生成 13、14、15。
+- 本期产生延期需求时，Handoff 只保留 `<requirement_pool_path>#POOL-ID` 引用；不得复制需求正文或为此生成 13、14、15。
 - 如果本期结论需要交给开发执行，即使变更很小，也必须改走分支 A。
 
 用途：
@@ -925,7 +1038,9 @@ Handoff Package 格式：
 ```yaml
 handoff_type: <planning_only | execution_ready>
 requires_execution_handoff: <true | false>
-future_phase_inputs: []
+deferred_requirement_refs:
+  requirement_pool_path: <本期存在延期项时填写真实路径>
+  pool_ids: []
 
 # Handoff Package 的完整结构、分支条件和生成规则由本节维护
 # frontend_experience_binding 等复用子格式以 04-planning-format-spec.md 为唯一格式来源
@@ -1030,6 +1145,7 @@ Handoff.active_change_revision
 - 必须来自本次 Planning Runtime 的正式输出。
 - 上述 YAML 只表达允许的职责名；实际 Handoff 只能列出本期真实已生成且适用的 role。
 - Handoff 不得包含尚未生成的文档、空占位路径、假设路径或未适用职责。
+- `deferred_requirement_refs` 只在本期新增或引用延期项时出现，只包含真实 `<requirement_pool_path>` 与 `POOL-ID`；不得复制需求摘要、状态或消费规则。
 - `handoff_type: execution_ready` 必须具备 13、14、15、Planning Execution Baseline revision、`execution_constraints` 与 `incremental_execution_contract`，且 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 与 Execution and Acceptance Framework Derivation Gate 均已通过。
 - 首次 `execution_ready` 在顶层与 `incremental_execution_contract` 内同时省略 `active_change_revision`；增量 `execution_ready` 两处必须包含完全一致的合法 active Change Set revision，并与 `current-interaction.yaml.active_change.change_revision` 及 `decision_ref` 指向的 Change Set revision 一致。任何分支都不得生成空键或伪造 revision。
 - `handoff_type: planning_only` 禁止包含 Development Landing Checklist、Execution and Integration Record、Acceptance and Retrospective Record、`planning_baseline_revision`、`active_change_revision`、`execution_constraints` 与 `incremental_execution_contract`；允许包含本期实际生成的 Requirement and Scope、Business Domain、UI/UX Design、Architecture Decision、Capability Governance、Test and Acceptance Plan、Risk, Dependency, and Open Questions 等职责。
@@ -1158,8 +1274,8 @@ deferred_improvement
 - `planning_gap`：`reopen_current_planning`；只回到真正拥有该事实的上游 SoT，再调用 08 传播受影响范围。
 - `requirement_change`：先按 `02-planning-change-levels.md` 做范围准入，决定本期吸收、增量、下一期或替换本期范围；不得先改 13。
 - `design_drift`：规划仍正确时优先 `fix_in_execution`；设计合同确实需要改变时才回到 05/09/11/13。只有用户路径或业务流程改变时才继续回到 03/01/02。
-- `deferred_improvement`：不影响本期验收且经确认允许延期时，`defer_to_next_phase`；15 已存在则进入其下一期输入区，否则进入已确认 Planning Context 的 `future_phase_inputs`。
-- 15 尚不存在时，将已确认 `future_phase_inputs` 同步为 `current-interaction.yaml` 的最小恢复镜像；Planning Context 仍是临时权威来源。Baseline 已冻结但 14/15 未真实派生时属于框架派生未完成，不得准备 execution-ready Handoff 或进入执行。
+- `deferred_improvement`：不影响本期验收且经确认允许延期时，`defer_to_next_phase`；立即写入 `<requirement_pool_path>`。15 已存在时只在其下一期输入区引用 `POOL-ID`。
+- 15 尚不存在时也直接写 Requirement Pool，并在 `discovery_checkpoint.relevant_requirement_pool_refs` 保留最小引用。Baseline 已冻结但 14/15 未真实派生时属于框架派生未完成，不得准备 execution-ready Handoff 或进入执行。
 
 只有 `planning_gap`、`requirement_change` 或真正改变设计合同的 `design_drift` 可以触发 Planning Recovery 与 SoT 失效传播。
 
@@ -1207,7 +1323,7 @@ candidate -> confirmed -> applied_to_planning -> handoff_prepared -> closed
 - Planning 只定义 15 的更新条件，不填写真实验收、发布或基线更新结果。
 - 只有实际发布确认后才更新生产当前事实；已验收未发布仍保持交付状态。
 - 本期关闭后 00–15 历史只读。旧期次只允许受控修正事实错误，独立新增需求默认进入下一期。
-- 下一期始终从最新 `PROJECT-CURRENT-BASELINE.md` 开始。
+- 下一期始终从最新 `PROJECT-CURRENT-BASELINE.md` 开始，并读取 `<requirement_pool_path>` 做 `same / conflict / unrelated` 判断；需求池不得覆盖当前基线。
 
 ## 10. Planning Document Mode
 
@@ -1302,6 +1418,11 @@ phase_change_target_reconciled_with_current_state
 
 检查：
 
+- `discovery_checkpoint` 已覆盖所有已完成访谈轮次，revision 与 `last_applied_round_id` 一致。
+- 不存在仍为 `recorded` / `validated` 的 Discovery 用户反馈。
+- 会影响本期判断的 `project_evidence / web_research` 未决项已经完成核验，或明确记录无法核验的阻断原因。
+- 纳入 Planning Context 的调研事实具备最小来源、检查时间与证据状态；会影响本期方向的功能候选均有明确的纳入、延期或不适用结论。
+- 已确认延期需求均已写入 `<requirement_pool_path>`，当前检查点只保留 `POOL-ID` 引用。
 - 当前项目状态
 - 目标
 - 范围
@@ -1319,6 +1440,8 @@ phase_change_target_reconciled_with_current_state
 - execution_handoff_decision
 
 是否已确认。
+
+任一 Discovery 轮次未持久化、检查点无法回读或 Requirement Pool 待写入时，Planning Context = INCOMPLETE，不得继续依赖聊天摘要补齐。
 
 --------------------------------------------------
 
@@ -1948,7 +2071,7 @@ Runtime State：
 <phase_planning_runtime_directory>/current-interaction.yaml
 ```
 
-它是上下文压缩、会话恢复和工具中断后的短期恢复来源；其中 `execution_handoff_decision` 与 15 尚不存在时的 `future_phase_inputs` 只是已确认 Planning Context 的最小镜像，`document_assembly` 只是当前装配进度的最小镜像。字段以 `04-planning-format-spec.md` 为准，处理顺序以 `10-planning-document-interaction-runtime.md` 为准，恢复校验以 `08-planning-recovery-runtime.md` 为准。
+它是上下文压缩、会话恢复和工具中断后的短期恢复来源；其中 `discovery_checkpoint` 从第一轮开始保存正在形成的最小 Planning Context 事实，`execution_handoff_decision` 是已确认 Planning Context 的最小分支镜像，`document_assembly` 是当前装配进度的最小镜像。字段以 `04-planning-format-spec.md` 为准，Discovery 处理顺序以本文件 3.2.1 为准，文档交互顺序以 `10-planning-document-interaction-runtime.md` 为准，恢复校验以 `08-planning-recovery-runtime.md` 为准。
 
 Project Runtime Evidence：
 
@@ -2008,7 +2131,7 @@ planning-runtime/
 规则：
 
 - 本 skill 不定义其他 skill 的运行时目录、日志结构、证据保存位置或实际回写机制。
-- `execution_handoff_decision` 第一次需要在发问前持久化时按需创建 `current-interaction.yaml`；不得等到进入 Planning Document Mode 后才创建。
+- 进入 `discovery_start` 且本期路径合法绑定后，在第一条实质性业务问题前创建 `current-interaction.yaml`；后续执行交接和 Document Mode 必须复用同一文件。
 - `event-log.md` 在第一次实际写入 Runtime Event 时创建。
 - `decision-log.md` 在第一次实际存在 Decision Snapshot 时创建。
 - `audit-log.md` 只在真正触发 Runtime Audit 时创建；普通 Planning 不默认创建。
@@ -2350,6 +2473,8 @@ missing_sections:
 
 共同条件：
 
+- Discovery 每轮反馈均已应用并持久化，`discovery_checkpoint.status: compiled_into_planning_context`，不存在只留在聊天或压缩摘要中的有效业务事实。
+- 本期所有确认延期项均已写入 Requirement Pool；所有确认纳入当前期的 `same` 池条目均已删除，已解决的 `conflict` 条目已先更新为用户最新需求。
 - 本期实际装配文档已生成并确认。
 - `assembled_documents` 与 `handoff_role_mapping` 已基于真实路径生成。
 - Handoff Branch Consistency Check 已通过；Planning Context、本期 `current-interaction.yaml` 恢复镜像、Document Assembly Plan 与 Handoff 的分支字段一致，前三者的 `decision_status` 均为 `confirmed`。
@@ -2369,7 +2494,7 @@ missing_sections:
 - `requires_execution_handoff: false`。
 - Handoff 不包含 13/14/15 职责、`planning_baseline_revision`、`active_change_revision`、`execution_constraints` 或 `incremental_execution_contract`，也不使用空值或虚构 revision 占位。
 - 不存在阻断本期规划结论本身的 OPEN。
-- Planning Context 存在已确认 `future_phase_inputs` 时，planning_only Handoff 已承接且没有为此生成 13/14/15。
+- 本期存在延期需求时，Requirement Pool 已成功写入，planning_only Handoff 只承接 `deferred_requirement_refs`，且没有为此生成 13/14/15。
 
 ```yaml
 event_seq:
