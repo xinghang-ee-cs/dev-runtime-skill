@@ -302,6 +302,7 @@ covered_by_asset_ref: ASSET-PROFILE-UX-001@asset-r2
 ### ASSET-PROFILE-PAGE-001
 
 ```yaml
+image_sequence: 1
 asset_revision: asset-r3
 asset_type: page_ui
 asset_status: visual_confirmed
@@ -329,6 +330,7 @@ confirmed_at: '2026-08-22T10:00:00+09:00'
 ### ASSET-PROFILE-UX-001
 
 ```yaml
+image_sequence: 2
 asset_revision: asset-r2
 asset_type: ux_interaction
 asset_status: visual_confirmed

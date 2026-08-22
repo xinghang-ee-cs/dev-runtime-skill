@@ -317,11 +317,12 @@ Batch Draft Assembly 发生在任何文档确认前；Role-Based Document Explan
 
 ```text
 Read 05 asset plan and exact Prompt revisions
--> Build one UI asset batch from all same-dependency required STYLE/PAGE/MODULE prompts
+-> Assign or restore every required ASSET's stable image_sequence from 05
+-> Build the next UI asset batch from at most 10 same-dependency required STYLE/PAGE/MODULE prompts
 -> Persist design_asset_collection(prompt_ready) + design_asset_generation_request target
--> Output every required UI prompt_body directly to the user
+-> Output every prompt in this batch directly to the user with the fixed user-facing format
 -> Persist collection_status = awaiting_assets
--> Ask the user to generate or provide the mapped UI images
+-> Ask the user to use any external image-generation tool or provide existing images, mapped by image_sequence
 -> Receive files or external references and persist latest_feedback first
 -> Bind each received image to ASSET-ID@revision and real path/reference
 -> Mark received -> review_pending
@@ -332,8 +333,9 @@ Read 05 asset plan and exact Prompt revisions
 -> User confirms or requests correction
 -> On confirm: mark exact UI ASSET revisions visual_confirmed
 -> On correction: revise only affected Prompt/contract/ASSET revision, return to prompt_ready and resend it
+-> If required UI prompts remain: build the next batch of at most 10 and repeat
 -> Rebuild PROMPT-UX reference_inputs from visual_confirmed UI asset revisions
--> If an interaction image is required: repeat the same batch loop for UX prompts and UX images
+-> If an interaction image is required: repeat the same at-most-10 batch loop for UX prompts and UX images
 -> If existing confirmed UI assets fully express the interaction: record covered_by_existing_ui_assets and skip UX image request
 -> When every required UI/UX asset is visual_confirmed: collection_status = complete
 -> Update 05 Manifest / contracts / coverage and affected downstream drafts
@@ -344,11 +346,13 @@ Read 05 asset plan and exact Prompt revisions
 
 用户态 Prompt 交付规则：
 
-- 必须在聊天回复中直接给出每个本批次资产的用途、目标工具、输出规格、`PROMPT-ID@revision`、对应 `ASSET-ID@revision` 和完整 fenced `prompt_body`。不得只告诉用户“Prompt 已写入 05”、只给文件路径、只给锚点或要求用户自行打开 Markdown 复制。
-- UI Prompt 默认按同一依赖层批量提供，至少包含当前所有必需 STYLE（适用时）、PAGE 和 UI-MOD Prompt；不得无必要地一张图问一轮。UX Prompt 必须在其引用的 UI ASSET revision 已真实收到并完成视觉确认后提供，避免引用不存在或旧版图片。
+- 每个批次只能包含同一依赖层的 `1–10` 条 Prompt；即使剩余项超过 10 条也不得一次性全部输出。依赖边界或剩余数量不足 10 条时允许小批次，不得为了凑满而混入尚不具备依赖的 UX Prompt。
+- 必须在聊天回复中直接按 11 §4.1 的唯一用户态格式交付本批次完整 Prompt，不得在本文件另定义或改写字段模板。不得只告诉用户“Prompt 已写入 05”、只给文件路径、只给锚点或要求用户自行打开 Markdown 复制。
+- 批次开头说明当前批次、预计总批次、当前图片范围和可使用任意外部生图工具。没有内置生图工具不构成阻断，不得因此要求用户配置 API Key、CLI fallback 或特定厂商工具。
+- UI Prompt 按依赖顺序分批提供 STYLE（适用时）、PAGE 和 UI-MOD Prompt；同层超过 10 条时继续下一批，不得无必要地一张图问一轮。UX Prompt 必须在其引用的 UI ASSET revision 已真实收到并完成视觉确认后提供，其 `参考的图片序号` 必须对应这些已确认 UI 图，避免引用不存在、旧版或仅存在于聊天描述中的图片。
 - 用户已经有符合要求的 UI/UX 图时允许直接上传或提供真实外部引用，不强制重新生成；仍必须绑定 ASSET revision 并执行视觉确认。
-- 必须明确告诉用户每张图对应哪个页面、模块或交互，以及建议文件名或回传映射方式，避免多图无法归属。
-- 用户一次只提供部分图片时，已收到项立即持久化并保留；后续只重发缺失或修订项的 Prompt，不要求重新上传未受影响图片。
+- 必须明确告诉用户按稳定图片序号回传，并可同时给出建议文件名，避免多图无法归属。用户一次只提供部分图片时，已收到项立即持久化并保留；后续只列出和重发缺失或修订项，不要求重新上传未受影响图片。
+- 一个批次完成视觉确认后，若仍有必需资产，必须主动交付下一批并重复“Prompt 交付 -> 外部生成/已有图回传 -> 审查 -> 用户确认”；直到全部必需 UI/UX 资产闭合。不得把“本批最多 10 张”误解为总共只处理 10 张，也不得在中途无故结束 05 设计资产收集。
 
 视觉确认规则：
 
@@ -356,6 +360,7 @@ Read 05 asset plan and exact Prompt revisions
 - `visual_confirmed` 只能由绑定当前批次和当前 ASSET revision 的用户确认产生，并写回真实路径/引用、确认来源和时间；一句“确认”不得同时确认图片和 05 文档。
 - 任一必需 UI/UX 图缺失、仍为 `review_pending` 或用户要求重做时，05 不得进入整体文档确认，`design_asset_collection` 保持未完成，相关 UI TASK 不得 Ready。
 - 图片修订必须提升对应 ASSET revision；Prompt 或合同内容变化时同步提升其 revision，并只失效真实依赖旧 revision 的下游草案。
+- 图片修订、批次切换和中断恢复不得重新编号。`design_asset_collection.active_prompt_refs` 与 `active_asset_refs` 按当次展示顺序保存，图片序号的唯一 SoT 仍是 05 ASSET 索引中的 `image_sequence`。
 - 本 Gate 复用 `current-interaction.yaml`、05 ASSET 索引和既有 `UI_CONFIRMATION` 事件；不得新增出图日志、图片确认 Runtime 或第二份设计 SoT。
 
 当前文档为 13 时，人话总结还必须说明：
