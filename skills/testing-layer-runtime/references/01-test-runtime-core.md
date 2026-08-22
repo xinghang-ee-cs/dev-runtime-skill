@@ -60,6 +60,7 @@ automated_failed:
 automated_skipped:
 manual_required:
 coverage:
+frontend_contract_validation_summary:
 ```
 
 启动时必须确认 Long Testing Handoff 的 `planning_baseline_revision`、可选 `active_change_revision` 与其引用的当前 Planning Handoff 一致，并确认 `executed_task_contract_revisions` 只来自 `execute_only`、`resume_only` 或 `reexecute_affected_part`。revision 缺失、冲突、过期或包含 `context_only`、`completed_locked`、`cancelled` 时，Test Intake Gate 不得通过。
@@ -73,6 +74,7 @@ coverage:
 | `automated_skipped` | 判断是否需要人工、服务器或用户确认 |
 | `manual_required` | 进入人工/真实设备/外部能力队列 |
 | `coverage` | 用于识别未覆盖范围，不作为通过证明 |
+| `frontend_contract_validation_summary` | UI/UX 适用时核对实际消费的设计文档、Manifest、PAGE/UX-SCN/ASSET revision；继承自动化证据，只将精确的未自动化项加入人工队列 |
 
 缺失 handoff 或字段不完整时：
 
@@ -125,6 +127,8 @@ planning_baseline_revision:
 active_change_revision:
 long_testing_handoff:
 planning_test_scope:
+frontend_experience_binding:
+frontend_contract_validation_summary:
 manual_required:
 server_required:
 release_required:
@@ -156,10 +160,11 @@ Test Intake Gate 之后必须进入 Test Planning Phase。
 
 - 从 planning 读取“测什么”。
 - 从 long handoff 读取自动化事实。
+- UI/UX 适用时从 Planning Handoff 读取精确设计合同与资产 revision，并与 Long `frontend_contract_validation_summary` 交叉校验；`unresolved_mismatch` 非空时阻断受影响测试。
 - 对 `automated_passed` 直接写入 `reused_from_long`。
 - 对 `manual_required` 建立人工测试卡。
 - 对服务器和 release 事项只建立验证/移交项。
-- 不生成纯 UI 对照、页面截图差异或视觉验收的独立人工测试项。
+- 不生成脱离 Planning TEST 和合同 revision 的纯审美对照项；允许为 Long 明确移交且 Planning 已定义的视觉一致性、真机响应式、复杂 UX 或无障碍观察生成合同绑定人工项，但必须同时包含 PAGE/UX-SCN/ASSET revision、设备/视口、业务进入路径、操作、可见断言与通过条件。
 - 不生成某一期的测试入口删除、测试快捷操作删除或测试专用接口删除测试项；这些只在最终上线门禁中移交。
 
 ## Execution/Test Change Triage Gate

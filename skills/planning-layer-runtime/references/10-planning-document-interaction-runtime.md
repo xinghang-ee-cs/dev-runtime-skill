@@ -1,6 +1,6 @@
 # Planning Document Interaction Runtime
 
-本文件是 Planning Document Mode 中逐文档交互、生成前确认、生成后解释、用户确认和状态回写的唯一事实来源。
+本文件是 Planning Document Mode 中批量草案装配、依次解释确认、定向修正和状态回写的唯一事实来源。
 
 本文件不新增规划生命周期，不新增 Runtime 状态机，不替代 `03-planning-doc-responsibility.md`、`04-planning-format-spec.md`、`06-planning-capability-governance.md` 或 `07-planning-conversation-runtime.md`。
 
@@ -35,7 +35,7 @@ Discovery 问答事务由 `07` 维护；本文件从执行交接分支确认与�
 适用于：
 
 - 执行交接分支确认。
-- 文档生成前关键确认。
+- 批量装配因事实不足而回流第一阶段时的阻断事实确认。
 - 文档草案生成后确认。
 - 用户要求解释后的再次确认。
 - 风险或冲突确认。
@@ -115,7 +115,8 @@ active_interaction:
 
 ## 1. 文档确认规则
 
-- 每次正式文档草案生成后，必须先输出可独立确认的人话总结；总结要让用户不打开 Markdown 也能判断方向对不对。
+- 本期全部计划装配文档草案完成批量生成与跨文档校验后，才进入用户确认队列；不得在批量生成中途打断用户逐份确认。
+- 轮到某份正式文档草案时，必须先输出可独立确认的人话总结；总结要让用户不打开 Markdown 也能判断方向对不对。
 - 人话总结必须覆盖该文件中所有需要用户拍板的业务结论：
   1. 这份文档当前草案实际确认了什么。
   2. 对哪些角色、流程、页面、数据、接口、测试、验收或业务结果会产生什么变化。
@@ -130,72 +131,86 @@ active_interaction:
 - 用户确认必须绑定当前文档、当前草案版本和确认范围；不得把一句"确认"错误理解为确认摘要本身、其他文档或其他范围。
 - 草案版本优先使用文档头部版本、修订时间或本次草案明确标识；若文档无独立版本字段，则以当前文件路径和当前草案内容作为本次确认版本，不新增 runtime、日志体系、SoT、目录或状态机。
 - 用户确认文档后，必须立即将该文档文件头部的 `状态` 字段从 `草案` 回写为 `已确认`。状态以文件内容为准，不得依赖对话记忆追踪。
-- 进入下一份文档前，必须先读取现有文档的状态字段，确认规划进度，不得凭记忆推断。
+- 进入下一份文档前，必须先读取现有文档状态和 `document_assembly.confirmation_queue`，确认规划进度，不得凭记忆推断。
 
-## 2. Per-Document Collaborative Confirmation Gate
+## 2. Batch Draft Assembly And Sequential Confirmation Gate
 
-每生成一份正式 SoT 文档草案前，必须执行 Per-Document Collaborative Confirmation Gate。
+Planning Document Mode 分为两个连续但不交错的阶段：先批量生成全部草案，再依次确认。
 
-Planning Document Mode 每份文档的生成顺序：
+唯一顺序：
 
 ```text
-Select Next Document
--> Persist pre_generation_confirmation Target
--> Explain Document Purpose to Current User
--> Per-Document Collaborative Confirmation Gate
--> Confirm / Correct / Complete Missing Points
--> Generate Formal Document Draft
+Freeze Document Assembly Plan
+-> Persist batch_revision and planned_roles
+-> Generate all applicable 00–12 and optional 13 drafts in dependency order
+-> After each file write, persist real path / draft revision / status in generated_documents
+-> Run cross-document reference, responsibility and draft completeness checks
+-> If missing Planning fact is found: stop batch, persist blocker, return to Discovery for one blocking fact
+-> If batch succeeds: draft_generation_status = generated
+-> Build confirmation_queue from real generated paths
+-> Select first confirmation item
 -> Persist draft_confirmation Target
 -> Role-Based Document Explanation Gate
--> 收到用户输入后先写 current-interaction.yaml
+-> Receive feedback and persist before processing
 -> Validate Feedback Binding
--> User Confirmation
--> 回写文档状态：将文件头部 `状态` 从 `草案` 改为 `已确认`
--> 标记反馈 applied / already_effective
--> 读取所有文档状态字段，确认规划进度
--> Conversation Continuity Gate
--> Move to Next Document
+-> Confirm or Correct
+-> On confirm: write document 状态 = 已确认 and queue status = confirmed
+-> On correction: update owning SoT and regenerate only affected downstream drafts
+-> Re-run affected cross-document gates and refresh their draft revisions / queue status
+-> Select next earliest unconfirmed or reopened item
+-> Continue until all applicable 00–13 documents are confirmed
+-> If 13 exists and is confirmed: derive 14/15 frameworks
 ```
 
-目标：
+批量生成规则：
 
-- 让当前使用者知道这份文档要锁定什么。
-- 在正式落文档前，确认该文档最容易理解偏差的关键点。
-- 避免 AI 基于粗粒度上下文自行补细节。
-- 确保每份文档都和使用者一起过了一遍。
+- 草案仍按依赖拓扑生成，不按用户确认轮次决定生成顺序。
+- 第二阶段不得重新逐文档访谈；生成所需事实必须来自已持久化 Discovery、Planning Context、项目证据、调研结果和已确认外部基线。
+- 批量生成是一个用户不可见的完整装配步骤，但每写入一份文件都必须立即更新 `current-interaction.yaml.document_assembly`，避免中断或压缩后重复生成。
+- 只有本期所有计划装配的 00–12 与可选 13 草案都真实存在、路径可回读且跨文档草案校验完成后，才向用户发出第一份文档确认。
+- 13 草案可以随 00–12 一起批量生成，但此时只能是 `草案`；13 的 Task/Implementation/UI Execution Gate 仍在轮到 13 确认前基于已经确认的上游文档重新运行。
+- 14、15 不参与初始批量草案生成；只在 13 已确认后自动派生。
+- 批量生成中发现第一阶段事实不足时，停止装配并回到 Discovery，只问当前阻断的一个事实；不得边生成边向用户追加文档问题。
 
-输入：
+依次确认规则：
 
-- 当前 Planning Context
-- 当前使用者画像与沟通偏好
-- 当前待生成文档职责
-- 当前文档上游 SoT
-- 当前文档下游影响
-- 当前缺失项、风险项、冲突项
+- 默认按依赖顺序确认；可以合并纯框架说明，但不得把多个需要用户拍板的 SoT 文档合成一次模糊确认。
+- 每轮只激活一个真实文档路径和 draft revision，继续复用现有反馈事务。
+- 用户确认一份文档不自动确认其他草案。
+- 用户纠正时先改真正拥有事实的文档；已生成但受影响的下游草案立即重建并提升 draft revision。
+- 已确认文档若被上游纠正真实命中，状态改回 `草案` / queue status `reopened`；未受影响的已确认文档保持不变。
+- 修正完成后从最早的 `reopened` 或 `pending_confirmation` 文档继续，不重新批量生成全部文档。
+- 用户可以要求跳到某份文档解释，但不得绕过其未确认上游来确认下游。
 
-输出：
+`document_assembly` 必须形成可恢复队列：
 
 ```yaml
-document_role:
-document_purpose_for_user:
-confirmed_points:
-missing_points:
-risk_points:
-user_questions:
-decision: continue_conversation | generate_document | blocked_by_missing_info
+batch_revision:
+draft_generation_status: <pending | generating | generated | blocked | invalidated>
+generated_documents:
+  - role:
+    path:
+    draft_revision:
+    document_status: <draft | confirmed | reopened | invalidated>
+confirmation_queue:
+  - role:
+    path:
+    draft_revision:
+    confirmation_status: <pending_confirmation | awaiting_feedback | confirmed | reopened | invalidated>
+current_confirmation:
+  role:
+  path:
+  draft_revision:
+generation_blocker:
+  owning_role:
+  unresolved_item_ref:
+  resume_condition:
+assembly_status: <batch_assembling | awaiting_confirmation | confirming | rebuilding | blocked | complete>
 ```
 
-正式文档生成前，AI 必须先用当前使用者能听懂的话解释：
+## 3. Batch Assembly Input Completeness Check
 
-1. 这份文档是干什么的。
-2. 为什么现在要确认它。
-3. 它会影响后面的哪些开发、测试或验收。
-4. 这份文档里最容易理解错的 1 到 3 个点。
-5. 当前还需要使用者确认的最小问题。
-
-只有当该文档关键确认点已确认，或明确登记为待确认项且不阻塞当前文档时，才允许生成正式文档草案。
-
-## 3. 文档生成前最少确认点
+以下内容必须在第一阶段 Discovery / Planning Context 中已经确认、由项目证据或公开调研核实，或明确登记为不阻断项。它们是批量草案装配的内部输入检查，不是在第二阶段逐文档重新询问用户的题单。
 
 00、01、02 生成前的最少确认点：
 
@@ -204,7 +219,7 @@ decision: continue_conversation | generate_document | blocked_by_missing_info
 - 02：每一步依赖哪些业务事实、谁具备资格、哪些对象可产生什么结果、哪些旧对象绝不能影响新流程。
 - 03：用户从哪里进入，什么条件下能做下一步，失败时看到什么、能怎么办，取消或失败后回哪里，哪些旧入口用户仍可能访问。
 - 04：这条流程必须依赖哪些能力才能走通，哪些能力只是协作不应承担主责任，哪些旧能力绝不能再参与，缺少哪个能力时必须阻断。
-- 05：本期最优先要先看到哪些页面，使用什么端、什么语言、什么视觉气质，是否已有品牌/Figma/截图/参考图，哪些页面或异常状态必须通过图明确表达，哪些局部变化需要单独做模块图，哪些交互现有页面图无法表达需要后续补 UX 图。
+- 05：本期最优先要先看到哪些页面，使用什么端、什么语言、什么视觉气质，是否已有品牌/Figma/截图/参考图，哪些页面或异常状态必须通过图明确表达，哪些局部变化需要单独做模块图，哪些交互现有页面图无法表达需要后续补 UX 图；准备交给开发时，还必须确认 Prompt 目标工具/输出规格、页面布局与响应式边界、状态反馈、内容长度、键盘焦点、可访问性、动效反馈、设计资产 revision 和允许/禁止偏离范围。能从项目设计体系、已确认资产或公开工具事实核实的内容先调研并写入，不把事实问题重复问用户。
 - 06：哪些业务事实证明流程可继续，什么事件会改变事实或状态，哪些状态必须持久化，哪些只是界面暂态，旧状态绝不能映射成什么新状态。
 - 07：前端需要读什么、提交什么，后端必须返回什么、拒绝什么，哪些写操作需要幂等和并发处理，旧审批字段或旧接口是否必须封锁。
 - 08：谁能对什么资源做什么动作，允许范围是什么，拒绝原因如何区分，工作人员只能协助到什么程度，历史对象只能在哪些范围只读。
@@ -213,11 +228,9 @@ decision: continue_conversation | generate_document | blocked_by_missing_info
 - 11：用户必须按怎样的顺序完成这条业务，哪些错误/越权/旧路径/异常绝不能通过，哪些结果必须自动化证明，哪些必须在真机或真实环境确认。
 - 12：哪些风险信号其实是同一个问题，哪些是必须先满足的依赖，哪些问题还没有拍板且会阻断任务。
 - 13：哪些结论已经确认到可以执行，哪些 OPEN 还没关闭不能生成任务，哪些任务必须串行或可以并行，完成后要证明什么。
-- 14 / 15：不单独进行生成前协作确认；13 确认后自动派生执行记录框架与验收框架，只预置待填写位置，不填写任何实际执行、验证、验收、发布或基线事实。
+- 14 / 15：不进入初始草案批次，也不进入独立确认队列；13 确认后自动派生执行记录框架与验收框架，只预置待填写位置，不填写任何实际执行、验证、验收、发布或基线事实。
 
-用户侧必须使用业务语言；不得要求用户直接回答"状态机"、"RBAC"、"对象关系"或"接口契约"。
-
-不得把完整设计 checklist 扔给用户；默认每轮只问一个最关键问题。
+若任一缺失项会阻断正确装配：停止批量生成，持久化 `draft_generation_status: blocked` 和 `generation_blocker`，回到第一阶段用业务语言只问一个当前阻断事实；回答持久化并重新达到 Planning Context COMPLETE 后，清空 blocker 并从未完成的批量装配检查点继续。不得把完整 checklist 扔给用户，也不得把第二阶段变成补访谈流程。
 
 ## 4. 文档确认门禁
 
@@ -225,7 +238,7 @@ decision: continue_conversation | generate_document | blocked_by_missing_info
 
 - Scenario Consistency Gate：每个 P0 FLOW 至少有一个 SCN；每个 SCN 只引用既有 FLOW；每个 SCN 的进入条件不弱于 FLOW 前置；每个关键异常有恢复、退出或人工协助路径；03 未新增主业务旅程；03 未改变 FLOW 的合法入口、终态或禁止路径。不满足时，03 不得确认。
 - Module Coverage Gate：每个 P0 FLOW 有主模块；每个关键 SCN 有承接模块；每个模块有输入事实、输出能力、非责任和隔离边界；旧流程隔离模块明确保护哪些 FLOW；不存在模块循环依赖或模糊复用。不满足时，04 不得确认。
-- UI/UX Design Readiness Gate：每个 P0 SCN 已映射 PAGE；每个 PAGE 有合法进入条件和 UI STATE；每个 UI STATE 有唯一主操作；全局风格提示词已准备；P0 页面提示词已准备；关键模块图需求已识别；UX 是否可由现有 UI 图覆盖已明确；需要出图但尚未收到资产的项已标记，不得伪造已确认。不满足时，05 的交互合同不得确认，涉及该页面的 UI 依赖开发任务不得生成或进入可执行状态。
+- UI/UX Design Readiness Gate：每个 P0 SCN 已映射 PAGE；每个 PAGE 有合法进入条件和 UI STATE；每个 UI STATE 有唯一主操作；全局风格提示词或继承基线已准备；P0 Prompt 具有可直接复制的完整 `prompt_body` 与输出规格；本期 PAGE/UI-MOD 已具备 UI Implementation Contract；关键 UX-SCN 已具备确定性状态迁移表；设计资产带 revision、真实路径和独立确认状态；05 Manifest 对内部引用完整，并以 `design_ready` 或带明确原因的 `blocked` 表示当前阶段；`scripts/validate_ui_ux_contract.py --allow-design-ready`、`--allow-blocked` 或同等结构校验通过。不要求此时尚未生成的 11、13 或 Handoff 引用；这些引用由后续 UI/UX Execution Readiness Gate 收口。需要出图但尚未收到或未确认的资产不得伪造，相关 UI TASK 不得 Ready。
 
 05 设计确认记录复用既有 `UI_CONFIRMATION` 事件；不得新增设计日志、出图日志、UX Runtime 或独立资产数据库。
 
@@ -244,29 +257,25 @@ decision: continue_conversation | generate_document | blocked_by_missing_info
 12/13/14/15 文档确认门禁：
 
 - Risk / Dependency / Open Item Gate：每个正式 RISK 已归并为唯一风险；每个 BLOCKER 有阻断阶段、处理策略与关闭条件；每个 DEP 有验证来源和最晚解除阶段；每个 OPEN 有回写目标和确认主体；关键 OPEN 未关闭时，相关任务不得进入 13；12 不重复定义已确认业务规则、状态、接口、权限或 UI 事实。不满足时，12 不得确认。
-- Task Contract Gate：只校验 13 自身及其上游 01–12；每条 P0 FLOW 至少有一个主 TASK；每个 TASK 可追溯到已装配且已确认的 FLOW / STATE / API / PERM / ARCH / TEST；关键 OPEN 已关闭；每个 CAP 任务只引用已确认的选型与门禁；每个旧流程隔离要求均被至少一个 TASK 承接；每个 TASK 有 Ready Gate、完成合同和回写目标；Implementation Naming Gate 与 Implementation Contract Completeness Gate 均通过。不满足时，13 不得确认。14、15 的预先存在不得作为 13 确认前置；两道实现门禁的唯一检查项由 `07-planning-conversation-runtime.md` 维护。
+- Task Contract Gate：只校验 13 自身及其上游 01–12；每条 P0 FLOW 至少有一个主 TASK；每个 TASK 可追溯到已装配且已确认的 FLOW / STATE / API / PERM / ARCH / TEST；关键 OPEN 已关闭；每个 CAP 任务只引用已确认的选型与门禁；每个旧流程隔离要求均被至少一个 TASK 承接；每个 TASK 有 Ready Gate、完成合同和回写目标；Implementation Naming Gate 与 Implementation Contract Completeness Gate 均通过。存在 UI TASK 时还必须通过 UI/UX Execution Readiness Gate，并以 execution-ready 默认校验验证 05、11、13 的精确绑定。不满足时，13 不得确认。14、15 的预先存在不得作为 13 确认前置；两道实现门禁的唯一检查项由 `07-planning-conversation-runtime.md` 维护。
 - Execution and Acceptance Framework Derivation Gate：13 已确认并回写后才运行；14 已按全部 TASK 预置 `EXEC-<TASK-ID>` 空白项；14 已继承 TASK 的目标、完成合同、预期 TEST、RISK / DEP / CAP 阻断与偏差回写位置；15 已按全部 P0 FLOW 和 TEST-ID 预置验收项，并包含 CAP 真实环境要求、RISK 关闭条件、DEP 解除条件、发布门禁和基线更新条件；14、15 只使用已确认 01–13 的引用；框架生成状态、框架完整性、用户独立确认和实际事实状态分别为 `generated` / `complete` / `not_required` / `not_started`；不得填写实际改动、验证通过、联调完成、通过、失败、已验收、可发布、已发布、生产已更新或基线已更新；Gate 通过后只允许基于真实路径生成 `assembled_documents` 与交接信息并标记为 `prepared`，随后持久化最终总结确认目标，不得标记整个规划结束。
 
 禁止：
 
-- 不经逐文档协作确认，直接生成正式文档。
+- 在全部计划草案生成和批量校验完成前开始逐文档确认。
+- 在批量生成过程中按每份文档打断用户补问或确认。
 - 把完整文档 checklist 抛给用户。
 - 让用户按专业字段回答。
 - 在用户没有确认该文档关键点时，把 AI 推断写成 `confirmed`。
-- 用前期粗粒度访谈替代逐文档确认。
-- 用 Role-Based Document Explanation Gate 替代生成前确认。
-- 用生成前确认替代 Role-Based Document Explanation Gate。
-- `Planning Context COMPLETE` 后直接连续生成多份文档。
+- 用批量生成替代后续逐文档确认。
+- 用某一份确认替代其他文档确认。
+- 用户纠正上游后全量重生成未受影响文档，或继续确认已失效下游草案。
 
-Per-Document Collaborative Confirmation Gate 发生在正式文档生成前。
-
-Role-Based Document Explanation Gate 发生在正式文档生成后。
-
-二者不可互相替代。
+Batch Draft Assembly 发生在任何文档确认前；Role-Based Document Explanation Gate 发生在批量生成完成后、当前文档确认前。两者不可交错。
 
 ## 5. Role-Based Document Explanation Gate
 
-每生成一份正式 SoT 文档草案后，必须执行 Role-Based Document Explanation Gate。
+全部正式 SoT 草案批量生成完成后，对 confirmation queue 中当前这一份执行 Role-Based Document Explanation Gate。
 
 输出必须包含：
 
@@ -292,8 +301,8 @@ Role-Based Document Explanation Gate 发生在正式文档生成后。
 - 禁止只输出"你重点看 X 点"、"可以不用细看 ID 和格式"这类收口内容。
 - 禁止默认让用户打开 Markdown 后再确认。
 - 在用户确认前，必须使用"当前草案理解"、"候选结论"、"确认后会锁定"等措辞，不得提前说已经锁定、已确定或正式生效。
-- Role-Based Document Explanation Gate 不得替代生成前的 Per-Document Collaborative Confirmation Gate。
-- Per-Document Collaborative Confirmation Gate 不得替代生成后的 Role-Based Document Explanation Gate。
+- Role-Based Document Explanation Gate 只确认当前 queue item，不得替代完整批量草案装配或其他文档确认。
+- 批量草案装配不产生用户确认，也不得省略后续 Role-Based Document Explanation Gate。
 - 生成后收到的任何确认、纠正、补充、解释、继续、暂停或回退输入，都必须先按第 0 节写入 `current-interaction.yaml`。
 
 当前文档为 13 时，人话总结还必须说明：

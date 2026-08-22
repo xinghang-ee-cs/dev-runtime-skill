@@ -1,6 +1,6 @@
 ---
 name: planning-layer-runtime
-description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
+description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。涉及前端时生成可复制设计 Prompt、页面实现合同、UX 状态迁移合同、版本化设计资产绑定和可由执行/测试层精确消费的 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
 ---
 
 # 规划层运行时（Planning Layer Runtime）
@@ -23,7 +23,9 @@ description: 交互式规划层运行时。用于读取目标项目当前基线�
 - `references/07-planning-conversation-runtime.md`：Planning Conversation 行为运行层；编排逐轮持久化、事实调研、需求池核对、完整一期生命周期、三个变更门禁、Planning Execution Baseline 冻结、Implementation Naming / Contract Completeness Gate、增量 Handoff 完整性、前端体验绑定和期次关闭。
 - `references/08-planning-recovery-runtime.md`：上下文压缩与中断恢复、Change Triage 后的精确 Planning Recovery、失效传播、恢复门禁、Runtime Audit 日志与用户隔离。
 - `references/09-execution-intent-guard.md`：Execution Boundary Kernel。所有输入的 execution intent 判定、阻断结果和语义转向规则的唯一事实来源。
-- `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、逐文档交互、13 开发前准备总结、最终人话总结确认和状态回写规则。
+- `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、批量草案装配、依次确认、13 开发前准备总结、最终人话总结确认和状态回写规则。
+- `references/11-planning-ui-ux-execution-contract.md`：涉及正式页面或用户可见交互时必读；定义 copy-ready Prompt、页面/模块实现合同、UX 状态迁移、版本化资产、精确 Handoff 绑定及 UI/UX Execution Readiness Gate。
+- `references/12-planning-ui-ux-execution-example.md`：生成或审查 execution-ready 05 时按需读取的完整结构示例；示例值不得当作目标项目事实。
 
 ## Project Path Binding
 
@@ -182,9 +184,16 @@ Execution Boundary Kernel（09）
 -> 根据 execution_handoff_decision 生成 Document Assembly Plan
 -> 在本期 current-interaction.yaml 同步最小 document_assembly 进度
 -> Planning Document Mode（07 + 10）
--> 实际装配文档生成并确认
+-> 按依赖拓扑一次性生成全部适用草案并持久化 confirmation queue
+-> 按队列依次解释、确认；纠正时只重建受影响草案
+
+存在正式页面或用户可见交互变化
+  -> 按 11 生成可复制 Prompt、UI Implementation Contract、UX Interaction Contract 与版本化资产索引
+  -> 运行 UI/UX Design Readiness Gate
+  -> 按当前阶段使用 scripts/validate_ui_ux_contract.py 的 design-ready 或 blocked 校验
 
 requires_execution_handoff: true
+  -> 形成 13 草案；存在 UI TASK 时运行 UI/UX Execution Readiness Gate 与 execution-ready 默认校验
   -> 13 通过 Task Contract Gate
   -> 13 通过 Implementation Naming Gate
   -> 13 通过 Implementation Contract Completeness Gate
@@ -232,13 +241,14 @@ requires_execution_handoff: false
 
 Planning Conversation 行为、Discovery、用户态回复、Exploration Guard、Internal Complexity、User Context Gate 和 Conversation Continuity 的完整规则见 `references/07-planning-conversation-runtime.md`。
 
-Planning Document Mode 的逐文档生成前确认、生成后解释、用户确认和状态回写规则见 `references/10-planning-document-interaction-runtime.md`。
+Planning Document Mode 的批量草案装配、跨文档校验、依次解释确认、定向重建和状态回写规则见 `references/10-planning-document-interaction-runtime.md`。
 
 `Planning Context COMPLETE`、正式文档生成完毕、13 已确认或 14/15 框架派生完成，都不等于 Planning 已真正结束。是否需要执行交接、两条条件式结束链路与最终整体确认以 `references/07-planning-conversation-runtime.md`、`references/10-planning-document-interaction-runtime.md` 和 `references/04-planning-format-spec.md` 为准。
 
 ## Document And Governance Boundaries
 
 - 文档生成必须遵循 `references/03-planning-doc-responsibility.md`、`references/04-planning-format-spec.md`、`references/05-planning-priority-system.md` 和 `references/06-planning-capability-governance.md` 定义的责任边界、格式、优先级、能力治理和门禁。
+- 涉及正式页面或用户可见交互时，05、13 与 Handoff 必须同时遵循 `references/11-planning-ui-ux-execution-contract.md`；不得以提示词要点、无 revision 图片、叙事性 UX 描述或聊天记录替代可执行合同。
 - 跨期延期需求必须写入唯一 `<requirement_pool_path>`；00–15、Planning Context、15 下一期输入和 Handoff 只能在需要时引用 `POOL-ID`，不得复制形成第二份待处理需求正文。
 - 使用 `references/02-planning-change-levels.md`，由 Planning Runtime 内部评估变更影响范围，用于决定 Planning Conversation 的探索深度。
 - 涉及外部能力、SDK、OpenAPI、MCP、AI 提供方、基础设施依赖或人工能力时，按 `references/06-planning-capability-governance.md` 执行。

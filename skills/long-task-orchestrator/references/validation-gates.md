@@ -80,6 +80,7 @@ backend_score:
 why_not_automated:
 manual_required:
 execution_constraint_validation:
+frontend_contract_validation:
 capability_id:
 capability_validation:
 capability_evidence:
@@ -107,6 +108,7 @@ playwright
 capability_real_call
 capability_binding
 execution_constraint_compliance
+frontend_contract_compliance
 ```
 
 `validation_focus` 记录验证覆盖重点，允许：
@@ -123,6 +125,11 @@ implementation_naming
 implementation_placement
 delegated_parameter_boundary
 dependency_governance
+ui_contract
+ux_contract
+responsive_behavior
+accessibility_behavior
+visual_asset_consistency
 ```
 
 字段定义：
@@ -137,6 +144,7 @@ dependency_governance
 - `why_not_automated`: 自动化不可执行时的具体原因；不得以此伪造 passed。
 - `manual_required`: 交给 testing-layer-runtime 的人工/真实环境项；无项目时必须为 `[]`。
 - `execution_constraint_validation`: Planning Handoff 执行约束合规结果。
+- `frontend_contract_validation`: UI TASK 实际消费的 05 Manifest、Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision 及结构、响应式、状态、交互、可访问性与视觉对照结果；唯一字段格式见 `frontend-experience-execution.md`。
 - `evidence`: 自动化命令输出、报告路径、截图/trace 路径或失败记录；必须能进入 Long Testing Handoff。
 
 `manual_required` 项格式：
@@ -179,6 +187,7 @@ and add manual_required with exact role, entry, action, expected visible state
 - 当前阶段对应的 task 范围。
 - user_flow validation 的 real entry、role、primary action、success visible state。
 - 适用时覆盖 disabled/blocked state 和 error visible state。
+- UI TASK 按 `frontend-experience-execution.md` 覆盖精确合同 revision、default/loading/empty/error/success/blocked、trigger/pending/success/failure/retry/cancel/back、目标视口、键盘焦点与可访问名称；项目已有截图/视觉回归能力时绑定确认的 ASSET revision。
 - 项目基线中可用的最小相关验证命令。
 - 前端与后端分开记录的覆盖率或不可用原因。
 - 验证不可用原因。
@@ -213,6 +222,7 @@ and add manual_required with exact role, entry, action, expected visible state
 - backend score
 - Long Testing Handoff classification: `automated_passed` / `automated_failed` / `automated_skipped` / `manual_required`
 - execution constraint compliance，覆盖命名、承接位置、参数委托边界与依赖治理。
+- frontend contract compliance，覆盖 Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision 与自动化/人工边界。
 
 ## 6. 验证报告要求
 
@@ -225,6 +235,9 @@ unsupported_validation_claim -> forbidden
 mock_only_capability_validation -> not_passed
 missing_capability_real_call_evidence -> not_passed
 missing_capability_binding_fields -> not_passed
+UI_TASK_without_frontend_contract_validation -> not_passed
+frontend_contract_revision_mismatch -> not_passed
+visual_comparison_unavailable_without_manual_required -> not_passed
 platform_capability_without_binding_validation -> not_passed
 sdk_capability_without_binding_validation -> not_passed
 ai_capability_without_binding_validation -> not_passed

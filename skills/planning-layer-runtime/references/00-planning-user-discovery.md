@@ -366,6 +366,16 @@ Discovery 不得依赖“全部问题问完后再统一整理”。本 Gate 复�
 - 法律、监管、行业规范、平台审核规则或安全要求。
 - 用户反馈中出现可以公开验证的能力判断、事实纠正或功能性补充。
 - AI 对技术约束或公开事实没有足够把握，且答案会影响下一问。
+- 涉及 UI/UX 时，目标设计工具的输入/输出限制、目标平台公开设计规范、浏览器或设备能力、公开组件库约束会影响 Prompt、响应式、可访问性或交互合同。
+
+涉及 UI/UX 时，在询问用户审美或业务取舍前先检查项目本地事实：
+
+- `PROJECT-CURRENT-BASELINE` 的当前前端体验来源。
+- 已有页面、路由、design token、全局样式、共享组件和响应式断点。
+- 项目内已有截图、Figma/设计引用、图标字体、可访问性约定、视觉回归和前端测试能力。
+- 现有页面对 default/loading/empty/error/success/blocked、键盘焦点和移动端的真实处理。
+
+可从本地证据确认的复用边界不得重复问用户；公开工具规格或平台规则按本 Gate 调研。品牌取舍、视觉偏好、业务主次操作、允许改变范围和设计资产确认仍由用户决定。
 
 来源优先级：
 
@@ -569,17 +579,17 @@ discovery_sufficiency:
 - 用户表达足够明确时，AI 主动归纳，不要求用户使用专业术语。
 - 通过后进入 Planning Completion Gate。
 
-## 8.1 Discovery 与逐文档确认边界
+## 8.1 Discovery、批量草案与逐文档确认边界
 
-User Discovery Runtime 只完成全局发现，不替代逐文档协作确认。
+User Discovery Runtime 必须形成足以一次性生成本期全部适用草案的完整 Planning Context，但不替代后续逐文档确认。
 
-即使 Discovery Sufficiency Gate 通过，进入某一份正式文档前，仍必须根据该文档职责执行 Per-Document Collaborative Confirmation Gate。
+Discovery Sufficiency Gate 通过后，Planning Document Mode 先批量生成全部适用草案，再按真实 confirmation queue 逐份解释和确认；不得在草案生成前重新逐文档访谈。
 
 原因：
 
-- 全局发现只能保证规划上下文够用。
-- 逐文档确认用于加深该文档的具体理解。
-- 文档越细，越需要局部确认。
+- 全局发现必须保证完整批量草案可以生成。
+- 批量生成用于尽早暴露跨文档引用和冲突，不表示文档已确认。
+- 逐文档确认用于让用户校正具体理解；纠正后只重建真实受影响草案。
 
 ## 9. Runtime Event Logging
 

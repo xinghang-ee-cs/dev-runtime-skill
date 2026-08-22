@@ -83,6 +83,7 @@ Runtime Bootstrap completed != execution_gate_open
 -> 读取 assembled_documents
 -> 读取 handoff_role_mapping
 -> 读取 execution_constraints
+-> 涉及 UI TASK 时执行 Frontend Contract Intake Gate
 -> 读取 Development Landing Checklist
 -> 确认正式执行记录与正式验收记录文件存在
 -> 确认 Source of Truth
@@ -103,6 +104,7 @@ Runtime Bootstrap completed != execution_gate_open
 - `assembled_documents` 只包含真实路径。
 - `handoff_role_mapping` 可解析。
 - `execution_constraints` 存在且语义完整。
+- 存在 UI TASK 时，`frontend_experience_binding.applicable: true`，`UI/UX Design` role 的真实路径可读，05 Manifest、13 TASK binding 与 Handoff 的 Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision、TEST refs 一致，并按 `frontend-experience-execution.md` 通过 Frontend Contract Intake Gate。
 - 不存在阻断执行的 P0 `blocking_open`。
 - 当前任务可追溯到正式 Planning 文档。
 
@@ -122,6 +124,7 @@ formal_execution_record_file_missing -> STOP
 formal_acceptance_record_file_missing -> STOP
 formal_acceptance_record_file_missing -> REPORT_HANDOFF_INCOMPLETE
 formal_acceptance_record_file_missing -> WRITE_BACK_UPSTREAM
+frontend_contract_intake_failed -> WRITE_BACK_UPSTREAM
 STOP -> do_not_create_task.md
 STOP -> do_not_implement
 ```
@@ -193,6 +196,7 @@ Runtime Bootstrap 完成后，完整 Preflight 才继续执行以下门禁：
 Capability Gate if applicable
 -> Implementation Placement Gate
 -> Implementation Contract Completeness Intake
+-> Per-Task Frontend Binding Gate if UI task
 -> Dependency Governance Gate if applicable
 -> confirm task generation inputs
 ```
@@ -207,6 +211,7 @@ Capability Gate if applicable
 - 清单包含用户旅程、验收步骤、端到端闭环、使用者视角验收、高风险流程和验证门禁。
 - 清单中的任务必须可追溯到 Planning 文档 ID；Planning ID 只作追踪，不得成为任何实现资产命名来源。涉及外部能力时还必须包含 CAP-ID。
 - 清单足以指导环境确认和任务生成。
+- UI TASK 的清单条目必须引用 05 的真实路径、Design Manifest、Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision 和 TEST；不得只写“按设计图实现”。
 
 检查 Capability Handoff：
 
@@ -330,6 +335,8 @@ plan_conflict -> STOP
 implementation_placement_unconfirmed -> STOP
 new_domain_without_architecture_basis -> STOP
 missing_business_or_contract_parameter -> STOP
+missing_or_conflicting_frontend_contract -> STOP
+missing_or_unconfirmed_design_asset_revision -> STOP
 dependency_governance_failed -> STOP
 formal_acceptance_record_file_missing -> STOP
 missing_user_journey -> STOP
@@ -362,6 +369,7 @@ checkpoint_runtime_synced
 upstream_plan_ready
 capability_handoff_passed_or_not_applicable
 implementation_contract_inputs_complete
+frontend_contract_intake_passed_or_not_applicable
 implementation_placement_inputs_complete
 environment_baseline_confirmed
 dependency_governance_passed_or_not_applicable

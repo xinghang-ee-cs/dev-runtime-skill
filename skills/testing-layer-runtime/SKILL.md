@@ -1,6 +1,6 @@
 ---
 name: testing-layer-runtime
-description: 通用测试治理 Skill，用于在 long-task-orchestrator 完成 ready_for_local_test 后管理期次测试生命周期：读取 planning 测试范围与带 revision 的 long 自动化交接，继承已通过自动化结果，规划测试顺序，指导人工/真实设备/云端/外部能力/最终验收，对测试发现做 Execution/Test Change Triage，并在完整上线时整理项目发布/安全流程移交材料。Use when Codex needs to manage phase testing, manual acceptance, real-device validation, server verification, external capability validation, final acceptance, test evidence/writeback, change triage, or release handoff. Do not use it to re-run long-owned vitest/jest/integration/api-test/playwright automation unless an allowed reuse exception applies.
+description: 通用测试治理 Skill，用于在 long-task-orchestrator 完成 ready_for_local_test 后管理期次测试生命周期：读取 planning 测试范围、UI/UX 合同与带 revision 的 long 自动化交接，继承已通过自动化结果，按精确 PAGE/UX-SCN/ASSET revision 规划人工视觉与交互验证，指导人工/真实设备/云端/外部能力/最终验收，对测试发现做 Execution/Test Change Triage，并在完整上线时整理项目发布/安全流程移交材料。Use when Codex needs to manage phase testing, manual acceptance, real-device validation, UI/UX contract verification, server verification, external capability validation, final acceptance, test evidence/writeback, change triage, or release handoff. Do not use it to re-run long-owned vitest/jest/integration/api-test/playwright automation unless an allowed reuse exception applies.
 ---
 
 # Testing Layer Runtime
@@ -26,6 +26,7 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 - 项目环境事实源（如 `docs/environment.md`、README、CI 配置或用户指定文档）：项目本地、云端、数据库、OpenAPI、Playwright、git 工具事实源。
 - `testing-handoff.md` 或 `long-runtime-testing-summary.md`：long 自动化测试事实源，优先级高于重新执行。
 - Planning Handoff 指定的 Test and Acceptance Plan：只读取测试范围与验收对象，不按固定编号或目录猜测路径。
+- UI/UX 适用时，Planning Handoff 指定的 `UI/UX Design` 真实路径与 `frontend_experience_binding`：只消费精确 PAGE/UI-MOD/UX-SCN/ASSET revision，不从目录或聊天记录选择设计版本。
 - `references/01-test-runtime-core.md`：职责边界、Long Testing Handoff、Test Planning Phase、依赖顺序和停止条件。
 - `references/02-test-environment-gates.md`：自动化结果继承、人工/真实设备、服务器、release handoff 环境规则。
 - `references/03-evidence-format.md`：证据、截图、Manual Guidance 和最终报告格式。
@@ -70,6 +71,7 @@ automated_failed:
 automated_skipped:
 manual_required:
 coverage:
+frontend_contract_validation_summary:
 ```
 
 Testing Runtime 必须继承 `automated_passed`，并把继承状态记录为：
@@ -78,7 +80,7 @@ Testing Runtime 必须继承 `automated_passed`，并把继承状态记录为：
 reused_from_long
 ```
 
-Testing 必须核对 Long Handoff 的 baseline/change revision 与其所引用 Planning Handoff 一致，且 `executed_task_contract_revisions` 不包含 `context_only`、`completed_locked` 或 `cancelled`。若 long handoff 缺失、字段不完整、revision 冲突或证据不存在，进入 Test Intake Mode 并报告缺口；不得用测试层重复执行来掩盖 handoff 缺失或过期交接。
+Testing 必须核对 Long Handoff 的 baseline/change revision 与其所引用 Planning Handoff 一致，且 `executed_task_contract_revisions` 不包含 `context_only`、`completed_locked` 或 `cancelled`。UI/UX 适用时还必须核对 `frontend_contract_validation_summary` 与 Planning `frontend_experience_binding` 的设计文档、Manifest、合同和资产 revision 一致，且 `unresolved_mismatch` 为空。若 long handoff 缺失、字段不完整、revision 冲突或证据不存在，进入 Test Intake Mode 并报告缺口；不得用测试层重复执行来掩盖 handoff 缺失或过期交接。
 
 ## Automated Result Reuse Rule
 
@@ -169,6 +171,7 @@ change_decision:
 - Automated Reuse Strategy：继承 long 自动化结果，不重复执行。
 - Manual Operation De-duplication Strategy：人工测试拆解必须先按用户实际操作去重。同一 actor、entry、precondition、operation、data_domain 的人工动作只能引导用户执行一次。一个人工动作可以覆盖多个 case / assertion。后续 case 若依赖同一动作，必须复用既有证据，只补缺失观察点，不得要求用户重复完整流程。
 - Guided Manual Operation Strategy：人工测试开始后，AI 必须从 `manual-test-queue.md` 中选择当前第一个 `queue_state = ready`、`depends_on` 全部通过、`blocked_by` 为空、`covered_by_evidence = false`、MANUAL-OP 在 `test-validation-results.md` 中不存在或 `status = pending`、当前环境可执行的操作，主动给出用户可照做的具体步骤。不得只输出 case 名称或任务名称。
+- Frontend Contract Manual Strategy：仅将 Long 未自动化且由 Planning TEST 明确要求的视觉一致性、真机响应式、复杂 UX 或可访问性观察项加入人工队列；每项必须绑定 PAGE/UX-SCN/ASSET revision、设备/视口、进入路径、操作、预期可见状态和通过条件，不得生成模糊“看看是否一致”卡片。
 - Manual Guidance Strategy：无法可靠自动化的交互操作使用；用户自然反馈，AI 负责追问、结构化、证据判断和 Runtime 回写。
 - Server Verification Strategy：只验证本地和 long 无法证明的云端事实。
 - Release Handoff Strategy：只整理上线门禁移交，不输出 release pass。
@@ -177,7 +180,7 @@ change_decision:
 
 1. 定位当前期次和 `writeback_target`。
 2. 读取 Long Testing Handoff，校验 baseline/change revision 与 TASK contract revision；缺失或冲突时进入 Test Intake Mode 并报告 handoff 缺口。
-3. 读取 Planning Handoff 指定的 Test and Acceptance Plan，只提取”测什么”。
+3. 读取 Planning Handoff 指定的 Test and Acceptance Plan；UI/UX 适用时同时读取指定 05 与 `frontend_experience_binding`，只提取精确验证目标。
 4. 进入 Test Planning Phase，先继承 `automated_passed`，标记 `reused_from_long`。
 5. 对 `automated_failed`、`automated_skipped`、`manual_required`、服务器验证和上线验证建立分类与阻塞关系。
 6. 基于已继承、失败、跳过、人工、服务器和上线验证范围，生成或更新 `test-execution-order.md`。

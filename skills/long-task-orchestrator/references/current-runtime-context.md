@@ -25,6 +25,9 @@ active_change_revision:
 incremental_execution_contract_snapshot:
 execution_constraints_source:
 execution_constraints_status:
+frontend_experience_binding_source:
+frontend_contract_intake_status:
+frontend_execution_snapshot:
 implementation_contract_status:
 dependency_governance_status:
 capability_governance_source:
@@ -81,6 +84,18 @@ incremental_execution_contract_snapshot:
   prohibited_actions: []
 execution_constraints_source: <field/path reference in Planning Handoff>
 execution_constraints_status: <passed | failed | invalidated>
+frontend_experience_binding_source: <Planning Handoff path>#frontend_experience_binding
+frontend_contract_intake_status: <passed | blocked | not_applicable | invalidated>
+frontend_execution_snapshot:
+  design_document_path: <UI 不适用时省略整个 snapshot>
+  design_contract_version: ui-ux-execution/v1
+  design_manifest_ref:
+  prompt_refs: []
+  page_contract_refs: []
+  module_contract_refs: []
+  interaction_contract_refs: []
+  confirmed_asset_refs: []
+  consistency_test_refs: []
 implementation_contract_status: <passed | blocked | pending>
 dependency_governance_status: <passed | blocked | not_applicable | pending>
 capability_governance_source: <confirmed Capability Governance path or null>
@@ -134,6 +149,7 @@ open_manual_required: 交给 testing-layer-runtime 的人工/真实环境验证�
 planning_baseline_revision: 当前实际消费的 Planning Execution Baseline revision
 active_change_revision: 仅增量 Handoff 存在；初始 Handoff 必须省略字段而非写空值
 incremental_execution_contract_snapshot: 当前 Handoff 六类 TASK 队列和 prohibited_actions 的恢复快照
+frontend_execution_snapshot: 当前 Handoff 允许消费的 UI/UX 合同和资产 revision 指针；不复制 Prompt、合同正文或图片内容
 formal_acceptance_record: 只读路径指针，不授权 Long 创建或写入正式验收记录
 acceptance_status: Long 中固定为 not_started
 acceptance_owner_runtime: 固定为 testing-layer-runtime
@@ -164,6 +180,7 @@ planning_handoff_intake_passed = false
 planning_handoff_revision_consistency_passed = false
 incremental_execution_contract_loaded = false
 execution_constraints_loaded = false
+frontend_contract_intake_passed_or_not_applicable = false
 phase_runtime_directory_created = false
 runtime_state_instantiated = false
 implementation_contract_complete_for_task = false
@@ -197,6 +214,18 @@ incremental_execution_contract_snapshot:
   prohibited_actions: []
 execution_constraints_source: <Planning Handoff path>#execution_constraints
 execution_constraints_status: passed
+frontend_experience_binding_source: <Planning Handoff path>#frontend_experience_binding
+frontend_contract_intake_status: passed
+frontend_execution_snapshot:
+  design_document_path: <formal 05 path>
+  design_contract_version: ui-ux-execution/v1
+  design_manifest_ref: <formal 05 path>#design-delivery-manifest
+  prompt_refs: [<PROMPT-ID@revision>]
+  page_contract_refs: [<PAGE-ID@revision>]
+  module_contract_refs: []
+  interaction_contract_refs: [<UX-SCN-ID@revision>]
+  confirmed_asset_refs: [<ASSET-ID@revision>]
+  consistency_test_refs: [<TEST-ID>]
 implementation_contract_status: passed
 dependency_governance_status: not_applicable
 acceptance_status: not_started

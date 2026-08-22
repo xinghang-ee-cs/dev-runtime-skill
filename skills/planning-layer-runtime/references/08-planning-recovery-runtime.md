@@ -116,9 +116,12 @@ Recovery Runtime 只允许：
 -> 恢复 active_change 的 revision / change_status / decision_ref
 -> 仅按 decision_ref 读取 decision-log 中对应 Change Set Decision Snapshot
 -> 核对 Change Set 与 Recovery Output 受影响范围
--> 恢复 document_assembly
--> 核对实际已生成正式文档的状态
+-> 恢复 document_assembly 的 batch_revision / draft_generation_status
+-> 核对 generated_documents 中每个真实路径、draft revision 与文档状态
+-> 恢复 confirmation_queue / current_confirmation
 -> 核对 Document Assembly Plan
+-> 若批量装配中断，按已持久化检查点继续生成剩余草案并完成跨文档校验
+-> 若处于确认或修正阶段，只恢复唯一 current_confirmation 或最早 reopened / pending_confirmation 项
 -> 恢复 execution_ready 或 planning_only 分支
 -> 判断 recorded / already_effective / invalid
 -> 完成或阻止该反馈
@@ -135,6 +138,16 @@ Recovery Runtime 只允许：
 - 上一条反馈仍为 `recorded` 或 `validated` 时，必须先完成该反馈，不得用新反馈覆盖。
 
 禁止根据压缩后的对话摘要、最近提到的文档编号、“下一步是第 X 份”、编号大小或模型记忆推断当前确认对象。
+
+批量装配与确认队列恢复规则：
+
+- `draft_generation_status: generating` 时，逐一回读 `generated_documents` 的真实文件；路径、revision 与内容匹配的草案直接复用，只从第一个缺失或无效项继续生成。不得覆盖有效草案，也不得在完整批次生成和跨文档校验完成前开始用户确认。
+- `draft_generation_status: blocked` 时，只按 `generation_blocker` 恢复 owning role、`unresolved_item_ref` 与恢复条件，再从 Discovery checkpoint 定位问题；回答写入 checkpoint 后清空 blocker 并继续原 `batch_revision`，不得在 `document_assembly` 复制问题正文或重新访谈已确认事实。
+- `draft_generation_status: generated` 时，`confirmation_queue` 必须覆盖本批次全部适用草案并与真实路径、draft revision 一致；不一致时先修复队列或标记草案 `invalidated`，不得凭文件编号补猜。
+- 同时存在多个草案是正常批量状态，不构成全量回退理由。恢复时只允许一个 `current_confirmation`；其版本必须等于队列中的当前 draft revision。
+- 用户纠正命中上游 SoT 时，按依赖关系把受影响项标记为 `reopened` 或 `invalidated`，只重建这些草案并刷新 revision；未受影响的草案、确认状态和真实文件保持不变。
+- 修正完成后，从依赖顺序中最早的 `reopened` 或 `pending_confirmation` 项继续。不得重新生成完整批次，不得把确认流程退化为“生成一份再问一份”。
+- `active_interaction`、`latest_feedback` 与 `current_confirmation` 任一绑定不一致时先停止并修复最小恢复镜像；不得将用户对一份文档的反馈消费到另一份草案。
 
 Discovery 恢复规则：
 
@@ -247,7 +260,9 @@ FLOW changed
 -> related SCN invalid
 -> related MODULE coverage reopen
 -> PAGE / UI-MOD / UX-SCN review reopen
--> related prompts and assets marked review_pending or superseded
+-> related Prompt / UI Implementation / UX Interaction contracts reopen and raise revision when content changes
+-> related assets marked review_pending or superseded
+-> design_delivery_manifest and downstream bindings invalidated
 
 SCN changed
 -> related MODULE coverage reopen
@@ -259,6 +274,16 @@ MODULE boundary changed
 global style changed（仅 replace_current 或受影响的 extend_current）
 -> related PROMPT-PAGE / PROMPT-MODULE / PROMPT-UX reopen
 -> only affected visual assets marked review_pending
+-> affected PAGE / UI-MOD contracts and Manifest reopen
+
+Prompt / PAGE / UI-MOD / UX-SCN / ASSET contract changed
+-> changed item must receive a new revision; same-revision silent replacement forbidden
+-> 05 design_delivery_manifest reopen
+-> related 11 TEST reopen
+-> related 13 frontend_contract_binding reopen
+-> Handoff.frontend_experience_binding invalid
+-> affected Long frontend_execution_snapshot invalid
+-> affected UI TASK only enters resume/reexecute after a new valid Handoff
 
 FLOW / DOMAIN 变化
 -> 06 invalid
@@ -339,6 +364,7 @@ TASK 合同变化
 - 禁止新增日志目录、独立事件系统或独立 Recovery SoT。
 - 视觉资产变化若不改变业务动作、场景入口、异常恢复、资格或流程终态，不得反向修改 01/02。
 - 视觉资产变化若导致主操作、进入条件、异常处理、旧入口处理或用户路径变化，必须回到 03；若影响合法业务旅程，则继续回到 01/02。
+- Prompt、PAGE/UI-MOD、UX-SCN 或 ASSET revision 变化必须同步更新 05 Manifest、11 TEST、13 TASK binding 与 Handoff；不得只替换图片文件或只改 Handoff。
 - 不得继续沿用旧接口兼容结论。
 - 06/07/08 恢复时必须先读取当前有效 SoT，再恢复后续文档。
 - 不得继续沿用已失效的受影响测试映射、任务合同、能力结论或架构绑定；未受影响结论不得被无条件重审。
@@ -365,8 +391,10 @@ TASK 合同变化
 -> 使原 planning_only Handoff 与最终总结失效
 -> 重新生成 Document Assembly Plan
 -> 同步 document_assembly
--> 装配 11、12、13 及 TASK 所需上游 SoT
--> 13 三个 Gate 与确认
+-> 按新计划批量生成全部新增或受影响草案并刷新 confirmation_queue
+-> 依次确认新增或 reopened 草案；未受影响的已确认文档保持有效
+-> 轮到 13 时运行三个 Gate 与适用的 UI/UX Execution Readiness Gate
+-> 确认 13
 -> 派生 14/15
 -> 重建 assembled_documents、handoff_role_mapping 与 execution_ready Handoff
 ```
@@ -383,6 +411,8 @@ TASK 合同变化
 -> 使原 execution_ready Handoff 与最终总结失效
 -> 重新生成 Document Assembly Plan
 -> 同步 document_assembly
+-> 按新计划只重建新增或受影响草案并刷新 confirmation_queue
+-> 依次确认 reopened 草案；未受影响的已确认文档保持有效
 -> 重新生成 planning_only Handoff
 ```
 
