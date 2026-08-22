@@ -23,7 +23,7 @@ description: 交互式规划层运行时。用于读取目标项目当前基线�
 - `references/07-planning-conversation-runtime.md`：Planning Conversation 行为运行层；编排逐轮持久化、事实调研、需求池核对、完整一期生命周期、三个变更门禁、Planning Execution Baseline 冻结、Implementation Naming / Contract Completeness Gate、增量 Handoff 完整性、前端体验绑定和期次关闭。
 - `references/08-planning-recovery-runtime.md`：上下文压缩与中断恢复、Change Triage 后的精确 Planning Recovery、失效传播、恢复门禁、Runtime Audit 日志与用户隔离。
 - `references/09-execution-intent-guard.md`：Execution Boundary Kernel。所有输入的 execution intent 判定、阻断结果和语义转向规则的唯一事实来源。
-- `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、批量草案装配、依次确认、13 开发前准备总结、最终人话总结确认和状态回写规则。
+- `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、批量草案装配、依次确认、05 UI/UX Prompt 与设计图收集交互、13 开发前准备总结、最终人话总结确认和状态回写规则。
 - `references/11-planning-ui-ux-execution-contract.md`：涉及正式页面或用户可见交互时必读；定义 copy-ready Prompt、页面/模块实现合同、UX 状态迁移、版本化资产、精确 Handoff 绑定及 UI/UX Execution Readiness Gate。
 - `references/12-planning-ui-ux-execution-example.md`：生成或审查 execution-ready 05 时按需读取的完整结构示例；示例值不得当作目标项目事实。
 
@@ -189,6 +189,8 @@ Execution Boundary Kernel（09）
 
 存在正式页面或用户可见交互变化
   -> 按 11 生成可复制 Prompt、UI Implementation Contract、UX Interaction Contract 与版本化资产索引
+  -> 第二阶段轮到 05 时，直接向用户交付完整 UI prompt_body 并收集、确认所需 UI 图
+  -> UI 图确认后，直接交付引用真实 UI revision 的必需 UX prompt_body 并收集、确认 UX 图
   -> 运行 UI/UX Design Readiness Gate
   -> 按当前阶段使用 scripts/validate_ui_ux_contract.py 的 design-ready 或 blocked 校验
 

@@ -36,6 +36,7 @@ Discovery 问答事务由 `07` 维护；本文件从执行交接分支确认与�
 
 - 执行交接分支确认。
 - 批量装配因事实不足而回流第一阶段时的阻断事实确认。
+- 05 确认过程中的 UI/UX Prompt 交付、设计图接收与视觉确认。
 - 文档草案生成后确认。
 - 用户要求解释后的再次确认。
 - 风险或冲突确认。
@@ -105,6 +106,7 @@ active_interaction:
 - “继续”记为 `continue`，只表示继续当前合法步骤，不自动等同于确认草案。
 - “讲一下”“第 X 份说了什么”记为 `ask_explanation`；只解释目标文档，不改变草案状态。
 - 用户补充事实记为 `supplement`；先判断事实归属的 SoT，再决定是否回写。
+- 当前目标是 `design_asset_batch` 时，用户上传图片或提供图片引用记为 `supplement`：先绑定当前批次，再写回对应 `ASSET-ID@revision`；上传行为不得被分类为图片视觉确认或 05 文档确认。
 - 用户纠正记为 `correct`；回写真正拥有该事实的上游 SoT，并按 `08-planning-recovery-runtime.md` 检查下游失效。
 - `supplement` 或 `correct` 涉及产品当前能力、版本限制、公开规范、法律监管或其他可核验事实时，必须在反馈已记录后先按 `07` 调研；可靠公开证据可以消除事实提问，但不得未经用户确认改变业务适用性、当前范围或已确认 SoT。
 - 调研发现的新功能或替代方案只作为候选；确认延期时写入 Requirement Pool，确认纳入时回到真正拥有该事实的上游 Planning Context / SoT 并执行失效传播。
@@ -150,6 +152,7 @@ Freeze Document Assembly Plan
 -> Build confirmation_queue from real generated paths
 -> Select first confirmation item
 -> Persist draft_confirmation Target
+-> If current item is 05 and required design assets are not visual_confirmed: run Design Asset Collection Interaction Gate
 -> Role-Based Document Explanation Gate
 -> Receive feedback and persist before processing
 -> Validate Feedback Binding
@@ -171,6 +174,7 @@ Freeze Document Assembly Plan
 - 13 草案可以随 00–12 一起批量生成，但此时只能是 `草案`；13 的 Task/Implementation/UI Execution Gate 仍在轮到 13 确认前基于已经确认的上游文档重新运行。
 - 14、15 不参与初始批量草案生成；只在 13 已确认后自动派生。
 - 批量生成中发现第一阶段事实不足时，停止装配并回到 Discovery，只问当前阻断的一个事实；不得边生成边向用户追加文档问题。
+- 初始批量允许 05 以 `planned / prompt_ready` ASSET 和 `blocked` Manifest 形成完整草案；这不允许跳过第二阶段的 Design Asset Collection Interaction Gate，也不允许伪造实际图片路径或 `visual_confirmed` 状态。
 
 依次确认规则：
 
@@ -238,7 +242,7 @@ assembly_status: <batch_assembling | awaiting_confirmation | confirming | rebuil
 
 - Scenario Consistency Gate：每个 P0 FLOW 至少有一个 SCN；每个 SCN 只引用既有 FLOW；每个 SCN 的进入条件不弱于 FLOW 前置；每个关键异常有恢复、退出或人工协助路径；03 未新增主业务旅程；03 未改变 FLOW 的合法入口、终态或禁止路径。不满足时，03 不得确认。
 - Module Coverage Gate：每个 P0 FLOW 有主模块；每个关键 SCN 有承接模块；每个模块有输入事实、输出能力、非责任和隔离边界；旧流程隔离模块明确保护哪些 FLOW；不存在模块循环依赖或模糊复用。不满足时，04 不得确认。
-- UI/UX Design Readiness Gate：每个 P0 SCN 已映射 PAGE；每个 PAGE 有合法进入条件和 UI STATE；每个 UI STATE 有唯一主操作；全局风格提示词或继承基线已准备；P0 Prompt 具有可直接复制的完整 `prompt_body` 与输出规格；本期 PAGE/UI-MOD 已具备 UI Implementation Contract；关键 UX-SCN 已具备确定性状态迁移表；设计资产带 revision、真实路径和独立确认状态；05 Manifest 对内部引用完整，并以 `design_ready` 或带明确原因的 `blocked` 表示当前阶段；`scripts/validate_ui_ux_contract.py --allow-design-ready`、`--allow-blocked` 或同等结构校验通过。不要求此时尚未生成的 11、13 或 Handoff 引用；这些引用由后续 UI/UX Execution Readiness Gate 收口。需要出图但尚未收到或未确认的资产不得伪造，相关 UI TASK 不得 Ready。
+- UI/UX Design Readiness Gate：每个 P0 SCN 已映射 PAGE；每个 PAGE 有合法进入条件和 UI STATE；每个 UI STATE 有唯一主操作；全局风格提示词或继承基线已准备；P0 Prompt 具有可直接复制的完整 `prompt_body` 与输出规格；本期 PAGE/UI-MOD 已具备 UI Implementation Contract；关键 UX-SCN 已具备确定性状态迁移表；设计资产带 revision、真实路径和独立确认状态；05 Manifest 对内部引用完整，并以 `design_ready` 或带明确原因的 `blocked` 表示当前阶段；`scripts/validate_ui_ux_contract.py --allow-design-ready`、`--allow-blocked` 或同等结构校验通过。不要求此时尚未生成的 11、13 或 Handoff 引用；这些引用由后续 UI/UX Execution Readiness Gate 收口。存在必需 UI/UX 图时，必须先完成 5.1 的用户态 Prompt 交付、图片接收和视觉确认，且 `design_asset_collection.collection_status: complete`；需要出图但尚未收到或未确认的资产不得伪造，05 不得整体确认，相关 UI TASK 不得 Ready。
 
 05 设计确认记录复用既有 `UI_CONFIRMATION` 事件；不得新增设计日志、出图日志、UX Runtime 或独立资产数据库。
 
@@ -304,6 +308,55 @@ Batch Draft Assembly 发生在任何文档确认前；Role-Based Document Explan
 - Role-Based Document Explanation Gate 只确认当前 queue item，不得替代完整批量草案装配或其他文档确认。
 - 批量草案装配不产生用户确认，也不得省略后续 Role-Based Document Explanation Gate。
 - 生成后收到的任何确认、纠正、补充、解释、继续、暂停或回退输入，都必须先按第 0 节写入 `current-interaction.yaml`。
+
+### 5.1 05 Design Asset Collection Interaction Gate
+
+当前 confirmation queue 项是 05，且本期需要 UI 图、局部模块图或 UX 图时，必须在 05 人话总结和正式文档确认前完成本 Gate。完整 Prompt 与资产格式以 `11-planning-ui-ux-execution-contract.md` 为准；本节只定义用户交互顺序。
+
+唯一顺序：
+
+```text
+Read 05 asset plan and exact Prompt revisions
+-> Build one UI asset batch from all same-dependency required STYLE/PAGE/MODULE prompts
+-> Persist design_asset_collection(prompt_ready) + design_asset_generation_request target
+-> Output every required UI prompt_body directly to the user
+-> Persist collection_status = awaiting_assets
+-> Ask the user to generate or provide the mapped UI images
+-> Receive files or external references and persist latest_feedback first
+-> Bind each received image to ASSET-ID@revision and real path/reference
+-> Mark received -> review_pending
+-> If this batch is partial: keep awaiting_assets, request only missing ASSET refs and wait
+-> When this batch is complete: persist collection_status = reviewing_assets
+-> Persist design_asset_review_confirmation target
+-> Explain visible coverage, known gaps and suspected contract mismatches
+-> User confirms or requests correction
+-> On confirm: mark exact UI ASSET revisions visual_confirmed
+-> On correction: revise only affected Prompt/contract/ASSET revision, return to prompt_ready and resend it
+-> Rebuild PROMPT-UX reference_inputs from visual_confirmed UI asset revisions
+-> If an interaction image is required: repeat the same batch loop for UX prompts and UX images
+-> If existing confirmed UI assets fully express the interaction: record covered_by_existing_ui_assets and skip UX image request
+-> When every required UI/UX asset is visual_confirmed: collection_status = complete
+-> Update 05 Manifest / contracts / coverage and affected downstream drafts
+-> Run UI/UX Design Readiness Gate
+-> Restore the current 05 draft_confirmation target
+-> Continue to Role-Based Document Explanation Gate and 05 confirmation
+```
+
+用户态 Prompt 交付规则：
+
+- 必须在聊天回复中直接给出每个本批次资产的用途、目标工具、输出规格、`PROMPT-ID@revision`、对应 `ASSET-ID@revision` 和完整 fenced `prompt_body`。不得只告诉用户“Prompt 已写入 05”、只给文件路径、只给锚点或要求用户自行打开 Markdown 复制。
+- UI Prompt 默认按同一依赖层批量提供，至少包含当前所有必需 STYLE（适用时）、PAGE 和 UI-MOD Prompt；不得无必要地一张图问一轮。UX Prompt 必须在其引用的 UI ASSET revision 已真实收到并完成视觉确认后提供，避免引用不存在或旧版图片。
+- 用户已经有符合要求的 UI/UX 图时允许直接上传或提供真实外部引用，不强制重新生成；仍必须绑定 ASSET revision 并执行视觉确认。
+- 必须明确告诉用户每张图对应哪个页面、模块或交互，以及建议文件名或回传映射方式，避免多图无法归属。
+- 用户一次只提供部分图片时，已收到项立即持久化并保留；后续只重发缺失或修订项的 Prompt，不要求重新上传未受影响图片。
+
+视觉确认规则：
+
+- 收到图片不等于确认。AI 先按 PAGE/UI-MOD/UX-SCN 合同检查覆盖状态、布局、主次操作、关键状态和明显冲突，再用人话说明差异并请求用户确认或重做。
+- `visual_confirmed` 只能由绑定当前批次和当前 ASSET revision 的用户确认产生，并写回真实路径/引用、确认来源和时间；一句“确认”不得同时确认图片和 05 文档。
+- 任一必需 UI/UX 图缺失、仍为 `review_pending` 或用户要求重做时，05 不得进入整体文档确认，`design_asset_collection` 保持未完成，相关 UI TASK 不得 Ready。
+- 图片修订必须提升对应 ASSET revision；Prompt 或合同内容变化时同步提升其 revision，并只失效真实依赖旧 revision 的下游草案。
+- 本 Gate 复用 `current-interaction.yaml`、05 ASSET 索引和既有 `UI_CONFIRMATION` 事件；不得新增出图日志、图片确认 Runtime 或第二份设计 SoT。
 
 当前文档为 13 时，人话总结还必须说明：
 

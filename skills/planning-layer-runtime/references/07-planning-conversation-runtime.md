@@ -681,7 +681,7 @@ UI 高风险项：
 
 以下问题只作为内部确认方向，不得把完整 checklist 扔给用户；默认每轮只问一个最关键问题。
 
-03 生成前使用业务语言确认：
+03 的以下事实必须在第一阶段覆盖，并在第二阶段轮到草案确认时用业务语言核对：
 
 - 用户从哪里进入？
 - 什么条件下能做下一步？
@@ -689,14 +689,14 @@ UI 高风险项：
 - 取消或失败后回哪里？
 - 哪些旧入口用户仍可能访问？
 
-04 生成前使用业务语言确认：
+04 的以下事实必须在第一阶段覆盖，并在第二阶段轮到草案确认时用业务语言核对：
 
 - 这条流程必须依赖哪些能力才能走通？
 - 哪些能力只是协作，不应承担主责任？
 - 哪些旧能力绝不能再参与？
 - 缺少哪个能力时必须阻断？
 
-05 生成前使用业务语言确认：
+05 的以下事实必须在第一阶段覆盖，并在第二阶段轮到草案确认时用业务语言核对：
 
 - 本期最优先要先看到哪些页面？
 - 使用什么端、什么语言、什么视觉气质？
@@ -707,7 +707,7 @@ UI 高风险项：
 - 准备交给开发时，目标工具与输出规格是什么，哪些 PAGE/UI-MOD/UX-SCN/ASSET revision 必须锁定？
 - 页面布局、响应式、内容长度、状态反馈、键盘焦点、可访问性和动效中，哪些用户可见取舍仍没有证据或确认？
 
-05 设计确认记录复用既有 `UI_CONFIRMATION` 事件，不新增设计日志、出图日志或 UX Runtime。
+轮到 05 时，若存在必需 UI/UX 图，必须切换到 `10-planning-document-interaction-runtime.md#51-05-design-asset-collection-interaction-gate`：直接交付完整 Prompt、接收并确认 UI 图，再按真实 UI revision 交付并接收必需 UX 图。05 设计确认记录复用既有 `UI_CONFIRMATION` 事件，不新增设计日志、出图日志或 UX Runtime。
 
 ### 5.3 06/07/08 逐文档确认重点
 
@@ -1640,7 +1640,8 @@ Planning Context = INCOMPLETE
 - P0 页面提示词已准备。
 - 关键模块图需求已识别。
 - UX 是否可由现有 UI 图覆盖已明确。
-- 需要出图但尚未收到资产的项已标记，不得伪造已确认。
+- 需要出图的项已按 10 完成 Prompt 用户态交付、图片接收和视觉确认；尚未收到或未确认的项保持明确阻断，不得伪造已确认。
+- `current-interaction.yaml.document_assembly.design_asset_collection.collection_status: complete`，或本期经确认没有必需 UI/UX 图；Prompt 仅写在 05 但未直接提供给用户不算完成。
 - 05 已包含唯一 `design_delivery_manifest`；设计事实和资产闭合时为 `design_ready`，仍缺内容或资产时为 `blocked` 且原因明确，不要求尚未生成的 11、13 或 Handoff 引用。
 - 每个本期设计范围内的 PROMPT 都包含 target tool、参考资产 revision、输出规格、negative constraints 和可直接复制的完整 `prompt_body`。
 - 每个本期设计范围内的 PAGE / UI-MOD 都包含 design token、布局、响应式、组件、状态、内容、无障碍、动效反馈与实现验收断言。
@@ -1649,7 +1650,7 @@ Planning Context = INCOMPLETE
 
 规则：
 
-- 不满足时，05 的交互合同不得确认。
+- 不满足时，05 不得进入整体文档确认。
 - 涉及该页面的 UI 依赖开发任务不得生成或进入可执行状态。
 - 不依赖 UI 的后续规划文档不应被无故阻塞。
 - `replace_current` 时，受影响页面提示词、模块提示词、UX 提示词和设计资产均已进入重新审查；`inherit_current` 不要求机械重做全局风格提示词。

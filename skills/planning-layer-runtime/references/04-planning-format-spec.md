@@ -201,6 +201,14 @@ document_assembly:
     owning_role:
     unresolved_item_ref:
     resume_condition:
+  design_asset_collection:
+    design_document_path:
+    collection_revision:
+    asset_kind:
+    collection_status:
+    active_batch_id:
+    active_prompt_refs: []
+    active_asset_refs: []
   assembly_status:
 
 active_interaction:
@@ -235,6 +243,7 @@ planning_status:
 ```text
 document
 discovery_question
+design_asset_batch
 execution_handoff_decision
 final_summary
 scope_change_decision
@@ -244,6 +253,8 @@ scope_change_decision
 
 ```text
 discovery_answer
+design_asset_generation_request
+design_asset_review_confirmation
 draft_confirmation
 execution_handoff_confirmation
 final_summary_confirmation
@@ -306,6 +317,10 @@ planning_handoff_complete
 - `generated_documents[].document_status` 只允许 `draft`、`confirmed`、`reopened`、`invalidated`；`confirmation_queue[].confirmation_status` 只允许 `pending_confirmation`、`awaiting_feedback`、`confirmed`、`reopened`、`invalidated`。
 - `confirmation_queue` 只能在当前批次所有计划草案真实生成且跨文档草案校验完成后激活；`current_confirmation` 每次只指向一个真实路径和 draft revision。批量生成中不得创建文档确认交互目标。
 - `generation_blocker` 只在 `draft_generation_status: blocked` 时保存 owning role、指向 Discovery `unresolved_items` 的引用与恢复条件；解除后清空，不得复制问题正文或用户回答。
+- `design_asset_collection` 仅在 05 当前确认项需要用户提供设计图时出现。`asset_kind` 只允许 `ui | ux`；`collection_status` 只允许 `prompt_ready | awaiting_assets | reviewing_assets | complete | blocked`；`active_prompt_refs` 与 `active_asset_refs` 只保存 05 中的精确 ID@revision，不复制 Prompt 正文或图片内容。
+- 给用户输出 UI/UX Prompt 前，必须先把 `target_type: design_asset_batch`、当前 `active_batch_id`、`stage: design_asset_generation_request`、Prompt/ASSET revision 与预期动作持久化；收到图片后先记录 `latest_feedback`，再把实际文件或外部引用写回 05 ASSET。
+- 请求用户确认已收到图片前，必须把同一批次切换为 `stage: design_asset_review_confirmation`；确认只作用于该批次实际收到的 ASSET revision，不得同时确认 05 文档或其他图片。
+- `design_asset_collection` 是短期恢复指针；完整 Prompt、资产路径、状态、确认来源和覆盖范围仍只写在 05。UI/UX 图收集不得创建第二份设计资产清单、出图日志或独立 Runtime。
 - `assembly_status` 只允许 `batch_assembling`、`awaiting_confirmation`、`confirming`、`rebuilding`、`blocked`、`complete`；它描述当前批次所处动作，不替代每份草案和队列项状态。
 - 用户纠正上游事实后，只把真实受影响的草案标记 `reopened` 或 `invalidated` 并提升其 draft revision；未受影响的已确认项保持 `confirmed`。
 - `document_assembly` 只保存批次、职责、草案真实路径与 revision、生成状态、确认队列、当前确认对象和装配状态，用于恢复当前进度；不得复制正式文档正文、完整 `assembled_documents`、Document Assembly Plan 或 Handoff Package。
@@ -317,6 +332,7 @@ planning_handoff_complete
 - Discovery 发问前的唯一绑定格式为 `target_type: discovery_question`、`target_id: <DQ-ID>`、`stage: discovery_answer`、`version: <当前 checkpoint revision>`；`latest_feedback.target_id` 必须复制同一 `DQ-ID`。
 - 向用户发出任何会影响流程状态的确认问题前，必须先写完整 `active_interaction`；不得等用户回复后再从聊天记忆推断确认对象。
 - 文档确认时，`target_id` 使用真实文档路径。
+- 设计资产生成请求使用 `target_type: design_asset_batch`、`target_id: <active_batch_id>`、`stage: design_asset_generation_request`；视觉确认使用同一 target 和 `stage: design_asset_review_confirmation`。用户提供图片不自动等于视觉确认。
 - 执行交接分支确认固定使用 `target_type: execution_handoff_decision`、`target_id: current_phase_execution_handoff_decision`、`stage: execution_handoff_confirmation`；必须先写入候选镜像和该交互目标，再向用户发问。
 - 最终总结确认固定使用 `target_type: final_summary`、`target_id: current_phase_final_summary`、`stage: final_summary_confirmation`；不得把最终总结伪装成正式文档，也不得新增最终总结 SoT 文件。
 - `feedback_id` 在本期内唯一；同一 `feedback_id` 只能成功应用一次。

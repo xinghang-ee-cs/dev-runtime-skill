@@ -119,6 +119,7 @@ Recovery Runtime 只允许：
 -> 恢复 document_assembly 的 batch_revision / draft_generation_status
 -> 核对 generated_documents 中每个真实路径、draft revision 与文档状态
 -> 恢复 confirmation_queue / current_confirmation
+-> 05 当前确认项适用时恢复 design_asset_collection 与 design_asset_batch 交互目标
 -> 核对 Document Assembly Plan
 -> 若批量装配中断，按已持久化检查点继续生成剩余草案并完成跨文档校验
 -> 若处于确认或修正阶段，只恢复唯一 current_confirmation 或最早 reopened / pending_confirmation 项
@@ -148,6 +149,16 @@ Recovery Runtime 只允许：
 - 用户纠正命中上游 SoT 时，按依赖关系把受影响项标记为 `reopened` 或 `invalidated`，只重建这些草案并刷新 revision；未受影响的草案、确认状态和真实文件保持不变。
 - 修正完成后，从依赖顺序中最早的 `reopened` 或 `pending_confirmation` 项继续。不得重新生成完整批次，不得把确认流程退化为“生成一份再问一份”。
 - `active_interaction`、`latest_feedback` 与 `current_confirmation` 任一绑定不一致时先停止并修复最小恢复镜像；不得将用户对一份文档的反馈消费到另一份草案。
+
+05 设计资产收集恢复规则：
+
+- 仅从 `design_asset_collection` 恢复当前 `asset_kind / collection_status / active_batch_id`，再读取 05 中对应 Prompt 与 ASSET 正文；不得从压缩摘要猜测用户正在生成 UI 图还是 UX 图。
+- `collection_status: prompt_ready` 表示 Prompt 尚未可靠交付：先持久化 `design_asset_generation_request`，再从 05 回读并直接输出完整 `prompt_body`。
+- `collection_status: awaiting_assets` 表示 Prompt 已交付、正在等待图片。恢复时保留已收到资产，只说明仍缺的 ASSET 映射；用户要求重发时从 05 输出同 revision Prompt，不另生成一份。
+- `collection_status: reviewing_assets` 时，必须回读 05 中实际收到的路径、ASSET revision、覆盖状态和 known gaps，恢复 `design_asset_review_confirmation`；不得把“已上传”推断为 `visual_confirmed`。
+- 收到尚未处理的图片反馈时，先把 `latest_feedback` 应用到原 `design_asset_batch`，再写 ASSET 路径与 `received / review_pending` 状态；不得错误应用到 05 文档确认目标。
+- UI 资产全部确认后才恢复 UX Prompt 交付；PROMPT-UX 必须引用当前 `visual_confirmed` UI revision。若该 UX 已由现有 UI 图充分覆盖，按 05 的 `covered_by_existing_ui_assets` 恢复，不额外索要图片。
+- Prompt、图片或确认 revision 不一致时只使受影响批次和下游草案失效；未受影响且已确认的 UI/UX 资产保持有效。
 
 Discovery 恢复规则：
 

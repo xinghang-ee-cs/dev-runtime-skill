@@ -35,7 +35,7 @@
 7. 带 revision 的设计资产索引。
 8. FLOW—SCN—MODULE—PAGE—合同—资产—TEST 覆盖矩阵。
 
-05 首次轮到确认与开发执行入口是两个阶段：设计内容和必需资产闭合后可标记 `design_ready`；11 TEST 与 13 TASK 精确绑定完成后才可标记 `execution_ready` 并准备 Handoff。本期只形成讨论或仍缺设计事实时使用 `blocked`。只要存在 UI TASK，进入 Handoff 前必须为 `execution_ready`，且对应资产必须为 `visual_confirmed`。
+第二阶段轮到 05 时，必须按 `10-planning-document-interaction-runtime.md#51-05-design-asset-collection-interaction-gate` 直接向用户提供完整 UI Prompt、接收并确认 UI 图，再为确有需要的交互提供基于已确认 UI revision 的 UX Prompt 并接收 UX 图。设计内容和全部必需资产闭合后可标记 `design_ready`；11 TEST 与 13 TASK 精确绑定完成后才可标记 `execution_ready` 并准备 Handoff。本期只形成讨论或仍缺设计事实/资产时使用 `blocked`。只要存在 UI TASK，进入 Handoff 前必须为 `execution_ready`，且对应资产必须为 `visual_confirmed`。
 
 ## 3. Design Delivery Manifest
 
@@ -130,6 +130,20 @@ Prompt 正文必须明确：
 - 省略 `prompt_body`，只列提示词要点。
 - 使用不存在或未确认的参考图。
 - 用 Prompt 新增 FLOW、资格、权限、状态或 API 语义。
+
+### 4.1 User-Facing Prompt Delivery And Asset Intake
+
+Prompt 写入 05 只是持久化，不等于已经交付给用户。轮到 05 确认时必须：
+
+- 在用户态回复中直接输出完整 fenced `prompt_body`，并同时说明 `PROMPT-ID@revision`、目标工具、输出规格、对应页面/模块/交互和待回传 `ASSET-ID@revision`。
+- 先按同一依赖层批量提供所有必需 STYLE（适用时）、PAGE 与 UI-MOD Prompt，让用户一次生成或提供 UI 图；不得只给文件链接或让用户自己去 05 查找 Prompt。
+- UI 图收到并达到 `visual_confirmed` 后，才允许将其真实路径与 revision 写入 `PROMPT-UX.reference_inputs` 并向用户提供 UX Prompt。需要多帧交互图时，明确帧序、画幅和每帧状态；已有确认 UI 图足以表达时不机械要求额外 UX 图。
+- 用户可上传自行制作、其他工具生成或既有的 UI/UX 图；Prompt 是方便生成的直接交付，不是接受资产的唯一入口。
+- 用户提供部分资产时保留已收到项，只继续请求缺失项；用户要求调整时仅提升受影响 Prompt、合同和 ASSET revision。
+
+交互目标、反馈绑定、图片接收、视觉确认和中断恢复以 10 与 08 为准。本节不新增交互 Runtime 或第二份资产状态。
+
+存在必需 UI/UX 图时，只有 `design_asset_collection.collection_status: complete` 且全部对应 ASSET revision 均为 `visual_confirmed`，05 才能通过整体确认；没有必需设计图时必须在 05 明确记录判定依据，不创建空批次。
 
 ## 5. UI Implementation Contract
 
@@ -246,6 +260,7 @@ supersedes: <旧 ASSET-ID@revision；不适用时省略>
 规则：
 
 - `received` 及以后状态必须有真实路径或外部引用。
+- `source: user_generated` 表示用户使用 Planning 提供的 Prompt 生成后回传；`user_provided` 表示用户直接提供已有图。两者进入执行前都必须经过同一视觉确认。
 - `visual_confirmed` 必须绑定 revision、用户确认来源与确认时间。
 - 同一资产内容变化必须提升 `asset_revision`；不得在原 revision 下静默替换。
 - 新 revision 未确认前，旧 revision 仍是执行绑定；如果旧版已被明确废弃，则 UI TASK 必须阻断。

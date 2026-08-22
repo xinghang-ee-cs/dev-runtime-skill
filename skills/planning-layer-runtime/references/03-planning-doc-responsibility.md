@@ -224,7 +224,7 @@ UI 设计流程启动文档
 
 规则：
 
-- 05 文档可以在“交互合同已确认”后进入已确认状态。
+- 05 的业务交互合同可以先形成草案，但只要本期要求交付 UI/UX 设计图，必须在第二阶段按 `10-planning-document-interaction-runtime.md` 直接向用户交付完整 Prompt、接收并确认全部必需设计资产后，05 才能进入整体文档确认。
 - 每一张设计图、每一个页面视觉方案、每个 UX 图都必须有独立资产状态。
 - 设计资产已生成不等于页面已开发、页面已测试、页面已验收或已上线。
 - UI 依赖开发任务只能在所需页面或模块资产达到 `visual_confirmed` 后生成或进入可执行状态。
@@ -244,14 +244,18 @@ UI 设计流程启动文档
 -> 确认交互合同、设计范围、页面优先级和资产计划
 -> 引用已确认继承基线，或仅在需要时生成/更新全局风格要求
 -> 按 P0 FLOW / SCN 顺序逐页生成带完整 prompt_body 和输出规格的页面提示词
+-> 第二阶段将同一依赖层的完整 UI prompt_body 直接提供给用户
 -> 用户生成或提供页面 UI 图
 -> 按资产 revision 回写真实路径、确认来源和状态
 -> 为每个进入开发的 PAGE / UI-MOD 生成 UI Implementation Contract
 -> 针对局部状态变化生成带完整 prompt_body 的模块化设计提示词
+-> 将必需模块 Prompt 与对应 ASSET 映射直接提供给用户
 -> 用户生成或提供模块 UI 图
 -> 基于已有 UI 图承接 UX 交互设计
 -> 为每个关键 UX-SCN 生成确定性状态迁移表
 -> 只有现有图无法说明交互时，生成带完整 prompt_body 的 UX 交互设计图提示词
+-> UI 图完成视觉确认后，将依赖真实 UI ASSET revision 的 UX prompt_body 直接提供给用户
+-> 用户生成或提供 UX 图并完成视觉确认
 -> 回写 UX 资产索引、覆盖状态与 design_delivery_manifest
 -> 运行 UI/UX Design Readiness Gate 和阶段性结构校验
 -> 11 TEST 与 13 UI TASK 形成后再运行 UI/UX Execution Readiness Gate
@@ -259,7 +263,7 @@ UI 设计流程启动文档
 
 `style_inheritance_decision.mode` 只允许 `inherit_current`、`extend_current`、`replace_current`；默认 `inherit_current`。用户未明确要求整体改版时，不得重新定义全局风格。`extend_current` 只能补充当前体系缺失的组件或适配能力；`replace_current` 必须有用户明确要求或当前体系无法承接的证据，并重新审查受影响页面提示词、模块提示词、UX 提示词和设计资产。
 
-默认一次只推进一个最高优先级页面或资产；用户明确要求批量时才可一次输出多条提示词。
+第二阶段默认按依赖层批量提供提示词：先一次提供当前全部必需 UI/模块 Prompt，收到并确认 UI 图后，再一次提供全部必需 UX Prompt。只有资产之间存在真实依赖、用户要求逐张处理或单批内容过大时才拆分；不得无必要地一张图问一轮。
 
 下游写回规则：
 
