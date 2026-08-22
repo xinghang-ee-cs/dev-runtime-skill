@@ -37,6 +37,9 @@ writeback_status：updated
 ```text
 页面/URL：
 视口/设备：
+PAGE / UI-MOD contract revision：
+UX-SCN revision：
+对照 ASSET-ID@revision：
 登录状态：
 操作路径：
 截图路径：
@@ -50,7 +53,7 @@ writeback_status：updated
 
 截图只能证明可见状态，不能单独证明业务流程通过。必须结合数据、接口响应、状态变化或人工内容。
 
-截图证据只能服务业务断言；不得为了”对照 UI 图”或”页面差异记录”单独生成一张人工测试卡。
+截图证据必须服务业务、交互或已确认的前端合同断言。不得生成脱离 Planning TEST、PAGE/UX-SCN/ASSET revision 的模糊“对照 UI 图”卡；Long 明确移交且 Planning 已定义的视觉一致性、真机响应式、复杂 UX 或可访问性观察项可以生成独立人工项，但必须写明设备/视口、进入路径、操作、预期可见状态、对照 revision、允许差异与通过条件。
 
 ## 证据与测试项绑定规则
 

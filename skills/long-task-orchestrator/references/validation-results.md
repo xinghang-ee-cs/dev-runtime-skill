@@ -37,6 +37,7 @@ backend_score:
 why_not_automated:
 manual_required:
 execution_constraint_validation:
+frontend_contract_validation:
 capability_id:
 capability_validation:
 capability_evidence:
@@ -123,6 +124,7 @@ playwright
 capability_real_call
 capability_binding
 execution_constraint_compliance
+frontend_contract_compliance
 ```
 
 `validation_focus` 只允许：
@@ -139,6 +141,11 @@ implementation_naming
 implementation_placement
 delegated_parameter_boundary
 dependency_governance
+ui_contract
+ux_contract
+responsive_behavior
+accessibility_behavior
+visual_asset_consistency
 ```
 
 `sdk_init`、`auth_check`、`timeout`、`rate_limit`、`fallback`、`runtime_binding`、`adapter_binding`、`sdk_api_binding`、`permission_binding` 只能作为 validation focus、Capability 字段或 evidence，不得作为独立 `validation_type`。`rerun` 是 `rerun_result`，`code_evidence` 是字段，`long_testing_handoff` 是输出分类，均不是 `validation_type`。
@@ -200,6 +207,15 @@ coverage:
   permissions:
   state_flows:
   business_flows:
+frontend_contract_validation_summary:
+  applicable: <true | false>
+  design_document_path:
+  design_manifest_ref:
+  validated_contract_refs: []
+  validated_asset_refs: []
+  automated_evidence_refs: []
+  manual_required: []
+  unresolved_mismatch: []
 formal_acceptance_record_path:
 acceptance_status: not_started
 owner_runtime: testing-layer-runtime
@@ -211,6 +227,7 @@ owner_runtime: testing-layer-runtime
 - 每条 `automated_failed` 必须保留失败摘要，不得被 testing-layer-runtime 当作已通过继承。
 - 每条 `automated_skipped` 必须保留未执行原因。
 - `manual_required` 只列 testing-layer-runtime 后续要管理的人工、真实设备、服务器/云端、外部能力最终验证、最终验收或上线前验证。
+- UI/UX 适用时 `frontend_contract_validation_summary` 必须按 `frontend-experience-execution.md` 记录；存在 `unresolved_mismatch` 时不得进入 `ready_for_local_test`。
 - 不得在 handoff 中把 manual/server/final/release 项写成 passed。
 - `formal_acceptance_record_path` 必须引用 Planning Handoff 已声明且真实存在的正式验收记录，只保存路径，不创建、修改或复制正文。
 - `acceptance_status` 在 Long 中固定为 `not_started`，不得填写 `passed`、`failed`、`accepted`、`approved` 或 `release_ready`。
@@ -223,8 +240,8 @@ owner_runtime: testing-layer-runtime
 validation_id: <VALIDATION-ID>
 time: <ISO-8601 timestamp>
 related_task: <TASK-ID>
-validation_type: <test | build | lint | smoke | openapi | typecheck | api-test | playwright | capability_real_call | capability_binding | execution_constraint_compliance>
-validation_focus: <unit | business_rule | contract | user_flow | state_transition | permission_boundary | capability_binding | implementation_naming | implementation_placement | delegated_parameter_boundary | dependency_governance>
+validation_type: <test | build | lint | smoke | openapi | typecheck | api-test | playwright | capability_real_call | capability_binding | execution_constraint_compliance | frontend_contract_compliance>
+validation_focus: <unit | business_rule | contract | user_flow | state_transition | permission_boundary | capability_binding | implementation_naming | implementation_placement | delegated_parameter_boundary | dependency_governance | ui_contract | ux_contract | responsive_behavior | accessibility_behavior | visual_asset_consistency>
 command:
   - <command or not_run_with_reason>
 scope: <validated scope>

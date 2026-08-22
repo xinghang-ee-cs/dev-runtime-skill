@@ -42,7 +42,7 @@ planning handoff 给执行 skill 时，必须显式输出职责到路径的映�
 | 02 | 梳理 | 核心业务实体、业务关系、生命周期、业务域权限关系、旅程对象支撑 | 实体、关系、归属、生命周期、Journey-Object Map、Access Context、对象处理矩阵、负向对象关系 | 00、01 | 03、04、06、08 | UI行为、接口格式、数据库实现、改变 01 的入口/前置/终态 |
 | 03 | 梳理 | 定义 SCN：把已确认 FLOW 展开为用户实际进入、操作、看见、失败、恢复、退出的场景 | 关联 FLOW、关联对象与资格前置、参与角色、合法进入条件、用户起点、用户动作、系统处理、用户可见结果、正常完成分支、前置缺失分支、权限不足分支、外部能力失败分支、用户取消分支、恢复/退出/人工协助路径、禁止的用户路径、需要承接的 PAGE / UI-MOD / UX-SCN | 01、02 | 04、05、06、10、11 | 主业务旅程定义、业务终态定义、权限资格定义、状态迁移定义、接口契约定义 |
 | 04 | 梳理 | 定义 MODULE：系统能力模块与隔离边界 | 模块类型、关联 FLOW、关联 SCN、模块业务责任、模块非责任、模块输入业务事实、模块输出业务能力、上游模块依赖、下游消费方、模块隔离边界、旧流程/旧语义隔离责任、优先级、业务旅程—场景—模块覆盖矩阵 | 01、02、03 | 05、06、07、09、12 | 用户页面、按钮、接口、字段、状态枚举、技术目录、代码实现 |
-| 05 | 梳理 | 继承、扩展或替换当前前端体验，并定义 PAGE、UI-MOD、UX-SCN、必要设计提示词和设计资产索引 | style_inheritance_decision、交互合同确认、视觉资产确认、PAGE、UI-MOD、UX-SCN、已确认继承基线引用或 PROMPT-STYLE、必要的 PROMPT-PAGE / MODULE / UX、设计资产索引、覆盖矩阵 | Project Current Baseline、03、04 | 07、09、10、11、12、13 | 无整体改版依据时重定义全局风格、改变业务流程/资格/状态/权限/API、伪造设计资产 |
+| 05 | 梳理 | 继承、扩展或替换当前前端体验，并定义可由设计、开发和测试精确消费的 UI/UX 执行合同 | style_inheritance_decision、design_delivery_manifest、带完整 prompt_body 的 PROMPT、PAGE/UI-MOD 实现合同、UX-SCN 状态迁移表、版本化设计资产索引、合同—资产—TEST 覆盖矩阵 | Project Current Baseline、03、04 | 07、09、10、11、12、13、Planning Handoff、Long、Testing | 无整体改版依据时重定义全局风格、改变业务流程/资格/状态/权限/API、伪造资产或 revision、让执行层从聊天记录补设计 |
 | 06 | 梳理 | 业务事实与状态合法性的唯一 SoT | 核心业务数据事实、业务事件、状态分类、状态枚举、状态唯一来源、是否持久化、允许迁移、非法迁移、迁移守卫、成功后的新事实、阻断事实、回滚或重试规则、旧对象/旧状态隔离映射、数据域治理边界、下游 API / PERM / TEST 映射 | 01、02、04 | 07、08、09、10、11 | 页面按钮、弹窗、接口路径、权限矩阵、数据库物理表结构、表名、字段类型、长度、索引、外键、SQL、ORM Schema、迁移脚本 |
 | 07 | 梳理 | 前后端读写、拒绝和恢复语义的 Canonical API Contract | API-ID、Contract Type、关联 FLOW/SCN/MODULE/PAGE、业务意图、触发业务事件、合法访问上下文、所需业务资格、状态与事实前置、请求允许/禁止字段、成功结果、拒绝结果、幂等与并发、旧流程边界、Canonical Physical Binding、关联 TEST | 02、04、06 | 08、09、10、11、12、13 | 完整角色权限矩阵、页面布局、视觉呈现、数据库实现细节 |
 | 08 | 梳理 | 后端不可绕过的访问决策、数据范围、拒绝分类、异常协助与历史访问策略 | PERM-ID、关联 FLOW/API/DOMAIN/STATE、动作、资源、允许主体、允许范围、业务资格、业务状态前置、数据域前置、允许结果、拒绝类型、拒绝原因码、只读边界、人工协助边界、旧流程禁止来源、关联 TEST | 02、06、07 | 09、10、11、12、13 | 接口参数、接口响应字段、页面按钮样式、业务状态枚举、数据库实现 |
@@ -211,8 +211,10 @@ cleanup
 ```text
 UI 设计流程启动文档
 + UX 交互设计承接文档
-+ 设计提示词交付文档
-+ 设计资产索引文档
++ 可直接复制的设计提示词交付文档
++ 页面 / 模块实现合同文档
++ UX 确定性状态迁移合同文档
++ 版本化设计资产索引文档
 ```
 
 双层确认：
@@ -222,12 +224,15 @@ UI 设计流程启动文档
 
 规则：
 
-- 05 文档可以在“交互合同已确认”后进入已确认状态。
+- 05 的业务交互合同可以先形成草案，但只要本期要求交付 UI/UX 设计图，必须在第二阶段按 `10-planning-document-interaction-runtime.md` 直接向用户交付完整 Prompt、接收并确认全部必需设计资产后，05 才能进入整体文档确认。
 - 每一张设计图、每一个页面视觉方案、每个 UX 图都必须有独立资产状态。
 - 设计资产已生成不等于页面已开发、页面已测试、页面已验收或已上线。
 - UI 依赖开发任务只能在所需页面或模块资产达到 `visual_confirmed` 后生成或进入可执行状态。
 - 不依赖 UI 的后续规划文档不应被无故阻塞。
 - 用户未提供图时，资产只能是 `planned` 或 `prompt_ready`。
+- 涉及后续工程执行时，05 必须按 `11-planning-ui-ux-execution-contract.md` 形成 `design_delivery_manifest`、完整 `prompt_body`、UI Implementation Contract、UX Interaction Contract 和带 revision 的资产引用；叙事性说明或提示词要点不能替代。
+- 05 的 `design_delivery_manifest`、13 的 `frontend_contract_binding` 与 Handoff 的 `frontend_experience_binding` 必须使用相同真实路径、ID 和 revision。
+- UI TASK 只能消费 Handoff 明确绑定的设计 revision；不得自动选择目录中的最新图，也不得依赖聊天记录补齐实现细节。
 
 05 设计流程：
 
@@ -238,19 +243,27 @@ UI 设计流程启动文档
 -> 生成 05 文档草案
 -> 确认交互合同、设计范围、页面优先级和资产计划
 -> 引用已确认继承基线，或仅在需要时生成/更新全局风格要求
--> 按 P0 FLOW / SCN 顺序逐页生成完整页面提示词
+-> 按 P0 FLOW / SCN 顺序逐页生成带完整 prompt_body 和输出规格的页面提示词
+-> 第二阶段将同一依赖层的完整 UI prompt_body 直接提供给用户
 -> 用户生成或提供页面 UI 图
--> 回写设计资产索引
--> 针对局部状态变化生成模块化设计提示词
+-> 按资产 revision 回写真实路径、确认来源和状态
+-> 为每个进入开发的 PAGE / UI-MOD 生成 UI Implementation Contract
+-> 针对局部状态变化生成带完整 prompt_body 的模块化设计提示词
+-> 将必需模块 Prompt 与对应 ASSET 映射直接提供给用户
 -> 用户生成或提供模块 UI 图
 -> 基于已有 UI 图承接 UX 交互设计
--> 只有现有图无法说明交互时，生成 UX 交互设计图提示词
--> 回写 UX 资产索引与覆盖状态
+-> 为每个关键 UX-SCN 生成确定性状态迁移表
+-> 只有现有图无法说明交互时，生成带完整 prompt_body 的 UX 交互设计图提示词
+-> UI 图完成视觉确认后，将依赖真实 UI ASSET revision 的 UX prompt_body 直接提供给用户
+-> 用户生成或提供 UX 图并完成视觉确认
+-> 回写 UX 资产索引、覆盖状态与 design_delivery_manifest
+-> 运行 UI/UX Design Readiness Gate 和阶段性结构校验
+-> 11 TEST 与 13 UI TASK 形成后再运行 UI/UX Execution Readiness Gate
 ```
 
 `style_inheritance_decision.mode` 只允许 `inherit_current`、`extend_current`、`replace_current`；默认 `inherit_current`。用户未明确要求整体改版时，不得重新定义全局风格。`extend_current` 只能补充当前体系缺失的组件或适配能力；`replace_current` 必须有用户明确要求或当前体系无法承接的证据，并重新审查受影响页面提示词、模块提示词、UX 提示词和设计资产。
 
-默认一次只推进一个最高优先级页面或资产；用户明确要求批量时才可一次输出多条提示词。
+第二阶段默认按依赖层批量提供提示词：先一次提供当前全部必需 UI/模块 Prompt，收到并确认 UI 图后，再一次提供全部必需 UX Prompt。只有资产之间存在真实依赖、用户要求逐张处理或单批内容过大时才拆分；不得无必要地一张图问一轮。
 
 下游写回规则：
 
@@ -808,7 +821,7 @@ planning skill 禁止预填：
 - 14、15 不得反向定义业务、状态、接口、权限或测试标准。
 - 14、15 的实际事实只能由后续执行或验收承接方填写。
 - 14、15 不触发“每次只能生成一份正式文档”的限制。
-- 14、15 不需要分别进行生成前协作确认。
+- 14、15 不进入初始草案批次或独立确认队列。
 - 14、15 不需要把独立用户确认作为 Planning 完成前提。
 - 不新增独立风险 Runtime、任务 Runtime、执行 Runtime、验收 Runtime、日志体系或治理目录。
 - 13 已确认、14/15 框架已生成或交接映射已准备，都不表示 Planning 已真正结束；完整结束条件只由 `07-planning-conversation-runtime.md` 维护，最终整体确认交互只由 `10-planning-document-interaction-runtime.md` 维护。

@@ -12,6 +12,9 @@ active_change_revision:
 incremental_execution_contract_snapshot:
 execution_constraints_source:
 execution_constraints_status:
+frontend_experience_binding_source:
+frontend_contract_intake_status:
+frontend_execution_snapshot:
 implementation_contract_status:
 dependency_governance_status:
 project_execution_baseline_file:
@@ -75,6 +78,7 @@ planning_baseline_revision_changed -> PRECISE_INVALIDATE
 active_change_revision_changed -> PRECISE_INVALIDATE
 incremental_execution_contract_changed -> PRECISE_INVALIDATE
 execution_constraints_changed -> INVALIDATE
+frontend_experience_binding_or_design_revision_changed -> PRECISE_INVALIDATE
 ```
 
 失效后先区分全局恢复失败与合法增量 Handoff。合法增量 Handoff 必须精确传播：
@@ -160,6 +164,9 @@ active_change_revision_presence_and_value_match
 incremental_execution_contract_snapshot_match
 execution_constraints_source_current
 execution_constraints_status_match
+frontend_experience_binding_source_current
+frontend_contract_intake_status_match
+frontend_execution_snapshot_match
 implementation_contract_status_match
 dependency_governance_status_match
 active_placement_decision_matches_active_task

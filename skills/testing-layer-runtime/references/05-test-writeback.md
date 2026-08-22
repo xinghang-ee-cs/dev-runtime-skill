@@ -34,6 +34,7 @@ long_testing_handoff:
   automated_skipped:
   manual_required:
   coverage:
+  frontend_contract_validation_summary:
 ```
 
 每一个继承的自动化 case 必须写入 `test-validation-results.md`，使用完整字段集：
@@ -48,6 +49,7 @@ started_at:
 completed_at:
 depends_on_check:
 expected_evidence:
+frontend_contract_refs: []
 result_summary:
 evidence_refs:
 evidence_missing_reason: null
@@ -114,6 +116,13 @@ MANUAL-OP-001:
       - 停用状态可见
       - 团队绑定可见
     feedback_hint: 可以自然反馈”列表状态正常””停用状态没显示”或直接发截图
+  frontend_contract_refs:
+    page_contract_refs: []
+    module_contract_refs: []
+    interaction_contract_refs: []
+    asset_refs: []
+    viewport_or_device: not_applicable
+    allowed_visual_differences: []
   covers:
     - TEST-P7-REGION-001
     - TEST-P7-TEAM-001
@@ -144,6 +153,7 @@ MANUAL-OP-001:
 - 当 `queue_state` 为 `ready`、`depends_on` 全部通过、`blocked_by` 为空且未被 `covered_by_evidence` 覆盖时，AI 可以选择该操作作为下一个人工测试操作。
 - `user_guidance` 只用于 AI 生成用户态引导，不要求用户填写。它必须帮助非专业用户知道下一步怎么做。
 - `covered_by_evidence`：`true` 表示该操作已被已有证据覆盖，无需再次引导用户执行。
+- `frontend_contract_refs`：仅 UI/UX 合同验证适用；必须来自 Planning Handoff 与 Long Testing Handoff 一致的精确 revision，并写明视口/设备和允许差异。非 UI 操作使用 `not_applicable`，不得填空引用。
 
 ## test-validation-results.md 格式
 
@@ -226,6 +236,7 @@ TEST-P7-PERM-001:
 - `completed_at`：本次执行完成时间；`in_progress` 项可为空。
 - `depends_on_check`：依赖检查结果；`passed` / `failed` / `pending`。
 - `expected_evidence`：预期证据类型描述。
+- `frontend_contract_refs`：UI/UX 测试适用时记录 PAGE/UI-MOD/UX-SCN/ASSET 精确 revision；非 UI/UX 测试为 `[]`。
 - `result_summary`：简短结果描述。
 - `evidence_refs`：证据引用路径列表；正式证据字段名，不得使用 `evidence`。
 - `evidence_missing_reason`：证据缺失原因；`evidence_insufficient` 或证据不完整时必填。

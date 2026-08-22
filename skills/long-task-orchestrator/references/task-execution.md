@@ -17,6 +17,7 @@
 - 拓扑约束有效
 - 验证证据定义有效
 - 当前 TASK 的 Implementation Placement Gate 与 Implementation Contract Completeness Intake 已通过
+- UI TASK 的 Frontend Contract Intake 与 Per-Task Frontend Binding Gate 已通过
 - dependency_governance_passed_or_not_applicable
 - 涉及外部能力时，Capability Evidence Gate 已通过
 - 涉及 Platform Capability、SDK Capability、AI Capability、External Capability 时，Capability Binding Gate 已通过
@@ -30,6 +31,7 @@ select_next_executable_unit
 -> confirm_dependencies
 -> confirm_execution_constraints_current
 -> confirm_implementation_contract_complete
+-> confirm_frontend_contract_binding_if_applicable
 -> confirm_implementation_placement
 -> confirm_dependency_governance_if_applicable
 -> confirm_capability_gate_if_applicable
@@ -130,7 +132,7 @@ STOP_IMPLEMENTATION
 -> WAIT_FOR_CONFIRMED_HANDOFF
 ```
 
-适用于新增未规划模块、以期次或 Planning ID 命名实现资产、修改 API/权限/状态机/数据模型/租户边界/用户可见规则/关键参数、引入外部能力或正式业务域，以及改变验收口径。禁止记录偏差后继续开发。
+适用于新增未规划模块、以期次或 Planning ID 命名实现资产、修改 API/权限/状态机/数据模型/租户边界/用户可见规则/关键参数、引入外部能力或正式业务域、改变验收口径，以及 PAGE/UI-MOD/UX-SCN/ASSET revision 与现有实现发生无法在已确认范围内解决的冲突。UI/UX 偏差按 `frontend-experience-execution.md` 分类并携带精确合同引用；禁止记录偏差后继续开发或自行重设计。
 
 若上游正式计划更新，按 `context-lifecycle.md` 校验新的 baseline/change revision，精确失效受影响 TASK，提升 `context_version`，保留 `completed_locked` 与未受影响事实，重读 Handoff/SoT 后只重建允许队列对应的 Context 与 TASK。
 

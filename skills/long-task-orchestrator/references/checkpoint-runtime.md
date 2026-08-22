@@ -25,6 +25,8 @@ planning_baseline_revision:
 active_change_revision:
 incremental_execution_contract_snapshot:
 execution_constraints_status:
+frontend_contract_intake_status:
+frontend_execution_snapshot:
 implementation_contract_status:
 active_placement_decision:
 dependency_governance_status:
@@ -60,6 +62,15 @@ incremental_execution_contract_snapshot:
   cancelled: []
   prohibited_actions: []
 execution_constraints_status: <passed | failed | invalidated>
+frontend_contract_intake_status: <passed | blocked | not_applicable | invalidated>
+frontend_execution_snapshot:
+  design_manifest_ref: <UI 不适用时省略整个 snapshot>
+  prompt_refs: []
+  page_contract_refs: []
+  module_contract_refs: []
+  interaction_contract_refs: []
+  confirmed_asset_refs: []
+  consistency_test_refs: []
 implementation_contract_status: <passed | blocked | pending>
 active_placement_decision: <extend_existing_domain | reuse_shared_capability | create_stable_business_domain | null>
 dependency_governance_status: <passed | blocked | not_applicable | pending>
@@ -146,6 +157,15 @@ incremental_execution_contract_snapshot:
   cancelled: []
   prohibited_actions: []
 execution_constraints_status: passed
+frontend_contract_intake_status: passed
+frontend_execution_snapshot:
+  design_manifest_ref: <formal 05 path>#design-delivery-manifest
+  prompt_refs: [<PROMPT-ID@revision>]
+  page_contract_refs: [<PAGE-ID@revision>]
+  module_contract_refs: []
+  interaction_contract_refs: [<UX-SCN-ID@revision>]
+  confirmed_asset_refs: [<ASSET-ID@revision>]
+  consistency_test_refs: [<TEST-ID>]
 implementation_contract_status: passed
 active_placement_decision: extend_existing_domain
 dependency_governance_status: not_applicable

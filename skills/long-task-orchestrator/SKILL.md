@@ -1,6 +1,6 @@
 ---
 name: long-task-orchestrator
-description: 当 Agent 必须接收已确认且 execution_ready 的初始或增量 planning handoff，按其中的基线 revision、增量执行队列、执行约束、稳定业务命名、实现合同和承接位置执行一个至少包含 4 个实现单元的完整功能或模块时使用。负责从开发开始到 ready_for_local_test，或在确认 testing/用户缺陷反馈后 patch 到 ready_for_local_retest：实现、重构、数据迁移、自动化测试代码编写与执行、结果记录及 Long Testing Handoff；不负责补写 Planning 业务合同、人工测试、真实设备测试、云端验证、最终验收或上线放行。
+description: 当 Agent 必须接收已确认且 execution_ready 的初始或增量 planning handoff，按其中的基线 revision、增量执行队列、执行约束、稳定业务命名、实现合同、UI/UX 精确绑定和承接位置执行一个至少包含 4 个实现单元的完整功能或模块时使用。负责从开发开始到 ready_for_local_test，或在确认 testing/用户缺陷反馈后 patch 到 ready_for_local_retest：实现、重构、数据迁移、按指定 Prompt/PAGE/UX/ASSET revision 落实前端、自动化测试代码编写与执行、结果记录及 Long Testing Handoff；不负责补写 Planning 业务合同、自行重设计、人工测试、真实设备测试、云端验证、最终验收或上线放行。
 ---
 
 # 长任务编排器
@@ -35,6 +35,7 @@ planning_handoff_intake_passed
 planning_handoff_revision_consistency_passed
 incremental_execution_contract_loaded
 execution_constraints_loaded
+frontend_contract_intake_passed_or_not_applicable
 phase_runtime_directory_created
 runtime_state_instantiated
 project_execution_baseline_status_current
@@ -273,6 +274,7 @@ long-task-orchestrator 只能承接 Planning 已确认的 `execution_ready` Hand
 -> 读取 assembled_documents
 -> 读取 handoff_role_mapping
 -> 读取 execution_constraints
+-> 涉及 UI TASK 时读取并校验 frontend_experience_binding、UI/UX Design 真实路径、Manifest、合同与资产 revision
 -> 读取 Development Landing Checklist
 -> 读取 Capability Governance（适用时）
 -> 检查关键参数状态
@@ -280,7 +282,7 @@ long-task-orchestrator 只能承接 Planning 已确认的 `execution_ready` Hand
 -> 通过后才进入环境检查和 task.md 生成
 ```
 
-合法入口必须同时满足 `requires_execution_handoff: true` 与 `handoff_type: execution_ready`，并确认 Handoff 有效、`planning_baseline_revision` 合法、`incremental_execution_contract` 完整、Development Landing Checklist 真实存在且已确认、14/15 或等价框架路径真实存在、`assembled_documents` 仅含真实路径、`handoff_role_mapping` 可解析、`execution_constraints` 存在、无 P0 `blocking_open`、任务可追溯且 Handoff 未失效。
+合法入口必须同时满足 `requires_execution_handoff: true` 与 `handoff_type: execution_ready`，并确认 Handoff 有效、`planning_baseline_revision` 合法、`incremental_execution_contract` 完整、Development Landing Checklist 真实存在且已确认、14/15 或等价框架路径真实存在、`assembled_documents` 仅含真实路径、`handoff_role_mapping` 可解析、`execution_constraints` 存在、无 P0 `blocking_open`、任务可追溯且 Handoff 未失效。存在 UI TASK 时还必须按 `references/frontend-experience-execution.md` 通过 Frontend Contract Intake Gate。
 
 以下任一条件必须停止，且不得生成 `task.md` 或开始 implementation：
 
@@ -295,6 +297,10 @@ execution_queue_overlap_or_unknown_task_revision
 Development Landing Checklist = missing_or_unconfirmed
 P0 parameter_status = blocking_open
 Handoff path != formal document path
+UI TASK frontend_experience_binding = missing_or_invalid
+UI/UX Design path_or_manifest = missing_or_conflicting
+Prompt_PAGE_UX_ASSET_revision = missing_or_conflicting
+required_design_asset != visual_confirmed
 ```
 
 不得根据文件编号、现存 13 文件、聊天记忆、期次名称、`task.md` 或历史 Runtime 反向猜测 Handoff 类型。
@@ -352,6 +358,8 @@ Capability Governance
 其中 `Development Landing Checklist` 是执行类任务的默认 handoff Source of Truth。实际文件路径必须由 planning handoff 或用户确认，不能由 long-task-orchestrator 通过编号猜测。
 
 若任务涉及外部能力、SDK、OpenAPI、MCP、AI Provider、基础设施依赖或第三方平台，则必须同时读取 planning handoff 指定的 `Capability Governance` 文档，并确认 Capability Registry 与 Evidence Gate 已通过。
+
+若任务涉及正式页面、用户可见交互、响应式行为、视觉资产或前端体验变化，则必须同时读取 Planning Handoff 指定的 `UI/UX Design` 文档，并按 `references/frontend-experience-execution.md` 校验 05 Manifest、13 TASK binding、Handoff binding 与 TEST refs。不得根据文件编号猜测 05，不得从目录自动选择最新设计图。
 
 涉及设备 API、容器 SDK、定位、摄像头、麦克风、推送或其他外部平台能力时，Runtime 必须同时检查 Capability Evidence Gate 与 Capability Binding Gate。两者均通过后，才允许进入 implementation。
 
@@ -417,6 +425,8 @@ Implementation Placement Gate
 
 每个 Runtime Task 还必须记录 `planning_baseline_revision`、可选 `active_change_revision`、`task_contract_revision` 与 `execution_disposition`。只有 `execute_only`、`resume_only`、`reexecute_affected_part` 三类允许进入可执行状态；其余三类只保留为锁定/上下文/取消索引，或在已有 Runtime 中按 Handoff 约束收敛，不得被执行。
 
+UI Runtime Task 还必须记录 TASK 级 `frontend_contract_binding_source` 与精确的 Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision、TEST refs 和 `frontend_contract_status`；只有 `passed` 才能执行。实现与确认设计合同发生冲突时按 Frontend Design Drift Stop Rule 停止并回写 Planning，不得自行重设计。
+
 承接策略只允许 `extend_existing_domain`、`reuse_shared_capability`、`create_stable_business_domain`，优先级依次如此。新建长期业务域必须具有正式架构依据和清晰、稳定、无重复的职责边界，否则停止并写回上游。
 
 关键参数状态只允许 `confirmed`、`explicitly_delegated`、`not_applicable`、`blocking_open`。影响当前 TASK 的任一参数为 `blocking_open` 或缺失业务/合同参数时，当前 TASK 必须 `BLOCKED`，关闭该任务 execution gate，写回上游且不得实现。
@@ -477,6 +487,15 @@ automated_failed:
 automated_skipped:
 manual_required:
 coverage:
+frontend_contract_validation_summary:
+  applicable: <true | false>
+  design_document_path:
+  design_manifest_ref:
+  validated_contract_refs: []
+  validated_asset_refs: []
+  automated_evidence_refs: []
+  manual_required: []
+  unresolved_mismatch: []
 formal_acceptance_record_path:
 acceptance_status: not_started
 owner_runtime: testing-layer-runtime
@@ -491,6 +510,7 @@ owner_runtime: testing-layer-runtime
 - `automated_skipped`：记录未执行或不可用的自动化验证，必须包含原因。
 - `manual_required`：记录 testing-layer-runtime 后续负责的人工测试、真实设备测试、服务器/云端验证、外部能力验证、最终验收或上线前验证。
 - `coverage`：记录自动化结果覆盖到的需求、任务、Capability、接口、权限、状态流或业务流程。
+- `frontend_contract_validation_summary`：UI/UX 适用时按 `frontend-experience-execution.md` 记录实际消费的设计合同与资产 revision、自动化证据、待人工项和未解决偏差；存在 `unresolved_mismatch` 时不得进入 `ready_for_local_test`。
 - `formal_acceptance_record_path`：只引用 Planning 已创建的正式验收记录路径。
 - `acceptance_status` 固定为 `not_started`，`owner_runtime` 固定为 `testing-layer-runtime`；Long 不得据此写入正式验收记录。
 
@@ -551,6 +571,7 @@ implementation_done
 + function_unit_tests_passed
 + business_unit_tests_passed
 + contract_validation_passed
++ frontend_contract_validation_passed_or_not_applicable
 + execution_constraint_validation_passed
 + minimum_capability_validation_passed_or_blocked
 + automated_validation_recorded
@@ -827,6 +848,7 @@ runtime_cleanup != delete_runtime_history
 | 拓扑 | `system-topology.md` |
 | 验证证据 | `validation-gates.md` |
 | Planning Handoff Intake 与执行前门禁 | `landing-checklist-preflight.md` |
+| UI/UX 合同消费、偏差停止与验证 | `frontend-experience-execution.md` |
 
 其他文件只能引用这些规则，不能重新定义。
 

@@ -94,6 +94,7 @@ INVALIDATED -> DONE
 - 当前 TASK 位于 `execute_only`、`resume_only` 或 `reexecute_affected_part`，且 contract revision 与 Handoff 一致。
 - 实现承接策略已确认，稳定业务命名与禁止命名已记录。
 - 当前 TASK 的实现合同完整，参数状态无 `blocking_open`。
+- UI TASK 的 Frontend Contract Intake 与 Per-Task Frontend Binding Gate 已通过，精确 Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision 可解析。
 - 涉及依赖变更时 Dependency Governance Gate 已通过。
 
 ### WAITING_VALIDATION
@@ -225,6 +226,15 @@ Static Task Definition 只包含静态字段。
 - 参数合同状态：
 - 明确委托的技术参数：
 - 是否涉及依赖变更：
+- Frontend Contract Binding Source（UI TASK）：
+- Design Document Path（UI TASK）：
+- Prompt Refs（UI TASK）：
+- PAGE Contract Refs（UI TASK）：
+- UI-MOD Contract Refs（UI TASK）：
+- UX-SCN Contract Refs（UI TASK）：
+- Confirmed Asset Refs（UI TASK）：
+- Frontend Consistency TEST Refs（UI TASK）：
+- Frontend Contract Status（UI TASK）：
 ```
 
 字段规则：
@@ -238,6 +248,8 @@ Static Task Definition 只包含静态字段。
 - 禁止实现命名必须列出本任务不可出现的期次/阶段/Sprint/版本/追踪 ID 命名模式。
 - 参数合同状态记录适用参数是否均为 `confirmed`、`explicitly_delegated` 或 `not_applicable`。
 - 明确委托的技术参数只记录 Planning 明确委托给执行层的参数。
+- UI TASK 的前端字段必须从 13 TASK binding 与 Handoff `frontend_experience_binding` 精确解析，ID 和 revision 必须一致；非 UI TASK 全部标记 `not_applicable`，不得复制空占位合同。
+- Frontend Contract Status 只允许 `passed`、`blocked`、`not_applicable`；`blocked` 时不得进入 `IN_PROGRESS`。
 
 ### Current Task State Table
 

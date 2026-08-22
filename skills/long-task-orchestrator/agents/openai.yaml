@@ -1,4 +1,4 @@
 interface:
   display_name: "Long Task Orchestrator"
-  short_description: "Run constrained dev, validation, and patches."
-  default_prompt: "Use $long-task-orchestrator only after a valid initial or incremental execution_ready Planning Handoff. Validate baseline/change revisions, execute only the permitted incremental queues, preserve completed and unaffected work, and hand off automated evidence without creating or writing the formal acceptance record."
+  short_description: "Run contract-bound dev, UI/UX, validation, and patches."
+  default_prompt: "Use $long-task-orchestrator only after a valid initial or incremental execution_ready Planning Handoff. Validate baseline/change revisions and, for UI tasks, resolve the exact Prompt, PAGE, UX-SCN, ASSET revisions before implementation. Execute only permitted queues, stop on design drift, preserve unaffected work, and hand off automated and manual-required evidence without writing the formal acceptance record."

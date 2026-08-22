@@ -179,13 +179,36 @@ active_change:
   decision_ref:
 
 document_assembly:
+  batch_revision:
   planned_roles:
     - <本期计划装配的职责名>
+  draft_generation_status:
   generated_documents:
     - role:
       path:
-      status:
-  current_document:
+      draft_revision:
+      document_status:
+  confirmation_queue:
+    - role:
+      path:
+      draft_revision:
+      confirmation_status:
+  current_confirmation:
+    role:
+    path:
+    draft_revision:
+  generation_blocker:
+    owning_role:
+    unresolved_item_ref:
+    resume_condition:
+  design_asset_collection:
+    design_document_path:
+    collection_revision:
+    asset_kind:
+    collection_status:
+    active_batch_id:
+    active_prompt_refs: []
+    active_asset_refs: []
   assembly_status:
 
 active_interaction:
@@ -220,6 +243,7 @@ planning_status:
 ```text
 document
 discovery_question
+design_asset_batch
 execution_handoff_decision
 final_summary
 scope_change_decision
@@ -228,8 +252,9 @@ scope_change_decision
 `stage` 至少支持：
 
 ```text
-pre_generation_confirmation
 discovery_answer
+design_asset_generation_request
+design_asset_review_confirmation
 draft_confirmation
 execution_handoff_confirmation
 final_summary_confirmation
@@ -287,8 +312,18 @@ planning_handoff_complete
 - 已确认延期需求的正文只进入 `<requirement_pool_path>`；`relevant_requirement_pool_refs` 只记录 `POOL-ID`，不得复制需求池正文。
 - `execution_handoff_decision` 只保存恢复分支所需的最小镜像：`requires_execution_handoff` 只允许 `true | false`，`handoff_type` 只允许 `execution_ready | planning_only`，`decision_status` 只允许 `candidate | confirmed`；`decision_basis` 只写存在或不存在后续工程任务的原因，`decision_source` 只允许实际使用的 `user_confirmation`、`confirmed_planning_context`、`document_assembly_requirement`。
 - Planning Conversation 中已确认的 Planning Context 是 `execution_handoff_decision` 的权威语义来源；本文件只是短期恢复镜像，不是第二套 Planning Context、业务 SoT、完整对话或推理记录。
-- `document_assembly.planned_roles` 只记录本期计划装配的职责，不预造文件路径；`generated_documents` 只加入已经真实生成的本期文档及其 `role / path / status`，路径必须真实存在；不得复制正式文档正文、完整 `assembled_documents` 或 Handoff Package。
-- `document_assembly` 只保存 `planned_roles`、已经真实生成的 `generated_documents`、`current_document` 与 `assembly_status`，用于恢复当前装配进度，不替代正式 `assembled_documents` 或 Document Assembly Plan。
+- `document_assembly.planned_roles` 只记录本期计划装配的职责，不预造文件路径；`generated_documents` 只加入已经真实生成的本期草案及其 `role / path / draft_revision / document_status`，路径必须真实存在。每生成或重建一份草案后立即更新，不得等整批结束再补记。
+- `batch_revision` 标识当前整批草案集合；`draft_generation_status` 只允许 `pending`、`generating`、`generated`、`blocked`、`invalidated`。
+- `generated_documents[].document_status` 只允许 `draft`、`confirmed`、`reopened`、`invalidated`；`confirmation_queue[].confirmation_status` 只允许 `pending_confirmation`、`awaiting_feedback`、`confirmed`、`reopened`、`invalidated`。
+- `confirmation_queue` 只能在当前批次所有计划草案真实生成且跨文档草案校验完成后激活；`current_confirmation` 每次只指向一个真实路径和 draft revision。批量生成中不得创建文档确认交互目标。
+- `generation_blocker` 只在 `draft_generation_status: blocked` 时保存 owning role、指向 Discovery `unresolved_items` 的引用与恢复条件；解除后清空，不得复制问题正文或用户回答。
+- `design_asset_collection` 仅在 05 当前确认项需要用户提供设计图时出现。`asset_kind` 只允许 `ui | ux`；`collection_status` 只允许 `prompt_ready | awaiting_assets | reviewing_assets | complete | blocked`；`active_prompt_refs` 与 `active_asset_refs` 只保存 05 中的精确 ID@revision，不复制 Prompt 正文或图片内容。
+- 给用户输出 UI/UX Prompt 前，必须先把 `target_type: design_asset_batch`、当前 `active_batch_id`、`stage: design_asset_generation_request`、Prompt/ASSET revision 与预期动作持久化；收到图片后先记录 `latest_feedback`，再把实际文件或外部引用写回 05 ASSET。
+- 请求用户确认已收到图片前，必须把同一批次切换为 `stage: design_asset_review_confirmation`；确认只作用于该批次实际收到的 ASSET revision，不得同时确认 05 文档或其他图片。
+- `design_asset_collection` 是短期恢复指针；完整 Prompt、资产路径、状态、确认来源和覆盖范围仍只写在 05。UI/UX 图收集不得创建第二份设计资产清单、出图日志或独立 Runtime。
+- `assembly_status` 只允许 `batch_assembling`、`awaiting_confirmation`、`confirming`、`rebuilding`、`blocked`、`complete`；它描述当前批次所处动作，不替代每份草案和队列项状态。
+- 用户纠正上游事实后，只把真实受影响的草案标记 `reopened` 或 `invalidated` 并提升其 draft revision；未受影响的已确认项保持 `confirmed`。
+- `document_assembly` 只保存批次、职责、草案真实路径与 revision、生成状态、确认队列、当前确认对象和装配状态，用于恢复当前进度；不得复制正式文档正文、完整 `assembled_documents`、Document Assembly Plan 或 Handoff Package。
 - `planning_execution_baseline_reference` 只在执行基线冻结后保存 `phase_id / revision` 的最小恢复引用；完整 Baseline 正文只存在于 13。
 - `active_change` 只保存当前 `change_revision / admission_result / change_status / decision_ref`；`decision_ref` 必须使用 `<phase_planning_runtime_directory>/decision-log.md#decision_id=<DEC-ID>` 精确指向本期既有 Change Set Decision Snapshot。该 Snapshot 同时承载完整 Change Set 与按 08 格式生成的 Recovery Output；不得在 `current-interaction.yaml` 复制它们、Baseline、TASK 或执行事实。
 - `change_status` 只允许 `candidate`、`confirmed`、`applied_to_planning`、`handoff_prepared`、`closed`、`superseded`。新变化到达时不得直接覆盖尚未关闭的 `active_change`。
@@ -297,6 +332,7 @@ planning_handoff_complete
 - Discovery 发问前的唯一绑定格式为 `target_type: discovery_question`、`target_id: <DQ-ID>`、`stage: discovery_answer`、`version: <当前 checkpoint revision>`；`latest_feedback.target_id` 必须复制同一 `DQ-ID`。
 - 向用户发出任何会影响流程状态的确认问题前，必须先写完整 `active_interaction`；不得等用户回复后再从聊天记忆推断确认对象。
 - 文档确认时，`target_id` 使用真实文档路径。
+- 设计资产生成请求使用 `target_type: design_asset_batch`、`target_id: <active_batch_id>`、`stage: design_asset_generation_request`；视觉确认使用同一 target 和 `stage: design_asset_review_confirmation`。用户提供图片不自动等于视觉确认。
 - 执行交接分支确认固定使用 `target_type: execution_handoff_decision`、`target_id: current_phase_execution_handoff_decision`、`stage: execution_handoff_confirmation`；必须先写入候选镜像和该交互目标，再向用户发问。
 - 最终总结确认固定使用 `target_type: final_summary`、`target_id: current_phase_final_summary`、`stage: final_summary_confirmation`；不得把最终总结伪装成正式文档，也不得新增最终总结 SoT 文件。
 - `feedback_id` 在本期内唯一；同一 `feedback_id` 只能成功应用一次。
@@ -896,6 +932,8 @@ cleanup
 
 `05-前端页面与UI/UX交互设计.md` 可以兼容旧文件路径 `05-前端页面与UI交互设计.md`，但正文标题和职责必须使用“UI/UX交互设计”。
 
+本节维护 Planning ID 与既有 05 基础格式；copy-ready Prompt、页面/模块实现合同、UX 状态迁移、版本化资产、Manifest、Handoff 精确绑定和执行门禁的完整唯一格式见 `11-planning-ui-ux-execution-contract.md`。涉及 UI TASK 时两者同时适用，发生格式简略与执行合同冲突时以 11 的更严格字段为准。
+
 05 必须区分：
 
 - 交互合同确认：页面承接的 SCN、页面状态、主次操作、禁用操作、异常恢复和旧入口处理。
@@ -921,22 +959,38 @@ Handoff 的前端体验绑定使用以下唯一子格式，不复制 05、09、1
 ```yaml
 frontend_experience_binding:
   applicable:
+  design_document_path:
+  design_contract_version:
+  design_manifest_ref:
   baseline_source:
   style_mode:
   reference_pages: []
   required_existing_components: []
   allowed_extensions: []
   prohibited_redefinitions: []
-  confirmed_design_assets: []
+  prompt_refs: []
+  page_contract_refs: []
+  module_contract_refs: []
+  interaction_contract_refs: []
+  confirmed_design_assets:
+    - id:
+      revision:
+      path_or_url:
+      status: visual_confirmed
   consistency_tests: []
 ```
 
 - 存在 UI TASK 或前端体验变化时 `applicable: true` 且所有适用字段必填；否则为 `false`，其余字段为空或省略。
 - `style_mode` 必须等于 05 的 `style_inheritance_decision.mode`；`baseline_source` 引用当前前端体验基线或已确认替换目标。
-- `confirmed_design_assets` 只能引用真实存在且已 `visual_confirmed` 的资产；`consistency_tests` 只引用 11 中相关 TEST-ID。
+- `design_document_path` 必须是 05 的真实路径；`design_contract_version` 固定为 `ui-ux-execution/v1`；`design_manifest_ref` 必须解析到 05 的唯一 Manifest。
+- `prompt_refs`、`page_contract_refs`、`module_contract_refs` 与 `interaction_contract_refs` 必须同时携带 ID、revision 和 05 内锚点；不得只给编号或聊天上下文。
+- `confirmed_design_assets` 只能引用真实存在且已 `visual_confirmed` 的同 revision 资产，并携带真实路径或外部引用；`consistency_tests` 只引用 11 中相关 TEST-ID。
 - `required_existing_components` 要求优先复用现有组件；`allowed_extensions` 只列允许新增部分；`prohibited_redefinitions` 禁止重写全局导航、主题、公共组件和未受影响页面。
+- `frontend_experience_binding` 与 05 `design_delivery_manifest`、13 `frontend_contract_binding` 的路径、ID 和 revision 必须一致；任何不一致都阻断 UI TASK Ready。
 
 ### PROMPT-STYLE-XXX：<全局风格统一性提示词>
+
+所有 PROMPT 必须先按 `11-planning-ui-ux-execution-contract.md` 填写 `prompt_revision`、`prompt_type`、`target_tool`、`language`、`reference_inputs`、`output_spec`、`required_constraints`、`negative_constraints` 与 fenced `prompt_body`。以下各节只补充不同 Prompt 类型的语义要求。
 
 必须覆盖：
 
@@ -985,6 +1039,9 @@ PROMPT-PAGE-<DOMAIN>-<SEQ>
 - 失败后的恢复或退出
 - 继承的全局风格要求
 - 完整页面生成要求
+- 目标工具或 `tool_agnostic`、参考资产 revision、视口、画幅、分辨率与帧数
+- 可直接复制且无需依赖聊天上下文的完整 `prompt_body`
+- 明确的 required constraints 与 negative constraints
 
 规则：
 
@@ -992,6 +1049,7 @@ PROMPT-PAGE-<DOMAIN>-<SEQ>
 - 每个 PAGE 必须定义合法进入条件。
 - 每个 UI STATE 只能有 0 或 1 个主操作。
 - 05 不得借页面设计改变 FLOW、资格、状态语义或权限规则。
+- 每个进入 UI TASK 的 PAGE 还必须提供 `11-planning-ui-ux-execution-contract.md` 定义的 UI Implementation Contract，覆盖 design token、布局、响应式、组件、全部适用状态、内容边界、无障碍、动效反馈和实现验收断言。
 
 ### UI-MOD-XXX：<局部模块名称>
 
@@ -1028,12 +1086,14 @@ PROMPT-MODULE-<DOMAIN>-<SEQ>
 - 必须保持的全局风格
 - 禁止重画整页
 - 禁止新增未确认业务动作
+- 目标工具或 `tool_agnostic`、参考资产 revision、局部输出画幅与完整 `prompt_body`
 
 规则：
 
 - 不是每个技术 MODULE 都必须生成 UI 图。
 - 只有用户可见的页面或局部交互模块才需要 UI 设计资产。
 - 先有页面整体设计，再补局部模块设计。
+- 进入 UI TASK 的 UI-MOD 必须使用与 PAGE 相同的 UI Implementation Contract 字段集，并将布局、状态、资产和验收范围限定到所属 PAGE 的指定局部区域。
 
 ### UX-SCN-XXX：<UX交互场景名称>
 
@@ -1056,6 +1116,8 @@ UX 必须优先复用已收到的页面图和模块图。
 - 成功结果
 - 失败、重试、取消、返回与人工协助路径
 - 已有 UI 图是否足以表达
+- `contract_revision`
+- From UI state、Trigger、Preconditions、Domain/API intent、Pending feedback、Success/Failure UI state、Recovery/Retry、Cancel/Back、Forbidden actions 与 Visible evidence 的逐步状态迁移表
 
 UX 图状态只允许：
 
@@ -1076,6 +1138,8 @@ superseded
 - 旧入口迁移后的用户路径不清楚。
 
 PROMPT-UX 必须生成多帧交互设计图，或带页面缩略图、箭头、状态说明的交互流程图。PROMPT-UX 不得重新设计页面视觉风格，不得重写 FLOW、资格、状态语义或权限规则。
+
+PROMPT-UX 还必须按 11 提供目标工具、参考资产 revision、帧数、画幅、分辨率、negative constraints 与完整 `prompt_body`。叙事性流程说明不能替代 UX Interaction Contract。
 
 ### ASSET-XXX
 
@@ -1104,6 +1168,10 @@ PROMPT-UX 必须生成多帧交互设计图，或带页面缩略图、箭头、�
 
 资产路径或引用：
 
+资产 revision：
+
+内容指纹（可获得时）：
+
 资产状态：
 - planned
 - prompt_ready
@@ -1117,6 +1185,10 @@ PROMPT-UX 必须生成多帧交互设计图，或带页面缩略图、箭头、�
 未覆盖项：
 
 确认结论：
+
+用户确认引用（`visual_confirmed` 必填）：
+
+确认时间（`visual_confirmed` 必填）：
 ```
 
 规则：
@@ -1126,13 +1198,16 @@ PROMPT-UX 必须生成多帧交互设计图，或带页面缩略图、箭头、�
 - 设计资产已生成不等于页面已开发、页面已测试、页面已验收或已上线。
 - UI 依赖开发任务只能在所需页面或模块资产达到 `visual_confirmed` 后生成或进入可执行状态。
 - 不依赖 UI 的后续规划文档不应被无故阻塞。
+- 同一资产内容变化必须提升 `asset_revision`；不得在原 revision 下静默替换。
+- `visual_confirmed` 必须携带真实路径或外部引用、revision、用户确认来源和确认时间。
+- Long 只能消费 Handoff 明确列出的 `ASSET-ID@revision`，不得自行选择目录中的最新文件。
 
 覆盖矩阵：
 
 ```markdown
-## FLOW—SCN—MODULE—PAGE—设计资产覆盖矩阵
+## FLOW—SCN—MODULE—PAGE—合同—资产—TEST 覆盖矩阵
 
-| FLOW | SCN | MODULE | PAGE | UI-MOD | UX-SCN | 页面图状态 | 模块图状态 | UX覆盖状态 | 开发前置状态 |
+| FLOW | SCN | MODULE | PAGE / UI-MOD | Prompt ref | UI contract revision | UX-SCN revision | Confirmed asset ref | TEST ref | Execution readiness |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ```
 
@@ -1144,6 +1219,7 @@ PROMPT-UX 必须生成多帧交互设计图，或带页面缩略图、箭头、�
 - 每个 UI STATE 只能有 0 或 1 个主操作。
 - 旧入口必须逐项定义唯一的页面处理方式：`redirect`、`block` 或 `readonly`。
 - 不得同时把“跳转、阻断、只读”写成同一旧入口的并列候选。
+- 每个进入 UI TASK 的行必须有 Prompt revision、UI contract revision、UX contract revision（适用时）、`visual_confirmed` ASSET revision 与 TEST-ID；`Execution readiness` 只允许 `design_ready`、`execution_ready` 或 `blocked:<reason>`。05 首次确认可为 `design_ready`，UI TASK Ready 前必须为 `execution_ready`。
 
 ## 4.10 Data / State Contract Format
 
@@ -1876,6 +1952,7 @@ manual_or_real_environment_required
 关联 PERM：
 关联 CAP：
 关联 PAGE / UI-MOD / UX-SCN：
+关联 Prompt / UI Contract / ASSET revision：
 
 测试目标：
 
@@ -1899,6 +1976,14 @@ manual_or_real_environment_required
 预期接口结果：
 
 预期用户可见结果：
+
+前端合同断言（UI/UX 适用）：
+- 结构与组件层级：
+- 响应式与内容边界：
+- default / loading / empty / error / success / blocked 状态：
+- trigger / pending / success / failure / retry / cancel / back：
+- 键盘、焦点、可访问名称与非颜色提示：
+- 视觉对照 ASSET-ID@revision：
 
 反向 / 禁止路径：
 
@@ -1982,6 +2067,8 @@ manual_or_real_environment_required
 - 若某项测试无法自动化，必须明确原因、真实环境要求和最终验收方式。
 - 自动化测试通过不等于真实环境能力已验收。
 - 视觉评审通过不等于接口、权限、状态与旧流程隔离已证明。
+- UI/UX TEST 必须引用 05 中精确的 PAGE/UI-MOD/UX-SCN/ASSET revision；不得只写“与设计一致”或依赖聊天截图。
+- 能自动化的结构、状态、响应式和交互行为必须标记相应自动化等级；纯视觉差异、真机布局或复杂体验确实不能自动化时，必须写清人工观察步骤、视口/设备、对照 revision 和通过条件。
 - 11 不记录测试命令、测试代码、fixture 脚本、执行调度、重试命令、实际执行状态或实际测试结果。
 
 ## 4.17 Risk / Task / Execution / Acceptance Framework Format
@@ -2293,11 +2380,20 @@ Task Ready Gate：
 - 发现偏差时的回写目标：
 
 前端体验绑定（UI TASK 适用）：
-- 当前前端体验基线：
-- 参考页面：
-- 已确认设计资产：
-- 允许扩展：
-- 禁止重定义：
+
+frontend_contract_binding:
+  design_document_path:
+  design_manifest_ref:
+  baseline_source:
+  reference_pages: []
+  prompt_refs: []
+  page_contract_refs: []
+  module_contract_refs: []
+  interaction_contract_refs: []
+  confirmed_asset_refs: []
+  consistency_test_refs: []
+  allowed_extensions: []
+  prohibited_redefinitions: []
 ```
 
 `contract_status` 只允许 `active`、`completed`、`superseded`、`cancelled`；`relation_to_previous` 只允许 `new`、`unchanged`、`extends`、`replaces`、`supersedes`；`execution_disposition` 只允许 `execute`、`resume`、`reexecute_affected_part`、`context_only`、`completed_locked`、`cancelled`。
@@ -2327,6 +2423,9 @@ Task Ready Gate 必须明确：
 - 会影响业务合同、用户体验、接口语义、数据、状态、权限或验收结果的参数均为 `confirmed` 或 `not_applicable`。
 - 纯技术参数若为 `explicitly_delegated`，已写明决策范围、既有规范、允许边界、验证方式和不可影响的业务结果。
 - 不存在阻断本任务的 `blocking_open`。
+- UI TASK 的 05、Design Manifest、Prompt、PAGE/UI-MOD、UX-SCN、ASSET 和 TEST 精确引用均可解析，且与 Handoff `frontend_experience_binding` 的路径、ID、revision 一致。
+- UI TASK 所需设计资产均为 Handoff 指定的 `visual_confirmed` revision；不得使用未确认或目录中自动发现的更新版本。
+- `scripts/validate_ui_ux_contract.py` 已通过，或脚本不可用时已经完成并记录同等结构与引用校验。
 
 Task Completion Contract 必须明确：
 
@@ -2350,6 +2449,7 @@ Task Completion Contract 必须明确：
 - `explicitly_delegated` 不得只写“实现时决定”。
 - 不得在 TASK 中使用“按实现时决定”“可选 A / B / C”“视情况复用”“后续再看”。
 - Task Completion 不等于最终验收、真实环境能力通过、已发布或 PROJECT-CURRENT-BASELINE 已更新。
+- UI TASK 的 Task Completion Contract 必须要求实现结构、响应式、状态、交互、可访问性和视觉资产一致性验证；合同或确认资产与现有代码冲突时，回写 `design_drift` 或 `planning_gap`，不得由执行层自行重设计。
 
 13 必须显式识别并写明：
 
@@ -2377,8 +2477,10 @@ Task Completion Contract 必须明确：
 唯一顺序：
 
 ```text
-12 已确认
--> 生成 13 草案
+初始批次已生成 13 草案
+-> 13 引用的 01–12 均已依次确认
+-> 轮到 13 confirmation queue 项
+-> 存在 UI TASK 时运行 UI/UX Execution Readiness Gate
 -> Task Contract Gate
 -> Implementation Naming Gate
 -> Implementation Contract Completeness Gate
@@ -2401,7 +2503,7 @@ Task Completion Contract 必须明确：
 - 本顺序只适用于实际装配 13、即 `requires_execution_handoff: true` 的 Planning。
 
 - 不触发“每次只能生成一份正式文档”的限制。
-- 不需要分别进行生成前协作确认。
+- 不进入初始草案批次或独立确认队列。
 - 不需要把 14、15 的独立用户确认作为 Planning 完成前提。
 - 自动生成后只向用户输出简洁说明：已生成执行记录框架与验收框架，当前只预置待填事实位置，不代表开发完成、测试通过、可发布或已发布。
 - 框架状态必须和实际事实状态分离。
@@ -2782,15 +2884,37 @@ PAGE / UI-MOD / UX-SCN：
 异常恢复：
 旧入口处理：
 
+## UI/UX 执行交付清单
+
+design_delivery_manifest：
+
+## 可复制设计提示词
+
+PROMPT-ID@revision：
+target_tool / output_spec / negative_constraints：
+prompt_body：
+
+## 页面实现合同
+
+PAGE / UI-MOD@revision：
+design token / layout / responsive / component / state / content / accessibility / motion / acceptance：
+
+## UX 交互合同
+
+UX-SCN@revision：
+From state / Trigger / Pending / Success / Failure / Retry / Cancel / Back / Forbidden / Evidence：
+
 ## 设计资产索引
 
-ASSET：
+ASSET@revision：
 PROMPT：
 资产状态：
+真实路径或引用：
+用户确认引用：
 
 ## 覆盖矩阵
 
-FLOW—SCN—MODULE—PAGE—设计资产覆盖矩阵
+FLOW—SCN—MODULE—PAGE—合同—资产—TEST 覆盖矩阵
 ```
 
 检查：
@@ -2798,7 +2922,10 @@ FLOW—SCN—MODULE—PAGE—设计资产覆盖矩阵
 - UI进入SoT链路
 - 交互合同与视觉资产分开确认
 - 设计提示词和资产索引可追踪
+- UI TASK 的 Prompt、PAGE/UI-MOD、UX-SCN、ASSET 和 TEST 具备精确 revision 绑定
+- Prompt 有可直接复制的完整 `prompt_body`，页面和 UX 有可执行合同
 - 用户未提供图时，资产只能是 `planned` 或 `prompt_ready`
+- 05 内容与资产闭合时 Manifest 可为 `design_ready`；只有提升为 `execution_ready`、所需资产 `visual_confirmed` 且执行级结构/引用校验通过时 UI TASK 才可 Ready
 - 不得把设计资产状态写成已开发、已测试、已验收或已上线
 
 ### 06-数据模型与状态流转.md

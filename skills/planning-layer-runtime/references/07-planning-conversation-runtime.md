@@ -673,13 +673,15 @@ UI 高风险项：
 规则：
 
 - UI 访谈方法沿用 `00-planning-user-discovery.md`。
-- `07` 只记录 UI 高风险项、待确认项和阻塞范围。
+- 询问前先读取当前前端体验基线、已有页面/路由、design token、共享组件、断点、现有状态模式、设计引用和前端验证能力；目标设计工具或平台公开约束会影响下一问时，先按 Discovery Fact Research Gate 调研并持久化。
+- 本地或公开事实只进入 `research_findings`；用户仍确认业务动作、体验取舍、允许改变范围和资产 revision。
+- `07` 只记录 UI 高风险项、待确认项和阻塞范围，不在 Discovery 中提前生成设计合同。
 
 ### 5.2 03/04/05 逐文档确认重点
 
 以下问题只作为内部确认方向，不得把完整 checklist 扔给用户；默认每轮只问一个最关键问题。
 
-03 生成前使用业务语言确认：
+03 的以下事实必须在第一阶段覆盖，并在第二阶段轮到草案确认时用业务语言核对：
 
 - 用户从哪里进入？
 - 什么条件下能做下一步？
@@ -687,14 +689,14 @@ UI 高风险项：
 - 取消或失败后回哪里？
 - 哪些旧入口用户仍可能访问？
 
-04 生成前使用业务语言确认：
+04 的以下事实必须在第一阶段覆盖，并在第二阶段轮到草案确认时用业务语言核对：
 
 - 这条流程必须依赖哪些能力才能走通？
 - 哪些能力只是协作，不应承担主责任？
 - 哪些旧能力绝不能再参与？
 - 缺少哪个能力时必须阻断？
 
-05 生成前使用业务语言确认：
+05 的以下事实必须在第一阶段覆盖，并在第二阶段轮到草案确认时用业务语言核对：
 
 - 本期最优先要先看到哪些页面？
 - 使用什么端、什么语言、什么视觉气质？
@@ -702,8 +704,10 @@ UI 高风险项：
 - 哪些页面或异常状态必须通过图明确表达？
 - 哪些局部变化需要单独做模块图？
 - 哪些交互现有页面图无法表达，需要后续补 UX 图？
+- 准备交给开发时，目标工具与输出规格是什么，哪些 PAGE/UI-MOD/UX-SCN/ASSET revision 必须锁定？
+- 页面布局、响应式、内容长度、状态反馈、键盘焦点、可访问性和动效中，哪些用户可见取舍仍没有证据或确认？
 
-05 设计确认记录复用既有 `UI_CONFIRMATION` 事件，不新增设计日志、出图日志或 UX Runtime。
+轮到 05 时，若存在必需 UI/UX 图，必须切换到 `10-planning-document-interaction-runtime.md#51-05-design-asset-collection-interaction-gate`：直接交付完整 Prompt、接收并确认 UI 图，再按真实 UI revision 交付并接收必需 UX 图。05 设计确认记录复用既有 `UI_CONFIRMATION` 事件，不新增设计日志、出图日志或 UX Runtime。
 
 ### 5.3 06/07/08 逐文档确认重点
 
@@ -946,9 +950,10 @@ Planning Conversation 已确认目标、范围与成果用途
 -> handoff_type: execution_ready
 -> decision_status: confirmed
 -> 重新评估 Document Assembly Plan
--> 装配 11、12、13 及 TASK 所需上游 SoT
--> 13 三个 Gate
--> 13 确认
+-> 批量生成全部新增或受影响草案并刷新 confirmation_queue
+-> 依次确认新增或 reopened 草案，保留未受影响的已确认状态
+-> 轮到 13 时运行三个 Gate 与适用的 UI/UX Execution Readiness Gate
+-> 确认 13
 -> 派生 14/15
 -> 重建 assembled_documents、handoff_role_mapping 与 Handoff
 ```
@@ -964,10 +969,12 @@ Planning Conversation 已确认目标、范围与成果用途
 ```text
 Planning Context COMPLETE
 -> 进入 Planning Document Mode
--> 按动态装配规则生成并确认所有实际需要的正式文档
+-> 按动态装配与依赖顺序一次性生成全部适用 00–13 草案并持久化 confirmation_queue
+-> 批量草案跨文档校验通过后，依次与用户确认；修正时只重建受影响草案
 -> 所有被 13 引用的上游 SoT 已生成并确认
 -> 12 已确认
--> 生成 13 草案
+-> 轮到已批量生成的 13 草案
+-> 存在 UI TASK 时运行 UI/UX Execution Readiness Gate
 -> Task Contract Gate
 -> Implementation Naming Gate
 -> Implementation Contract Completeness Gate
@@ -1000,7 +1007,8 @@ Planning Context COMPLETE
 ```text
 Planning Context COMPLETE
 -> 进入 Planning Document Mode
--> 按动态装配规则生成并确认所有实际需要的正式文档
+-> 按动态装配与依赖顺序一次性生成全部适用草案并持久化 confirmation_queue
+-> 批量草案跨文档校验通过后，依次与用户确认；修正时只重建受影响草案
 -> 所有实际装配文档均已确认
 -> 汇总实际 assembled_documents
 -> 基于真实路径生成 handoff_role_mapping
@@ -1043,8 +1051,8 @@ deferred_requirement_refs:
   pool_ids: []
 
 # Handoff Package 的完整结构、分支条件和生成规则由本节维护
-# frontend_experience_binding 等复用子格式以 04-planning-format-spec.md 为唯一格式来源
-frontend_experience_binding: <UI 适用时填写完整绑定；不适用时 applicable: false>
+# frontend_experience_binding 的基础字段以 04、执行级精确绑定以 11-planning-ui-ux-execution-contract.md 为格式来源
+frontend_experience_binding: <UI 适用时按 04 + 11 填写真实 05 路径、Manifest、Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision 与 TEST；不适用时 applicable: false>
 
 # 以下字段仅 execution_ready / requires_execution_handoff: true 时生成
 planning_baseline_revision: <Planning Execution Baseline revision>
@@ -1079,6 +1087,8 @@ incremental_execution_contract:
     - 不得把 context_only TASK 当作待执行任务
 
 handoff_role_mapping:
+  - role: UI/UX Design
+    path: <本期实际生成 05 时填写真实路径>
   - role: Capability Governance
     path: <真实已生成路径>
   - role: Test and Acceptance Plan
@@ -1144,6 +1154,7 @@ Handoff.active_change_revision
 - 必须使用实际路径。
 - 必须来自本次 Planning Runtime 的正式输出。
 - 上述 YAML 只表达允许的职责名；实际 Handoff 只能列出本期真实已生成且适用的 role。
+- 本期实际生成 05 时，无论 `planning_only` 还是 `execution_ready`，`handoff_role_mapping` 都必须包含 `UI/UX Design` 的真实路径；未生成 05 时不得输出空占位 role。
 - Handoff 不得包含尚未生成的文档、空占位路径、假设路径或未适用职责。
 - `deferred_requirement_refs` 只在本期新增或引用延期项时出现，只包含真实 `<requirement_pool_path>` 与 `POOL-ID`；不得复制需求摘要、状态或消费规则。
 - `handoff_type: execution_ready` 必须具备 13、14、15、Planning Execution Baseline revision、`execution_constraints` 与 `incremental_execution_contract`，且 Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 与 Execution and Acceptance Framework Derivation Gate 均已通过。
@@ -1151,6 +1162,8 @@ Handoff.active_change_revision
 - `handoff_type: planning_only` 禁止包含 Development Landing Checklist、Execution and Integration Record、Acceptance and Retrospective Record、`planning_baseline_revision`、`active_change_revision`、`execution_constraints` 与 `incremental_execution_contract`；允许包含本期实际生成的 Requirement and Scope、Business Domain、UI/UX Design、Architecture Decision、Capability Governance、Test and Acceptance Plan、Risk, Dependency, and Open Questions 等职责。
 - 只有本期存在并已生成 13 时，Handoff 才可包含 `Development Landing Checklist`、`Execution and Integration Record`、`Acceptance and Retrospective Record`。
 - 只有 14、15 自动派生完成且 Execution and Acceptance Framework Derivation Gate 通过后，才可以写入 `framework_status: planned_and_created`。
+- 存在 UI TASK 时，Handoff 必须包含 `applicable: true` 的完整 `frontend_experience_binding`，并且 05 `design_delivery_manifest`、13 `frontend_contract_binding` 与 Handoff 的设计文档路径、合同版本、Prompt/PAGE/UI-MOD/UX-SCN/ASSET ID 和 revision、TEST-ID 完全一致。
+- Handoff `confirmed_design_assets` 只能列出真实存在、用户已确认且状态为 `visual_confirmed` 的同 revision 资产；缺少路径、确认来源或 revision 时不得准备 execution-ready Handoff。
 - `Execution and Integration Record.framework_status: planned_and_created` 只表示 14 已由 planning skill 创建执行记录框架和待填写位置，不代表实际执行事实。
 - `Acceptance and Retrospective Record.framework_status: planned_and_created` 只表示 15 已由 planning skill 创建验收与复盘框架和待填写位置，不代表实际验收或发布事实。
 - Handoff 只定义 planning skill 的输出事实，不定义或修改任何其他 skill 的内部职责、运行方式或文件维护逻辑。
@@ -1233,9 +1246,10 @@ Document Assembly 原则：
 - Document Assembly 必须显式判断 `requires_execution_handoff`；该值不得只由 S/M/L 决定。
 - Document Assembly Plan 必须直接读取 Planning Context 中 `decision_status: confirmed` 的 `execution_handoff_decision`；不得重新判断或覆盖该结论。
 - Document Assembly Plan 中保存的 `execution_handoff_decision` 必须与 Planning Context 逐字段一致；不一致时不得进入 Planning Document Mode。
-- Document Assembly Plan 生成后，必须把最小装配进度同步到本期 `current-interaction.yaml.document_assembly`；只记录职责、真实已生成文档、当前文档和装配状态，不复制正式装配结果或 Handoff。
+- Document Assembly Plan 生成后，必须把最小装配进度同步到本期 `current-interaction.yaml.document_assembly`；记录 `batch_revision`、职责、每份真实草案路径与 revision、批量生成状态、confirmation queue、当前确认对象和装配状态，不复制正式文档正文、完整装配结果或 Handoff。
 - `requires_execution_handoff: true` 时必须装配 13 并执行 `execution_ready` 分支；`requires_execution_handoff: false` 时不装配 13/14/15 并执行 `planning_only` 分支。
 - 只要装配 13，就必须同时装配并确认 11、12，以及所有被 TASK 引用的上游 SoT。
+- 初始批量生成可以先生成 13 草案以完成全链路引用检查，但 13 必须保持 `草案`，直到确认队列中的上游 SoT 全部确认且 13 的全部 Gate 重新通过。
 - 15 不得作为可独立装配的孤立文档；只能由已确认的 13 连同 14 一起自动派生。
 - `assembled_documents` 只能包含已经真实生成的文档路径，不得伪造路径。
 - `handoff_role_mapping` 只能在所有实际装配文档完成后生成，且必须只使用真实路径。
@@ -1343,25 +1357,26 @@ candidate -> confirmed -> applied_to_planning -> handoff_prepared -> closed
 - 涉及 Priority 时，按 `05-planning-priority-system.md` 执行。
 - 涉及格式、ID、状态、测试范围或下游验证结果引用时，按 `04-planning-format-spec.md` 执行。
 - 正式文档不得口语化。
-- 每次只生成一份正式文档草案。例外：13 确认并回写后，14、15 作为框架对自动派生，不触发“每次只能生成一份正式文档”的限制。
-- 逐文档生成、用户态总结、确认、状态回写、进入下一份文档的完整生命周期，以 `10-planning-document-interaction-runtime.md` 为唯一规则来源。
-- 本文件只保留 Planning Conversation 到 Planning Document Mode 的入口条件和边界，不重复维护逐文档生命周期规则。
+- 按 Document Assembly Plan 和依赖拓扑一次性生成本期全部适用 00–12 与可选 13 草案；每份落盘后立即持久化真实路径和 draft revision，但批量完成前不向用户逐份确认。
+- 批量草案生成完成并通过跨文档草案校验后，再按 confirmation queue 依次输出用户态总结、确认和状态回写；用户纠正只重建受影响下游草案。
+- 批量生成、依次确认、修正重建与进入下一份文档的完整生命周期，以 `10-planning-document-interaction-runtime.md` 为唯一规则来源。
+- 本文件只保留 Planning Conversation 到 Planning Document Mode 的入口条件和边界，不重复维护批量装配与依次确认生命周期规则。
 - `requires_execution_handoff: true` 时，13 确认并回写 `状态: 已确认` 后，Planning Document Mode 必须自动生成 14 和 15 的正式框架，并运行 Execution and Acceptance Framework Derivation Gate；14、15 只预置后续事实填写位置，不填写任何实际执行、验证、验收、真实环境或发布结论。
 - `requires_execution_handoff: false` 时，不生成 13、14、15，不运行实现类 Gate；所有实际装配文档确认后直接准备 `planning_only` Handoff。
-- 14、15 不需要分别进行生成前协作确认，也不需要把独立用户确认作为 Planning 完成前提。
+- 14、15 不进入初始草案批次或独立确认队列，也不需要把独立用户确认作为 Planning 完成前提。
 - 对应分支的正式 Handoff 已基于真实路径准备后，进入 `planning_status: awaiting_final_summary_confirmation`，并按 `10-planning-document-interaction-runtime.md` 输出最终人话总结。此时只说明 Handoff 已准备及其事实边界，不得宣称 Planning 已完成。
 
 ### 10.1 Document Interaction Runtime Handoff
 
-Planning Document Mode 每次只处理一份文档。
+Planning Document Mode 先批量装配全部适用草案，完成后每次只激活 confirmation queue 中的一份文档。
 
-完整步骤、生成前协作确认、生成后人话总结、确认绑定、状态回写和进入下一文档规则，不在本文件重复定义。
+完整步骤、批量草案生成、逐份人话总结、确认绑定、修正传播、状态回写和进入下一文档规则，不在本文件重复定义。
 
 使用本文件执行 Planning Conversation Runtime 时：
 
 - 进入 Planning Document Mode 前，仍必须先满足本文件的 Planning Completion Gate。
-- 进入 Planning Document Mode 后，逐文档生命周期立即切换到 `10-planning-document-interaction-runtime.md`。
-- 本文件不维护逐文档生命周期；若出现重复或冲突，以 `10-planning-document-interaction-runtime.md` 为准，并删除重复规则。
+- 进入 Planning Document Mode 后，批量草案装配与依次确认生命周期立即切换到 `10-planning-document-interaction-runtime.md`。
+- 本文件不维护该生命周期；若出现重复或冲突，以 `10-planning-document-interaction-runtime.md` 为准，并删除重复规则。
 
 ### 10.2 Conversation Continuity Gate
 
@@ -1625,14 +1640,21 @@ Planning Context = INCOMPLETE
 - P0 页面提示词已准备。
 - 关键模块图需求已识别。
 - UX 是否可由现有 UI 图覆盖已明确。
-- 需要出图但尚未收到资产的项已标记，不得伪造已确认。
+- 需要出图的项已按 10 完成 Prompt 用户态交付、图片接收和视觉确认；尚未收到或未确认的项保持明确阻断，不得伪造已确认。
+- `current-interaction.yaml.document_assembly.design_asset_collection.collection_status: complete`，或本期经确认没有必需 UI/UX 图；Prompt 仅写在 05 但未直接提供给用户不算完成。
+- 05 已包含唯一 `design_delivery_manifest`；设计事实和资产闭合时为 `design_ready`，仍缺内容或资产时为 `blocked` 且原因明确，不要求尚未生成的 11、13 或 Handoff 引用。
+- 每个本期设计范围内的 PROMPT 都包含 target tool、参考资产 revision、输出规格、negative constraints 和可直接复制的完整 `prompt_body`。
+- 每个本期设计范围内的 PAGE / UI-MOD 都包含 design token、布局、响应式、组件、状态、内容、无障碍、动效反馈与实现验收断言。
+- 每个关键 UX-SCN 都包含 From state、Trigger、Preconditions、Pending、Success、Failure、Retry、Cancel、Back、Forbidden actions 与 Visible evidence 的状态迁移表。
+- UI/UX 结构校验脚本以 `--allow-design-ready` 或 `--allow-blocked` 通过，或脚本不可用时已逐项完成并记录同等检查。
 
 规则：
 
-- 不满足时，05 的交互合同不得确认。
+- 不满足时，05 不得进入整体文档确认。
 - 涉及该页面的 UI 依赖开发任务不得生成或进入可执行状态。
 - 不依赖 UI 的后续规划文档不应被无故阻塞。
 - `replace_current` 时，受影响页面提示词、模块提示词、UX 提示词和设计资产均已进入重新审查；`inherit_current` 不要求机械重做全局风格提示词。
+- 任一合同引用、revision、真实资产路径或状态迁移不完整时，UI TASK 必须保持 Not Ready；不得让执行层从聊天记录、未确认图片或通用经验补齐。
 
 --------------------------------------------------
 
@@ -1749,6 +1771,27 @@ Planning Context = INCOMPLETE
 
 --------------------------------------------------
 
+### UI/UX Execution Readiness Gate
+
+仅在本期存在 UI TASK、11 已确认且 13 草案已形成时运行；不作为 05 轮到确认时的前置。
+
+检查：
+
+- 05 `design_delivery_manifest.execution_readiness` 已从 `design_ready` 提升为 `execution_ready`，且 `unresolved_design_refs: []`。
+- 每个 UI TASK 引用的 Prompt、PAGE/UI-MOD、UX-SCN 与 ASSET 都携带精确 revision，并能在 05 解析。
+- 所需 ASSET revision 真实存在且为 `visual_confirmed`，包含真实路径/引用、用户确认来源和确认时间。
+- 05 Manifest 的 `consistency_test_refs` 与 11 中适用 UI/UX TEST 一致。
+- 13 `frontend_contract_binding` 与 05 Manifest 的路径、ID、revision 和 TEST 一致。
+- 使用校验脚本的 execution-ready 默认模式通过，或脚本不可用时已逐项完成并记录同等检查。
+
+规则：
+
+- Gate 未通过时，对应 UI TASK 不得通过 Task Contract Gate 或进入 Ready；非 UI TASK 不被无故阻塞。
+- 13 确认并准备正式 Handoff 时，再将 Handoff `frontend_experience_binding` 与 05/11/13 逐项比较；不允许为了提前通过本 Gate 伪造尚未生成的 Handoff。
+- 任何设计内容变化必须提升对应 revision，并按 08 精确失效旧绑定。
+
+--------------------------------------------------
+
 ### Risk / Dependency / Open Item Gate
 
 检查：
@@ -1782,7 +1825,7 @@ Planning Context = INCOMPLETE
 - TASK 不引用不存在、未装配或未确认的 FLOW / STATE / API / PERM / ARCH / CAP / TEST 结论。
 - 每个 TASK 具有合法 `task_revision`；增量 TASK 与前一合同的关系和执行处置明确。
 - 同一 TASK ID 发生合同修订时，`previous_contract_revision` 必须精确指向上一合同 revision，`previous_task_id` 指向自身；跨 TASK 的 `extends / replaces / supersedes` 同时指向前一 TASK 与其合同 revision。
-- UI TASK 已绑定当前前端体验基线、参考页面、设计资产、允许扩展和禁止重定义内容。
+- UI TASK 已通过 UI/UX Execution Readiness Gate，并绑定 05 真实路径、Manifest、Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision、TEST、当前前端体验基线、允许扩展和禁止重定义内容。
 - active Change Set 存在时，未受影响 TASK 按实际状态继续分类：未开始且仍需执行者为 carried-forward pending 并保持 `execute`，正在执行者保持 `resume`，已完成者为 `completed_locked`；只有纯背景项为 `context_only`。
 
 规则：
