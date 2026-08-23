@@ -153,10 +153,10 @@ Recovery Runtime 只允许：
 05 设计资产收集恢复规则：
 
 - 仅从 `design_asset_collection` 恢复当前 `asset_kind / collection_status / active_batch_id`，再读取 05 中对应 Prompt 与 ASSET 正文；不得从压缩摘要猜测用户正在生成 UI 图还是 UX 图。
-- 按 `active_prompt_refs / active_asset_refs` 的持久化顺序恢复当前批次，再从 05 ASSET 的 `image_sequence` 恢复用户态图片序号；批次上限与重发顺序按 10 恢复，用户态格式只按 11 §4.1 渲染。序号缺失、重复或与引用不一致时先阻断并修正 05，不得在恢复时临时重排。
+- 按 `active_prompt_refs / active_asset_refs` 的持久化顺序恢复当前批次，再从 05 ASSET 的 `image_sequence` 恢复用户态图片序号；批次上限与重发顺序按 10 恢复，Prompt 用户态格式按 11 §4.1 渲染，图片确认展示格式按 11 §4.2 渲染。序号缺失、重复或与引用不一致时先阻断并修正 05，不得在恢复时临时重排。
 - `collection_status: prompt_ready` 表示 Prompt 尚未可靠交付：先持久化 `design_asset_generation_request`，再从 05 回读并直接输出完整 `prompt_body`。
 - `collection_status: awaiting_assets` 表示 Prompt 已交付、正在等待图片。恢复时保留已收到资产，只说明仍缺的 ASSET 映射；用户要求重发时从 05 输出同 revision Prompt，不另生成一份。
-- `collection_status: reviewing_assets` 时，必须回读 05 中实际收到的路径、ASSET revision、覆盖状态和 known gaps，恢复 `design_asset_review_confirmation`；不得把“已上传”推断为 `visual_confirmed`。
+- `collection_status: reviewing_assets` 时，必须回读 05 中实际收到的路径、ASSET revision、覆盖状态和 known gaps，恢复 `design_asset_review_confirmation`，再按稳定 `image_sequence` 重新呈现本批全部 `review_pending` 图片后请求确认：当前工具支持图片展示时重新内联展示，不支持时依次恢复绑定当前 revision 的有效直接链接或自主定位信息。不得依赖压缩前的呈现、只恢复文字总结，或把“已上传”推断为 `visual_confirmed`。用户已经明确说明自行找到并确认当前 revisions 时优先应用该反馈并正常推进；只有真实位置或 revision 无法确定、用户无法找到或反馈无法绑定时才请求对应序号的最小补充，不要求用户重传其余有效图片。
 - 收到尚未处理的图片反馈时，先把 `latest_feedback` 应用到原 `design_asset_batch`，再写 ASSET 路径与 `received / review_pending` 状态；不得错误应用到 05 文档确认目标。
 - UI 资产全部确认后才恢复 UX Prompt 交付；PROMPT-UX 必须引用当前 `visual_confirmed` UI revision。若该 UX 已由现有 UI 图充分覆盖，按 05 的 `covered_by_existing_ui_assets` 恢复，不额外索要图片。
 - Prompt、图片或确认 revision 不一致时只使受影响批次和下游草案失效；未受影响且已确认的 UI/UX 资产保持有效。
