@@ -26,7 +26,7 @@ class ManifestVersionGateTests(unittest.TestCase):
             REPOSITORY_ROOT / "scripts/validate-skill-manifest.py",
             self.root / "scripts/validate-skill-manifest.py",
         )
-        self.write_manifest("0.1.0")
+        self.write_manifest("0.1.0", "0.1.0")
         self.write_skill("first\n")
         self.git("init")
         self.git("config", "user.name", "Runtime Skills Test")
@@ -52,10 +52,10 @@ class ManifestVersionGateTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def write_manifest(self, skill_version: str) -> None:
+    def write_manifest(self, skill_version: str, release_version: str) -> None:
         manifest = {
             "schema_version": 1,
-            "release_version": "0.1.0",
+            "release_version": release_version,
             "repository": {
                 "url": "https://github.com/example/runtime-skills",
                 "channel": "stable",
@@ -94,7 +94,12 @@ class ManifestVersionGateTests(unittest.TestCase):
         self.assertEqual(failed.returncode, 1)
         self.assertIn("version did not increase", failed.stderr)
 
-        self.write_manifest("0.1.1")
+        self.write_manifest("0.1.1", "0.1.0")
+        release_not_bumped = self.validate()
+        self.assertEqual(release_not_bumped.returncode, 1)
+        self.assertIn("release_version did not increase", release_not_bumped.stderr)
+
+        self.write_manifest("0.1.1", "0.1.1")
         passed = self.validate()
         self.assertEqual(passed.returncode, 0, passed.stderr)
 

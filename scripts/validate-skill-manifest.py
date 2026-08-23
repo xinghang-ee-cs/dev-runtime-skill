@@ -111,11 +111,20 @@ def validate_repository(root: Path, compare_ref: str | None, release_tag: str | 
         if previous is not None:
             paths = changed_paths(root, compare_ref)
             try:
-                if runtime.parse_semver(str(manifest["release_version"])) < runtime.parse_semver(
-                    str(previous["release_version"])
-                ):
+                current_release = runtime.parse_semver(str(manifest["release_version"]))
+                previous_release = runtime.parse_semver(str(previous["release_version"]))
+                if current_release < previous_release:
                     errors.append(
                         "release_version may not decrease: "
+                        f"{previous['release_version']} -> {manifest['release_version']}"
+                    )
+                managed_content_changed = any(
+                    path.startswith("skills/") or path == "scripts/runtime-skills.py"
+                    for path in paths
+                )
+                if managed_content_changed and current_release <= previous_release:
+                    errors.append(
+                        "managed Skill content changed but release_version did not increase: "
                         f"{previous['release_version']} -> {manifest['release_version']}"
                     )
             except runtime.RuntimeSkillsError as exc:
