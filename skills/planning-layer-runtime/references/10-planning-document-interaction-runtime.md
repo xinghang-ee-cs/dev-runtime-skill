@@ -329,6 +329,7 @@ Read 05 asset plan and exact Prompt revisions
 -> If this batch is partial: keep awaiting_assets, request only missing ASSET refs and wait
 -> When this batch is complete: persist collection_status = reviewing_assets
 -> Persist design_asset_review_confirmation target
+-> Re-read and present every exact current ASSET revision in stable image_sequence order: inline, direct link, or exact self-location information
 -> Explain visible coverage, known gaps and suspected contract mismatches
 -> User confirms or requests correction
 -> On confirm: mark exact UI ASSET revisions visual_confirmed
@@ -357,9 +358,13 @@ Read 05 asset plan and exact Prompt revisions
 视觉确认规则：
 
 - 收到图片不等于确认。AI 先按 PAGE/UI-MOD/UX-SCN 合同检查覆盖状态、布局、主次操作、关键状态和明显冲突，再用人话说明差异并请求用户确认或重做。
+- 请求确认前，必须按 11 §4.2 呈现本批次每个 `review_pending` ASSET revision，并按稳定 `image_sequence` 排序：当前交互工具支持图片展示时直接内联展示实际图片；确认不支持图片展示时优先提供绑定同一 revision、可直接打开的图片链接；链接也不可用时提供足以让用户自行定位当前图片的序号、标题、revision、真实位置和可获得的内容指纹。不得在支持展示时无故降级，也不得只给无法区分版本的模糊文件名或文字总结。
+- 每张图片、回退链接或自主定位信息必须同时给出用户态图片序号、标题、当前资产版本、覆盖范围、known gaps / 疑似合同冲突和 `review_pending` 状态；UX 多帧资产必须按合同定义的帧序逐帧映射。内部路径、ID、revision 与指纹用于精确绑定，不要求用户理解裸 ID。
+- 当前交互工具无法展示图片或生成有效直接链接本身不构成阻断，也不得要求用户切换工具。提供准确定位信息后，允许用户自行找到图片并确认或纠正；只有实际资产缺少可定位的真实位置、当前 revision 无法唯一确定，或用户明确表示无法找到时，才保持 `review_pending` 并请求补充该项。不得以“AI 已读取文件”代替用户查看，也不得因 AI 的呈现能力不足否决用户已经明确完成的自主查看。
+- 在 `design_asset_review_confirmation` 中，用户对当前批次准确 ASSET revisions 的明确确认或纠正是视觉接受结论的优先依据。用户说明已自行找到并查看当前图片后予以确认，必须正常写入 `visual_confirmed` 并推进；用户指出画面不对则按其反馈修订。AI 可以保留并说明合同缺口，但不得用自己的审美判断或展示失败覆盖用户反馈；反馈无法唯一绑定批次或 revision 时只做最小澄清。
 - `visual_confirmed` 只能由绑定当前批次和当前 ASSET revision 的用户确认产生，并写回真实路径/引用、确认来源和时间；一句“确认”不得同时确认图片和 05 文档。
 - 任一必需 UI/UX 图缺失、仍为 `review_pending` 或用户要求重做时，05 不得进入整体文档确认，`design_asset_collection` 保持未完成，相关 UI TASK 不得 Ready。
-- 图片修订必须提升对应 ASSET revision；Prompt 或合同内容变化时同步提升其 revision，并只失效真实依赖旧 revision 的下游草案。
+- 图片修订必须提升对应 ASSET revision，并在再次请求确认前重新展示新 revision 的实际图片、重新提供其直接链接，或更新自主定位信息；旧 revision 的展示、链接、定位信息和确认不得沿用。Prompt 或合同内容变化时同步提升其 revision，并只失效真实依赖旧 revision 的下游草案。
 - 图片修订、批次切换和中断恢复不得重新编号。`design_asset_collection.active_prompt_refs` 与 `active_asset_refs` 按当次展示顺序保存，图片序号的唯一 SoT 仍是 05 ASSET 索引中的 `image_sequence`。
 - 本 Gate 复用 `current-interaction.yaml`、05 ASSET 索引和既有 `UI_CONFIRMATION` 事件；不得新增出图日志、图片确认 Runtime 或第二份设计 SoT。
 
