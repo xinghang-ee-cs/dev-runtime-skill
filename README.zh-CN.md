@@ -4,7 +4,7 @@
 
 这是一套与具体项目无关的 Agent Skills，负责开发规划、实现、测试和代码检查。仓库只保存可复用治理；目标项目的命令、账号、路径和环境事实必须留在目标项目中。
 
-只有 `skills/` 下被选中的目录属于可安装 Skill 包；`AGENTS.md` 是可复用的项目入口模板。`src/`、`public/`、`package*.json`、`astro.config.mjs`、`tsconfig.json` 和文档部署 workflow 只用于构建本仓库的 Astro/Starlight 文档站，不能复制到目标项目。
+只有 `skills/` 下被选中的目录属于可安装 Skill 包；`AGENTS.md` 是可复用的项目入口模板。`src/`、`public/`、`package*.json`、`astro.config.mjs`、`tsconfig.json` 和文档部署 workflow 只用于构建本仓库的 Astro/Starlight 文档站，不能复制到目标项目。`package.json` 的版本属于文档站，不代表任何 Skill 版本。
 
 ## 四个 Skill
 
@@ -30,9 +30,32 @@ planning-layer-runtime
 
 Planning Execution Baseline 冻结后，已接受的需求或合同变化通过追加式 Change Set 和增量 Handoff 流转。Long 只消费被选中的执行队列，Testing 先分类再回流；默认不会重开或重跑整个期次。
 
+## 版本与自动同步
+
+仓库采用两个版本层级：GitHub Release 表示一组经过共同验证的 Skill 快照，每个 Skill 在 [`skills-manifest.json`](skills-manifest.json) 中拥有独立 SemVer。README 和 `SKILL.md` 都不是版本事实源。
+
+安装后，目标项目会得到：
+
+```text
+runtime-skills.lock.json               # 已安装 Release、commit、Skill 版本、目标位置和内容摘要
+.runtime-skills/runtime-skills.py      # 项目内同步入口
+```
+
+把锁文件提交到目标项目 Git。它会把 `.agents/skills/`、`.claude/skills/` 等多个副本绑定到同一 Release，避免不同 Agent 使用新旧混合规则。
+
+每个 Agent 会话第一次使用 Runtime Skill 前运行：
+
+```bash
+python .runtime-skills/runtime-skills.py sync --project .
+```
+
+默认自动安装兼容的补丁更新；次版本和主版本更新只报告差异，等待用户确认。存在本地修改或多平台副本漂移时停止覆盖。活动期次应先 `pin`，保持 Planning、Long 和 Testing 使用同一套规则，期次关闭后再 `unpin`。
+
+完整命令、退出行为和版本升级规则见[版本与更新机制](src/content/docs/reference/versioning-and-updates.md)。
+
 ## 部署到 Agent 项目
 
-不需要用户手动复制文件。只需让 Agent 同时拥有本仓库的读取权限和目标项目的写入权限，然后运行下方初始化 Prompt。
+不需要用户手动复制文件。只需让 Agent 同时拥有本仓库的读取权限和目标项目的写入权限，然后运行下方初始化 Prompt。Agent 应调用同步工具，不再自行维护一套无版本复制逻辑。
 
 用户只需提供目标项目名称、本地路径或仓库地址，以及 Agent 平台和需要安装的 Skill。有足够权限时，Agent 会自行定位项目、完整复制所选 Skill 并完成适配，不要求用户手动搬运或编辑文件。
 
@@ -48,6 +71,9 @@ Planning Execution Baseline 冻结后，已接受的需求或合同变化通过�
 your-project/
 ├── AGENTS.md
 ├── CLAUDE.md                   # 仅 Claude Code 需要
+├── runtime-skills.lock.json
+├── .runtime-skills/
+│   └── runtime-skills.py
 ├── .agents/skills/             # Codex + GitHub Copilot
 │   ├── ai-code-inspection/
 │   ├── planning-layer-runtime/
@@ -83,16 +109,28 @@ Claude Code 不会直接读取 `AGENTS.md`，因此 Agent 会创建或合并这�
 请完整负责本次初始化，不要要求我手动复制、粘贴或编辑安装文件。
 根据我提供的项目名称或地址，在你有权限访问的工作区和仓库中搜索目标项目。只找到一个匹配的本地项目时直接继续；仅在找不到目标、存在多个匹配或权限不足时再询问我。
 写入前自行确认来源是当前 Skill 仓库，目标是搜索到的目标项目。
-从本仓库中只复制 skills/ 下已选择 Skill 的完整目录，并放入该 Agent 平台支持的项目级 Skill 目录。
+运行 scripts/runtime-skills.py install --release latest，从最新稳定 Release 将已选择 Skill 的完整目录放入该 Agent 平台支持的项目级 Skill 目录；同时生成 runtime-skills.lock.json 和项目内同步入口。多个 Agent 平台必须在同一次安装中传入全部目标目录。
 将本仓库 AGENTS.md 中适用的路由与安全规则合并到目标项目的 AGENTS.md，绝不覆盖目标项目已有指令。使用 Claude Code 时，还要创建或合并 CLAUDE.md，使其导入 AGENTS.md。
 不要复制本仓库的 README、src/、public/、package.json、package-lock.json、astro.config.mjs、tsconfig.json、.github/workflows/ 或任何其他文档站文件。
 只扫描目标项目，列出已安装 Skill，并根据该项目的真实事实适配 Skill 自有的稳定环境档案或启动文件。
 在对应 Skill 的进入条件满足前，不要创建任务或期次 Runtime 状态。
 不要修改业务代码，不执行数据库迁移、部署、commit 或 push。
-报告本次复制、合并和初始化的文件；识别出的组件、语言、框架、持久化方案、测试工具、CI workflow 和验证命令；以及仍未确认的事实。
+运行同步工具的 verify，报告安装的 Release、commit、每个 Skill 版本、全部安装位置；本次复制、合并和初始化的文件；识别出的组件、语言、框架、持久化方案、测试工具、CI workflow 和验证命令；以及仍未确认的事实。
 ```
 
 AI 初始化只包括：定位指定目标、安装选中的 Skill 包、合并 Agent 入口指令，以及适配 Skill 自有的环境档案或启动文件。它不代表迁移本仓库，更不会把本仓库的文档站搬进目标项目。
+
+也可以直接从本仓库运行同步工具。例如同时安装给 Codex 和 Claude Code：
+
+```bash
+python scripts/runtime-skills.py install \
+  --release latest \
+  --project /path/to/your-project \
+  --skill planning-layer-runtime \
+  --skill long-task-orchestrator \
+  --destination .agents/skills \
+  --destination .claude/skills
+```
 
 ## 开始使用
 

@@ -46,6 +46,7 @@ export default defineConfig({
           label: '参考',
           items: [
             { label: 'Skill 目录', slug: 'reference/skill-catalog' },
+            { label: '版本与更新机制', slug: 'reference/versioning-and-updates' },
             { label: '编写新教程', slug: 'authoring/writing-tutorials' },
           ],
         },

@@ -32,17 +32,29 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 → 按其路由加载必要资源
 ```
 
-## 3. 安装到外部项目
+## 3. 版本检查、同步与期次锁定
 
-1. 复制所需 Skill 的完整目录并保持内部相对路径不变。
-2. 同时复制 `SKILL.md`、`agents/` 元数据、references、Profiles、模板和必要 Runtime bootstrap 资产；不要只复制单个 `SKILL.md`。
-3. 不复制其他项目已经填写的环境事实或运行状态。`ai-code-inspection` 安装包中的 `assets/runtime-templates/` 只作为初始化源；首次使用时在目标项目根目录创建 `.runtime/ai-code-inspection/`，环境档案从 `uninitialized` 模板开始，运行状态从空闲模板开始。
-4. 目标项目已有 `AGENTS.md` 时合并适用规则，不得直接覆盖。
-5. 根据目标 Agent 平台和项目约定选择项目级 Skill 目录。可能的目录例如但不限于 `.skills/`、`.agents/skills/`、`.claude/skills/`、`.codex/skills/`。
-6. 实际路径由所使用的 Agent 平台和项目约定决定；不得把任一示例目录视为唯一安装方式。
-7. 平台没有固定 Skill 目录时，在目标项目的 `AGENTS.md` 中声明每个 Skill 的真实位置和发现方式。
+- `skills-manifest.json` 是仓库当前版本事实的唯一来源；不得从 `package.json`、README、`SKILL.md` 或文件修改时间推断 Skill 版本。
+- 目标项目必须提交根目录 `runtime-skills.lock.json`。它记录来源 Release、commit、每个 Skill 版本、全部安装位置和内容摘要；不同 Agent 平台不得维护彼此独立的版本事实。
+- 目标项目存在锁文件时，每个 Agent 会话第一次使用任一 Runtime Skill 前，先运行 `python .runtime-skills/runtime-skills.py sync --project .`。同一会话且锁文件未变化时不重复检查。
+- `sync` 只在无本地漂移、无期次锁定且更新为兼容补丁版本时自动更新。次版本或主版本变化必须先展示版本差异并取得用户确认。
+- 任何受管 Skill 或同步工具与锁文件摘要不一致时，停止自动覆盖，先运行 `diff` 并让用户决定保留本地修改还是采用发布版本。
+- 新期次开始前先完成同步，再运行 `pin --reason <期次或任务标识>`。从 Planning 建立期次开始，到 Long、Testing 和期次关闭之间保持同一版本；不得在活动期次中途自动换版。
+- 只有期次已经关闭，或用户明确批准迁移并接受重新校验现有 Runtime/合同后，才运行 `unpin` 并更新。
+- 网络或 GitHub 不可用时，至少运行 `verify`。本地副本全部匹配锁文件时可以继续使用已锁版本，但必须报告没有完成远端更新检查。
 
-## 4. 首次项目初始化
+## 4. 安装到外部项目
+
+1. 优先运行 `scripts/runtime-skills.py install --release latest`，由同步工具从最新稳定 Release 复制完整 Skill 目录、安装目标项目级同步入口并生成锁文件；不要以手工复制作为正常安装流程。只有维护者明确验证未发布内容时才使用 `--source`。
+2. 安装时同时复制 `SKILL.md`、`agents/` 元数据、references、Profiles、模板和必要 Runtime bootstrap 资产；不要只复制单个 `SKILL.md`。
+3. 多平台共用时，在同一次安装中传入全部目标 Skill 根目录。工具必须把所有副本绑定到同一锁文件和同一 Release。
+4. 不复制其他项目已经填写的环境事实或运行状态。`ai-code-inspection` 安装包中的 `assets/runtime-templates/` 只作为初始化源；首次使用时在目标项目根目录创建 `.runtime/ai-code-inspection/`，环境档案从 `uninitialized` 模板开始，运行状态从空闲模板开始。
+5. 目标项目已有 `AGENTS.md` 时合并适用规则，不得直接覆盖。
+6. 根据目标 Agent 平台和项目约定选择项目级 Skill 目录。可能的目录例如但不限于 `.skills/`、`.agents/skills/`、`.claude/skills/`、`.codex/skills/`。
+7. 实际路径由所使用的 Agent 平台和项目约定决定；不得把任一示例目录视为唯一安装方式。
+8. 平台没有固定 Skill 目录时，在目标项目的 `AGENTS.md` 中声明每个 Skill 的真实位置和发现方式。
+
+## 5. 首次项目初始化
 
 Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行：
 
@@ -61,7 +73,7 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 
 初始化只使用当前仓库证据和用户明确提供的约束。不得从 Skill 示例或其他项目推断技术栈；不得默认使用 Vue、React、NestJS、Prisma、TypeScript、某个 package manager、测试命令或数据库迁移命令。无法可靠确认的事实保持未确认并报告。
 
-## 5. Skill 选择规则
+## 6. Skill 选择规则
 
 ```text
 用户请求
@@ -82,7 +94,7 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 - 不让发布流程代替日常代码检查。
 - 必要时按 `planning → implementation → testing → 项目发布/安全流程` 顺序切换；每个阶段只保留一个主治理 Skill，完成明确 handoff 后再切换。
 
-## 6. 项目适配原则
+## 7. 项目适配原则
 
 通用 Skill 源文件不得存放目标项目的业务参数和长期环境事实。项目特定信息只写入：
 
@@ -93,7 +105,7 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 
 不得把项目名称、业务模块、企业名称、固定端口、固定域名、私有路径、用户名、密钥、真实数据库地址、真实部署环境或单个项目的 package script 回写到通用 Skill 源文件。
 
-## 7. 规则优先级
+## 8. 规则优先级
 
 在不与 Agent 平台或其他更高优先级指令冲突的前提下，仓库内按以下顺序解释：
 
@@ -113,7 +125,7 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 - 技术栈 Profile 不得重新定义场景、范围、授权、问题分类或生命周期。
 - 项目代码与正式契约冲突时，按选中 Skill 定义的事实优先级取证；没有明确依据时不得自行猜测。
 
-## 8. 安全与修改原则
+## 9. 安全与修改原则
 
 - 先识别检查范围与修改范围；读取权限不等于修改权限。
 - 不修改范围外文件，不覆盖或清理用户未提交改动。
@@ -123,14 +135,15 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 - 修改后运行目标项目已有的适用 build、test、lint、typecheck、schema 或契约验证命令。
 - 无法验证时明确报告未执行项、原因和剩余风险。
 
-## 9. 外部用户快速开始
+## 10. 外部用户快速开始
 
-1. 将需要的 Skill 完整复制到项目。
+1. 使用同步工具安装所需 Skill，并把 `runtime-skills.lock.json` 提交到目标项目。
 2. 在项目顶层放置或合并本 `AGENTS.md` 的适用入口规则。
-3. 让 Agent 扫描项目并初始化各已选 Skill 需要的环境档案或 Runtime 目录。
-4. 先运行只读检查验证适配结果。
-5. 确认识别出的技术栈、命令、范围和权限正确。
-6. 再执行明确允许修改的任务。
+3. 运行 `verify`，确认所有 Agent 平台副本与锁文件一致。
+4. 让 Agent 扫描项目并初始化各已选 Skill 需要的环境档案或 Runtime 目录。
+5. 先运行只读检查验证适配结果。
+6. 确认识别出的技术栈、命令、范围和权限正确。
+7. 再执行明确允许修改的任务。
 
 通用示例指令：
 
