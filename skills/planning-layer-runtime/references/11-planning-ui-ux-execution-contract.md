@@ -133,15 +133,28 @@ Prompt 正文必须明确：
 
 ### 4.1 User-Facing Prompt Delivery And Asset Intake
 
-Prompt 写入 05 只是持久化，不等于已经交付给用户。轮到 05 确认时必须：
+Prompt 写入 05 只是持久化，不等于已经交付给用户。批次选择、每批上限、UI/UX 依赖顺序、图片接收、视觉确认和继续条件只按 10 执行，中断恢复只按 08 执行；本节是每条 Prompt 用户态格式与图片序号映射的唯一事实来源。
 
-- 在用户态回复中直接输出完整 fenced `prompt_body`，并同时说明 `PROMPT-ID@revision`、目标工具、输出规格、对应页面/模块/交互和待回传 `ASSET-ID@revision`。
-- 先按同一依赖层批量提供所有必需 STYLE（适用时）、PAGE 与 UI-MOD Prompt，让用户一次生成或提供 UI 图；不得只给文件链接或让用户自己去 05 查找 Prompt。
-- UI 图收到并达到 `visual_confirmed` 后，才允许将其真实路径与 revision 写入 `PROMPT-UX.reference_inputs` 并向用户提供 UX Prompt。需要多帧交互图时，明确帧序、画幅和每帧状态；已有确认 UI 图足以表达时不机械要求额外 UX 图。
+- 主展示必须固定为“序号、`title`、尺寸建议、参考的图片序号、单独 Prompt 文本”，用户无需理解内部 ID 即可复制和回传：
+
+````markdown
+序号：图 01
+title：资料审核页—默认与提交状态
+尺寸建议：桌面端；1440×1024；16:10；2x；4 帧
+参考的图片序号：无
+
+```prompt
+<独立、完整、无需引用聊天上文的 prompt_body>
+```
+````
+
+- `序号` 来自对应 ASSET 的稳定 `image_sequence`，跨批次、恢复与 revision 变化均不得重排；`参考的图片序号` 只引用已真实提供的 ASSET 序号，没有时明确写 `无`。内部 `PROMPT-ID@revision -> ASSET-ID@revision`、目标工具和对应合同继续持久化，并可作为每项末尾的一行追踪信息，但不得取代主展示字段。
+- 批次开头按 10 说明进度，并明确用户可把 Prompt 复制到任意外部生图工具；本格式不得依赖内置 ImageGen、CLI、API Key 或指定供应商。
+- UX Prompt 的“参考的图片序号”必须逐一映射其 `reference_inputs` 中已达到 `visual_confirmed` 的 UI ASSET revision；需要多帧交互图时，Prompt 正文明示帧序、画幅和每帧状态，已有确认 UI 图足以表达时不机械增加 UX 图。
 - 用户可上传自行制作、其他工具生成或既有的 UI/UX 图；Prompt 是方便生成的直接交付，不是接受资产的唯一入口。
-- 用户提供部分资产时保留已收到项，只继续请求缺失项；用户要求调整时仅提升受影响 Prompt、合同和 ASSET revision。
+- 用户按图片序号回传；部分回传、修订与继续行为按 10 处理，且不得改变未受影响 ASSET 的 `image_sequence`。
 
-交互目标、反馈绑定、图片接收、视觉确认和中断恢复以 10 与 08 为准。本节不新增交互 Runtime 或第二份资产状态。
+本节不新增交互 Runtime 或第二份资产状态。
 
 存在必需 UI/UX 图时，只有 `design_asset_collection.collection_status: complete` 且全部对应 ASSET revision 均为 `visual_confirmed`，05 才能通过整体确认；没有必需设计图时必须在 05 明确记录判定依据，不创建空批次。
 
@@ -239,6 +252,7 @@ implementation_acceptance:
 每个 `ASSET` 使用以下字段：
 
 ```yaml
+image_sequence: <本期 05 内唯一且稳定的正整数；用户态显示为图 01>
 asset_revision: <稳定 revision>
 asset_type: <global_style | page_ui | module_ui | ux_interaction>
 asset_status: <planned | prompt_ready | received | review_pending | visual_confirmed | superseded>
@@ -259,6 +273,8 @@ supersedes: <旧 ASSET-ID@revision；不适用时省略>
 
 规则：
 
+- `image_sequence` 是用户态图片映射的唯一序号：同一 ASSET 的所有 revision 保持不变，批次切换、中断恢复、替换或确认顺序变化都不得重编号；新 ASSET 使用本期下一个未占用正整数，已废弃序号不回收。
+- Prompt 展示中的“序号”和“参考的图片序号”必须由 `image_sequence` 渲染。引用图片时仍在内部绑定确切 `ASSET-ID@revision`，不得只保存数字而丢失版本关系。
 - `received` 及以后状态必须有真实路径或外部引用。
 - `source: user_generated` 表示用户使用 Planning 提供的 Prompt 生成后回传；`user_provided` 表示用户直接提供已有图。两者进入执行前都必须经过同一视觉确认。
 - `visual_confirmed` 必须绑定 revision、用户确认来源与确认时间。

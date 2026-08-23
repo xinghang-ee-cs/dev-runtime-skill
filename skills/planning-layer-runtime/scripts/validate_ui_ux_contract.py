@@ -277,6 +277,22 @@ def validate_interactions(text: str, result: ValidationResult) -> dict[str, str]
 def validate_assets(text: str, manifest: str, result: ValidationResult) -> dict[str, str]:
     blocks = extract_heading_blocks(text, r"ASSET-[A-Z0-9-]+")
     result.require(bool(blocks), "no ASSET contract found")
+    seen_sequences: dict[int, str] = {}
+    for asset_id, block in blocks.items():
+        require_fields(asset_id, block, ["image_sequence"], result)
+        sequence_value = extract_yaml_mapping_value(block, "image_sequence")
+        sequence_valid = bool(sequence_value and re.fullmatch(r"[1-9]\d*", sequence_value))
+        result.require(sequence_valid, f"{asset_id}: image_sequence must be a positive integer")
+        if not sequence_valid:
+            continue
+        sequence = int(sequence_value)
+        previous_asset = seen_sequences.get(sequence)
+        result.require(
+            previous_asset is None,
+            f"{asset_id}: duplicate image_sequence {sequence} already used by {previous_asset}",
+        )
+        if previous_asset is None:
+            seen_sequences[sequence] = asset_id
     confirmed_ids = set(re.findall(r"ASSET-[A-Z0-9-]+", manifest))
     for asset_id in confirmed_ids:
         block = blocks.get(asset_id, "")
@@ -287,6 +303,7 @@ def validate_assets(text: str, manifest: str, result: ValidationResult) -> dict[
             asset_id,
             block,
             [
+                "image_sequence",
                 "asset_revision",
                 "asset_type",
                 "asset_status",

@@ -1,4 +1,4 @@
 interface:
   display_name: "规划层运行时"
   short_description: "逐轮持久化发现，交付可执行规划与 UI/UX 合同"
-  default_prompt: "使用 $planning-layer-runtime 先核实项目证据与可查公开事实，逐轮保存需求发现并维护跨期需求池；第一阶段完成后一次性生成全部适用规划草案，再按队列依次确认并定向修正。涉及前端时生成可复制 Prompt、页面实现合同、UX 状态迁移和版本化资产索引；第二阶段轮到设计文档时，直接把完整 UI Prompt 交给用户并收集、确认 UI 图，再基于已确认 UI 版本交付必要的 UX Prompt 并收集、确认 UX 图，最终形成可由 Long 和 Testing 精确消费的 UI/UX Handoff。"
+  default_prompt: "使用 $planning-layer-runtime 先核实项目证据与可查公开事实，逐轮保存需求发现并维护跨期需求池；第一阶段完成后一次性生成全部适用规划草案，再按队列依次确认并定向修正。涉及前端时生成可复制 Prompt、页面实现合同、UX 状态迁移和版本化资产索引；第二阶段轮到设计文档时，每批最多十条，按稳定序号、title、尺寸建议、参考图片序号和独立 Prompt 文本直接交付，用户可使用任意外部生图工具并按序号回传；逐批确认 UI 图后再基于已确认 UI 版本交付必要的 UX Prompt，循环至全部必需资产确认，最终形成可由 Long 和 Testing 精确消费的 UI/UX Handoff。"
