@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "release_version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/xinghang-ee-cs/dev-runtime-skill",
+    "channel": "stable"
+  },
+  "tool": {
+    "version": "0.1.0",
+    "path": "scripts/runtime-skills.py"
+  },
+  "skills": {
+    "ai-code-inspection": {
+      "version": "0.1.0",
+      "path": "skills/ai-code-inspection"
+    },
+    "long-task-orchestrator": {
+      "version": "0.1.0",
+      "path": "skills/long-task-orchestrator"
+    },
+    "planning-layer-runtime": {
+      "version": "0.1.0",
+      "path": "skills/planning-layer-runtime"
+    },
+    "testing-layer-runtime": {
+      "version": "0.1.0",
+      "path": "skills/testing-layer-runtime"
+    }
+  }
+}
