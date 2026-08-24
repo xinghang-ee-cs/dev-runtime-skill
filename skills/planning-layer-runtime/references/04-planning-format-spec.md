@@ -161,6 +161,13 @@ discovery_checkpoint:
       related_requirement_pool_refs: []
   relevant_requirement_pool_refs: []
 
+explanation_adaptation:
+  mode: <plain_language | adaptive | technical_concise>
+  terminology_policy: <explain_first_use | explain_when_ambiguous | concise>
+  source: <safe_default | user_profile | current_discovery | combined>
+  source_refs: []
+  last_reconciled_at:
+
 execution_handoff_decision:
   requires_execution_handoff:
   handoff_type:
@@ -307,6 +314,9 @@ planning_handoff_complete
 - `verified` 只表示来源足以支持客观结论，不等于用户已确认其业务适用性；会改变范围、取舍或验收的结论必须保持 `candidate`，直到用户确认后才转入对应业务事实或 Requirement Pool。
 - 调研发现的延期功能正文只进入 Requirement Pool；`research_findings.related_requirement_pool_refs` 与 `relevant_requirement_pool_refs` 只保存 `POOL-ID`。调研结论不得成为第二份延期需求正文。
 - 用户初始需求必须在第一条实质性业务问题前写入 `initial_intake_summary`；这里只保存结构化短摘要，不保存整段聊天。
+- `explanation_adaptation` 是当前期次的用户态解释快照，不是第二份长期用户画像。进入 Planning Document Mode 前，按“用户当前明确要求 -> 本期 Discovery 表现 -> 无冲突的高置信 `user-profile.yaml` -> `plain_language` 安全默认值”生成；只保存模式、术语策略、最小来源引用和更新时间，不保存原始聊天、心理判断、身份推断或业务正文。
+- `explanation_adaptation.source_refs` 只引用 `user-profile.yaml` 中实际命中的偏好键、当前 Discovery 轮次/事实 ID 或用户当前明确指令的最小引用；不得复制偏好正文或完整反馈。当前表达与长期画像冲突时当前表达优先，本期只更新该快照，长期画像等 Planning 收尾时再按 Interaction Preference Consolidation 处理。
+- `plain_language` 在专业词首次出现时补一句业务解释与实际影响；`adaptive` 只解释首次出现或可能歧义的术语；`technical_concise` 可以直接展示专业字段和值，但仍必须说明业务、开发、测试和上线影响。无法可靠判断时必须使用 `plain_language`。
 - 收到 Discovery 回答后，必须先把 `latest_feedback` 绑定到当时已持久化的 `discovery_question` 并写为 `recorded`，再更新事实与未决项。完成应用后清除 `raw_user_input`，更新 `last_applied_round_id`，回读校验成功后才允许写入下一条问题。
 - `discovery_checkpoint` 是当前期未完成 Planning Context 的最小恢复检查点，不是正式 SoT、Decision Log、完整 Planning Context 副本、访谈历史或研究报告。只保留会改变规划方向、范围、授权、流程或验收的事实、未决项与最小调研结论。
 - 已确认延期需求的正文只进入 `<requirement_pool_path>`；`relevant_requirement_pool_refs` 只记录 `POOL-ID`，不得复制需求池正文。
@@ -1703,6 +1713,9 @@ PROJECT-CURRENT-BASELINE.md
 - 仅用于历史追溯的模块。
 - 本期允许复用的技术基础。
 - 本期禁止复用的旧业务语义。
+- 本期涉及数据库或持久化时，当前数据库基线、现有资料与远程环境的证据状态。
+
+本期涉及数据库或持久化时，09 还必须包含 `13-planning-database-persistence-contract.md#5-second-stage-database-and-persistence-decision-contract` 定义的唯一 `database_persistence_contract`。本文件不复制该结构；数据库合同格式、默认建议、用户画像适配、阻断状态和校验命令均以 13 reference 为准。
 
 ARCH 决策记录最小格式：
 
@@ -2990,6 +3003,10 @@ PERM-ID：
 ### 09-架构设计与关键决策.md
 
 ```markdown
+## 数据库与持久化决策合同（适用时）
+
+使用 13-planning-database-persistence-contract.md 定义的 database_persistence_contract 完整结构。
+
 ## Canonical Contract—Architecture Binding
 
 | FLOW | MODULE | STATE / EVENT | Canonical API | 目标逻辑承接层 | 可复用技术基础 | 禁止复用旧语义 | 旧流程切断位置 | 关联 CAP | 下游 TASK |
@@ -3007,6 +3024,7 @@ PERM-ID：
 - 每条 P0 FLOW 都有逻辑架构承接位置。
 - 每个 Canonical API Contract 都有 Architecture Binding。
 - 允许复用的技术基础与禁止复用的旧业务语义必须分开写。
+- 涉及数据库或持久化时，数据库合同必须通过对应确定性校验；阻断草案不得伪装成可执行结论。
 - 旧审批、旧入口、旧状态无法进入新 Command、新 State 或新 Decision View。
 - 外部能力未完成 10 选型时，只能定义能力端口和边界，不得确认具体 Provider。
 - 09 只移交架构风险给 12，不重复定义正式 RISK。

@@ -53,6 +53,30 @@ python .runtime-skills/runtime-skills.py sync --project .
 
 完整命令、退出行为和版本升级规则见[版本与更新机制](src/content/docs/reference/versioning-and-updates.md)。
 
+### Release Tag 与可直接使用的迁移/更新 Prompt
+
+稳定 GitHub Release 的 Tag 统一采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`，例如 `v0.2.0`。这个 Tag 标识一组经过共同验证的仓库快照；快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 可跟随最新稳定 Release；目标项目需要复现固定版本时，使用 `v0.2.0` 这类精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
+
+把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”和“旧版无锁副本的迁移”。原样使用时更新到最新稳定 Release；需要固定版本时，在消息末尾补充类似 `目标 Release：v0.2.0` 即可。
+
+```text
+请在当前项目中接管或更新 Runtime Skills。
+
+来源仓库：https://github.com/xinghang-ee-cs/dev-runtime-skill
+目标 Release：最新稳定版；如果我另外给出 vMAJOR.MINOR.PATCH 格式的 Tag，则以该精确 Tag 为准。
+
+请从检查到验证完整负责本次操作。只把当前项目根目录视为目标，不要要求我手动搬运或编辑文件。
+
+1. 检查 runtime-skills.lock.json、.runtime-skills/runtime-skills.py、AGENTS.md、CLAUDE.md，以及 .agents/skills/、.claude/skills/、.github/skills/ 等受支持的项目级 Skill 目录。识别当前已有的 Runtime Skill、所有副本位置、正在使用的 Agent 平台、本地 Git 改动和活动期次锁定；不要扫描无关项目。
+2. 只要锁文件存在，就按“受管安装”处理，即使项目内同步入口或某个受管副本已经缺失。同步入口正常时，先执行 verify 和远端 status，再对目标 Release 执行 diff；入口缺失或 verify 报告漂移时，从锁定或目标 Release 临时取得可信同步工具做诊断，不得把项目误判为无版本安装，也不得未经同意修复。存在活动期次锁定时，不更新、不绕过锁定，只报告当前版本并延后更新。兼容的修订版本更新通过 sync 执行；遇到次版本或主版本变化时，先汇总目标 Release、各 Skill 版本、增加/修改/删除的文件以及兼容性影响，得到我的明确确认后，才使用所需的 --allow 级别执行 update。
+3. 如果已有 Runtime Skill 目录但没有锁文件，按“无版本旧副本”处理。从来源仓库把目标稳定 Release 临时取到本机；根据现有目录准确识别 Skill 名称和目标根目录，不自行增删 Skill。先不带 --overwrite-local-changes 执行一次 install，让工具列出将增加、修改和删除的内容；把差异展示给我，并等待我明确同意。得到同意后，才能带 --overwrite-local-changes 重新执行，以采用该 Release、生成 runtime-skills.lock.json 并安装 .runtime-skills/runtime-skills.py。
+4. 如果既没有受管安装，也没有旧版 Runtime Skill 副本，停止更新并说明这是首次安装；只询问当前项目无法判断的 Agent 平台或 Skill 选择，然后按来源仓库的首次安装流程执行。
+5. 保留项目自己的全部指令。只把适用的路由和安全规则合并进 AGENTS.md；使用 Claude Code 时继续维护 CLAUDE.md 的导入，绝不整体覆盖这两个文件。不得静默覆盖 Skill 本地修改，不得混用不同 Release 的副本，不得降级 Skill，不得暴露凭证，也不要修改业务代码、执行数据库迁移、部署、commit 或 push。
+6. 经我确认并完成迁移或更新后，执行 verify。报告原 Release 和 Skill 版本 -> 当前 Release 和 Skill 版本、全部实际安装位置、锁文件状态、期次锁定状态、合并过的指令文件，以及仍未解决的漂移或待决事项。如果远端不可用，明确区分“本地校验通过”和“已成功检查最新版本”。
+```
+
+对已受管项目执行精确版本更新时，同步命令可以直接接收 Release Tag，例如 `--release v0.2.0`。尚未发布为 GitHub Release 的 Tag 不能作为稳定更新来源。
+
 ## 部署到 Agent 项目
 
 不需要用户手动复制文件。只需让 Agent 同时拥有本仓库的读取权限和目标项目的写入权限，然后运行下方初始化 Prompt。Agent 应调用同步工具，不再自行维护一套无版本复制逻辑。

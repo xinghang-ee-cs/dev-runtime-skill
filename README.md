@@ -53,6 +53,30 @@ Compatible patch updates are applied automatically by default. Minor and major u
 
 See [Versioning and updates](src/content/docs/reference/versioning-and-updates.md) for the full command and release policy.
 
+### Release tags and a copy-ready migration/update prompt
+
+Stable GitHub Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.2.0`. The tag identifies the jointly validated repository bundle; the versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release or an exact tag such as `v0.2.0` when the target project must reproduce a specific bundle. After installation, `runtime-skills.lock.json` records what that project actually uses.
+
+Paste the following prompt directly into the Agent that is working in the target project. It handles both an existing managed installation and an older unversioned copy. It uses the latest stable Release as-is; append an exact target such as `Target Release: v0.2.0` when required.
+
+```text
+Adopt or update Runtime Skills in the current project.
+
+Source repository: https://github.com/xinghang-ee-cs/dev-runtime-skill
+Target Release: latest stable, unless I explicitly provide a vMAJOR.MINOR.PATCH tag.
+
+Take responsibility for the workflow from inspection through verification. Treat the current project root as the only target; do not ask me to move or edit files manually.
+
+1. Inspect runtime-skills.lock.json, .runtime-skills/runtime-skills.py, AGENTS.md, CLAUDE.md, and supported project-level Skill roots such as .agents/skills/, .claude/skills/, and .github/skills/. Identify the currently installed Runtime Skills, every destination copy, the Agent platforms in use, local Git changes, and any active phase pin. Do not scan unrelated projects.
+2. If the lock file exists, treat this as a managed installation even when the project-local synchronization entry point or a managed copy is missing. When the entry point is healthy, first run verify and remote status, then run diff against the requested Release. When it is missing or verify reports drift, use a temporary trusted copy of the tool from the locked/requested Release to diagnose it; do not reclassify the project as an unmanaged installation or repair it without approval. If an active phase is pinned, do not update or bypass the pin; report the installed version and defer the update. Apply a compatible patch through sync. For a minor or major change, summarize the affected Release, Skill versions, added/modified/removed files, and compatibility impact, then wait for my explicit confirmation before running update with the required --allow level.
+3. If Runtime Skill directories exist without a lock file, treat them as unmanaged legacy copies. Obtain the requested stable Release from the source repository in a temporary location. Infer the exact existing Skill names and destination roots without adding or removing Skills. Run the install command once without --overwrite-local-changes so the tool reports the incoming additions, modifications, and removals. Show that comparison and wait for my explicit approval before rerunning with --overwrite-local-changes to adopt the Release, create runtime-skills.lock.json, and install .runtime-skills/runtime-skills.py.
+4. If neither a managed installation nor legacy Runtime Skill copies exist, stop and tell me this is a first installation; ask only for any Agent platform or Skill selection that cannot be determined from the current project, then use the repository's installation flow.
+5. Preserve all project-specific instructions. Merge only applicable routing and safety rules into AGENTS.md, and maintain the CLAUDE.md import when Claude Code is used. Never replace either file wholesale. Never silently overwrite local Skill changes, mix copies from different Releases, downgrade a Skill, expose credentials, modify business code, run database migrations, deploy, commit, or push.
+6. After an approved migration or update, run verify. Report the previous Release and Skill versions -> installed Release and Skill versions, the exact destinations, lock-file state, phase-pin state, merged instruction files, and any unresolved drift or decisions. If remote access is unavailable, say so and distinguish local verification from a successful latest-version check.
+```
+
+For an exact managed update, the synchronization commands accept the Release tag directly, for example `--release v0.2.0`. Do not use a tag that has not been published as a GitHub Release.
+
 ## Install in an Agent project
 
 No manual file copying is required. Give the Agent read access to this repository and write access to the target project, then run the initialization prompt below. The Agent should invoke the synchronization tool instead of maintaining an unversioned copy workflow.
