@@ -10,6 +10,7 @@
 - Incremental Discovery Persistence
 - Discovery Fact Research
 - Functional Supplement Discovery
+- Guided Data And Persistence Discovery
 - Requirement Pool Intake Support
 - Project Current State Discovery
 - Business Discovery
@@ -207,6 +208,8 @@ confirmed_stable_context: []
 - 开发实现视角可进入技术边界问题，但必须先确认业务目标。
 - 设计体验视角优先确认页面行为、交互结果和流程体验。
 - 面向非技术身份时，不直接提问 RBAC、状态机、数据模型、API 契约或架构模式。
+- 第一阶段的数据发现始终使用业务语言；即使识别为开发实现视角，也不得主动把访谈变成数据库类型、ORM、Schema、Migration、远程连接或部署参数问卷。
+- 用户主动使用数据库专有名词时可以理解并保存最小证据，但下一问仍优先确认它对现有数据、使用方式、迁移、安全或验收的实际影响。
 
 ## 3.1 Project Current State Discovery
 
@@ -377,6 +380,8 @@ Discovery 不得依赖“全部问题问完后再统一整理”。本 Gate 复�
 
 可从本地证据确认的复用边界不得重复问用户；公开工具规格或平台规则按本 Gate 调研。品牌取舍、视觉偏好、业务主次操作、允许改变范围和设计资产确认仍由用户决定。
 
+涉及业务数据或持久化时，在提问前先按 `13-planning-database-persistence-contract.md` 检查当前基线、依赖、Schema、Migration、Seed、公开环境示例、部署说明、测试和数据资料入口等非敏感项目证据。不得读取或输出真实连接串、账号、密码、Token、内网地址或生产数据；证据已经足以确认的数据库现状不得重复问用户。
+
 来源优先级：
 
 ```text
@@ -402,6 +407,26 @@ Discovery 不得依赖“全部问题问完后再统一整理”。本 Gate 复�
 
 当一次反馈包含多个可核验事实时，可以合并成一次小范围调研，但每条结论必须保留自己的 `research_id` 和来源。联网能力不可用时，把受影响项保持为 `unresolved_items`，`resolution_route: web_research`，不得改问用户去回忆公开资料，除非用户可以提供唯一内部来源。
 
+## 4.3 Guided Data And Persistence Discovery
+
+第一阶段只发现会改变数据库方向的业务事实，不要求用户选择物理数据库方案。完整语言边界、证据检查、自然问法和第一阶段充分性要求见 `13-planning-database-persistence-contract.md#3-first-stage-guided-data-discovery`。
+
+适用时按最大不确定性逐轮确认：
+
+- 当前是否已经有正式记录，以及这些记录目前由什么系统或位置保存。
+- 已有记录需要继续使用、只读保留、迁入新系统、清理还是完全不承接。
+- 后续能否提供结构说明、脱敏样例、备份文件或受控只读入口；只确认可提供性与责任主体，不索取凭证。
+- 正式使用是单人本机、多人联网、跨组织，还是断网也必须继续工作。
+- 正式数据、脱敏测试资料和禁止进入开发测试的数据边界。
+- 迁移失败、资料无法提供或远程环境未就绪会阻断什么业务结果。
+
+硬规则：
+
+- 每轮仍优先只问一个业务问题，不得把上述内容变成固定题单。
+- 不主动使用数据库引擎、ORM、Schema、Migration、连接串、主从、连接池等专有名词。
+- 不因用户技术熟练而削弱场景复述、业务白话、逐轮持久化、先查证后提问和理解确认。
+- 精确数据库方案在第二阶段由 09 草案提出并由用户确认；第一阶段只需要形成足以生成候选方案的业务约束。
+
 ## 发现输出（Discovery Output）
 
 User Discovery Runtime 完成后必须输出：
@@ -417,6 +442,13 @@ discovered_business_facts:
   pain_points:
   collaboration_roles:
   completion_rules:
+  data_context:
+    existing_records:
+    current_source_or_location:
+    reuse_migration_or_retention_direction:
+    existing_material_availability:
+    usage_and_connectivity_mode:
+    sensitive_data_boundary:
 
 researched_facts:
   - research_id:
@@ -548,6 +580,10 @@ Planning Conversation Mode
 是否涉及外部能力
 是否涉及权限变化
 是否涉及数据库结构或破坏性变更
+是否已有正式记录、现有数据来源和复用/迁移/只读保留/清理方向
+是否能在后续提供结构说明、脱敏样例、备份或受控只读入口；不能提供时影响什么
+正式使用属于单人本机、多人联网、跨组织或离线场景中的哪一种
+正式数据、测试资料与敏感信息的隔离边界是什么
 是否有 UI 操作路径
 哪些内容明确不做
 每轮有效回答已写入 discovery_checkpoint

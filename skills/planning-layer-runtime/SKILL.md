@@ -1,6 +1,6 @@
 ---
 name: planning-layer-runtime
-description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。涉及前端时生成可复制设计 Prompt、页面实现合同、UX 状态迁移合同、版本化设计资产绑定和可由执行/测试层精确消费的 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
+description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并以业务白话逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。第二阶段根据长期用户画像与本期交互调整术语解释，形成可确认的数据库与持久化决策；涉及前端时生成可复制设计 Prompt、页面实现合同、UX 状态迁移合同、版本化设计资产绑定和可由执行/测试层精确消费的 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
 ---
 
 # 规划层运行时（Planning Layer Runtime）
@@ -26,6 +26,7 @@ description: 交互式规划层运行时。用于读取目标项目当前基线�
 - `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、批量草案装配、依次确认、05 UI/UX Prompt 与设计图收集交互、13 开发前准备总结、最终人话总结确认和状态回写规则。
 - `references/11-planning-ui-ux-execution-contract.md`：涉及正式页面或用户可见交互时必读；定义 copy-ready Prompt、页面/模块实现合同、UX 状态迁移、版本化资产、精确 Handoff 绑定及 UI/UX Execution Readiness Gate。
 - `references/12-planning-ui-ux-execution-example.md`：生成或审查 execution-ready 05 时按需读取的完整结构示例；示例值不得当作目标项目事实。
+- `references/13-planning-database-persistence-contract.md`：涉及业务数据持久化、数据库、现有/远程数据库、数据迁移或数据库环境时必读；定义第一阶段业务化数据发现、用户画像驱动的第二阶段术语解释、09 数据库决策合同和确定性校验。
 
 ## Project Path Binding
 
@@ -93,6 +94,7 @@ Execution Boundary Kernel 的完整定义见 `references/09-execution-intent-gua
 - `.runtime/planning-layer-runtime/` 不保存期次需求、正式 SoT、完整聊天记录、完整用户输入、完整 AI 输出、决策快照、运行时事件、审计日志或 long/testing 执行结果。
 - `README.md` 不是必建文件；只有确实需要向人说明本地边界时才按需创建。
 - `user-profile.yaml` 是长期稳定用户交互倾向和规划协作偏好的唯一来源。
+- 第二阶段解释专业规划内容前，把 `user-profile.yaml` 中无冲突的高置信长期偏好与本期 Discovery 表现合并为 `current-interaction.yaml.explanation_adaptation`；当前明确表达优先，无法判断时默认先用人话解释术语。
 - `environment-profile.yaml` 存放后续 Planning 需要复用的稳定项目与开发环境事实，不得保存任何凭证。
 - `project-profile.yaml` 只存放项目身份、稳定项目描述和项目当前基线文件路径。
 - `context-index.yaml` 只在确有多个稳定上下文入口时创建，并且只存放入口路径。
@@ -176,6 +178,7 @@ Execution Boundary Kernel（09）
 -> 将最小调研结论、来源与时效写入 discovery_checkpoint
 -> Discovery / Planning Conversation（00 + 07）
 -> 每轮先持久化用户回答，再补充必要事实调研并更新 discovery_checkpoint，最后提出下一问题
+-> 涉及数据时按 13 只用业务白话确认已有记录、来源、复用/迁移/保留方向、使用方式、可提供材料与敏感数据边界；不在第一阶段询问数据库配置
 -> 确认目标、范围与成果用途
 -> 形成 execution_handoff_decision 候选
 -> 在本期 current-interaction.yaml 持久化最小恢复镜像与确认目标
@@ -184,8 +187,17 @@ Execution Boundary Kernel（09）
 -> 根据 execution_handoff_decision 生成 Document Assembly Plan
 -> 在本期 current-interaction.yaml 同步最小 document_assembly 进度
 -> Planning Document Mode（07 + 10）
+-> 合并长期用户画像与本期交互，持久化 explanation_adaptation
 -> 按依赖拓扑一次性生成全部适用草案并持久化 confirmation queue
 -> 按队列依次解释、确认；纠正时只重建受影响草案
+
+本期涉及数据库或持久化
+  -> 06 只确认业务事实、持久化需求、状态与数据域语义
+  -> 09 按 13 形成数据库与持久化决策合同
+  -> 第二阶段直接向用户展示复用/新建、数据库类型、环境拓扑、远程库、现有资料、迁移/回退与数据治理摘要
+  -> 按 explanation_adaptation 决定术语解释深度；用户当前反馈优先
+  -> 运行 Database And Persistence Decision Gate 与确定性校验
+  -> blocking_open 移交 12 并阻断对应 TASK Ready
 
 存在正式页面或用户可见交互变化
   -> 按 11 生成可复制 Prompt、UI Implementation Contract、UX Interaction Contract 与版本化资产索引
@@ -251,6 +263,7 @@ Planning Document Mode 的批量草案装配、跨文档校验、依次解释确
 
 - 文档生成必须遵循 `references/03-planning-doc-responsibility.md`、`references/04-planning-format-spec.md`、`references/05-planning-priority-system.md` 和 `references/06-planning-capability-governance.md` 定义的责任边界、格式、优先级、能力治理和门禁。
 - 涉及正式页面或用户可见交互时，05、13 与 Handoff 必须同时遵循 `references/11-planning-ui-ux-execution-contract.md`；不得以提示词要点、无 revision 图片、叙事性 UX 描述或聊天记录替代可执行合同。
+- 涉及数据库或持久化时，06、09、12、13 与 Handoff 必须同时遵循 `references/13-planning-database-persistence-contract.md`；第一阶段不得以技术画像为由使用配置问卷，第二阶段不得静默假设数据库、远程环境、已有资料或迁移就绪状态。
 - 跨期延期需求必须写入唯一 `<requirement_pool_path>`；00–15、Planning Context、15 下一期输入和 Handoff 只能在需要时引用 `POOL-ID`，不得复制形成第二份待处理需求正文。
 - 使用 `references/02-planning-change-levels.md`，由 Planning Runtime 内部评估变更影响范围，用于决定 Planning Conversation 的探索深度。
 - 涉及外部能力、SDK、OpenAPI、MCP、AI 提供方、基础设施依赖或人工能力时，按 `references/06-planning-capability-governance.md` 执行。

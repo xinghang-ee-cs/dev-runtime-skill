@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "release_version": "0.1.0",
+  "release_version": "0.2.0",
   "repository": {
     "url": "https://github.com/xinghang-ee-cs/dev-runtime-skill",
     "channel": "stable"
@@ -19,7 +19,7 @@
       "path": "skills/long-task-orchestrator"
     },
     "planning-layer-runtime": {
-      "version": "0.1.0",
+      "version": "0.2.0",
       "path": "skills/planning-layer-runtime"
     },
     "testing-layer-runtime": {
