@@ -1,6 +1,6 @@
 ---
 name: planning-layer-runtime
-description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并以业务白话逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。第二阶段根据长期用户画像与本期交互调整术语解释，形成可确认的数据库与持久化决策，并在不收集秘密值的前提下引导用户完成 Long 开始前必需的环境、账号、外部工具和数据依赖配置；测试设计以业务旅程和端到端证明为主，区分本地证据与部署后云端证据。涉及前端时生成可复制设计 Prompt、页面实现合同、UX 状态迁移合同、版本化设计资产绑定和可由执行/测试层精确消费的 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
+description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并以业务白话逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。对当前合同仍有效的实现缺陷只治理追加式 `bugfixes/` 与最终生产基线更新，不重开或污染原 00–15。第二阶段根据长期用户画像与本期交互调整术语解释，形成可确认的数据库与持久化决策，并在不收集秘密值的前提下引导用户完成 Long 开始前必需的环境、账号、外部工具和数据依赖配置；测试设计以业务旅程和端到端证明为主，区分本地证据与部署后云端证据。涉及前端时生成可复制设计 Prompt、页面实现合同、UX 状态迁移合同、版本化设计资产绑定和可由执行/测试层精确消费的 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
 ---
 
 # 规划层运行时（Planning Layer Runtime）
@@ -27,6 +27,7 @@ description: 交互式规划层运行时。用于读取目标项目当前基线�
 - `references/11-planning-ui-ux-execution-contract.md`：涉及正式页面或用户可见交互时必读；定义 copy-ready Prompt、页面/模块实现合同、UX 状态迁移、版本化资产、精确 Handoff 绑定及 UI/UX Execution Readiness Gate。
 - `references/12-planning-ui-ux-execution-example.md`：生成或审查 execution-ready 05 时按需读取的完整结构示例；示例值不得当作目标项目事实。
 - `references/13-planning-database-persistence-contract.md`：涉及业务数据持久化、数据库、现有/远程数据库、数据迁移或数据库环境时必读；定义第一阶段业务化数据发现、用户画像驱动的第二阶段术语解释、09 数据库决策合同和确定性校验。
+- `references/14-bugfix-case-governance.md`：已确认实现缺陷的追加式 Case 目录、原 00–15 只读例外、Planning 退出条件和最终生产基线更新门禁。
 
 ## Project Path Binding
 
@@ -248,12 +249,15 @@ requires_execution_handoff: false
 
 -> 后续执行 / 测试 / 验收发现问题时先做 Execution/Test Change Triage Gate（07）
 -> 仅 planning_gap、requirement_change 或真正改变设计合同的 design_drift 进入 Planning Recovery（08）
+-> implementation_defect 且当前合同仍有效时，不重开 Planning；按 14 在原期次 bugfixes/ 追加 Bugfix Case
 -> 冻结基线后只通过 Change Set 修订受影响 SoT、TEST、TASK、14/15 空白框架与 Handoff
 -> 未受影响和已完成事实保持不变
 -> 实际验收与发布由后续承接方填写
 -> 实际发布确认后才更新 PROJECT-CURRENT-BASELINE
 -> 更新当前前端体验事实并关闭本期；关闭后的 00–15 历史只读
 ```
+
+Bugfix Case 的“追加”只例外允许写入 `bugfixes/`，不解除关闭期次 00–15 的历史只读状态。恢复会话时若发现未完成 Case，按其 `next_required_action` 路由到对应 Skill，不启动 Planning 访谈；只有合同不明确或改变时才进入本 Skill。
 
 进入 Planning Document Mode 的最低条件：
 
@@ -280,6 +284,7 @@ Planning Document Mode 的批量草案装配、跨文档校验、依次解释确
 - 13 首次确认后冻结 `planning_execution_baseline`；Handoff 已生成、14/15 已派生或任一 TASK 已开始时同样视为已经冻结。冻结后的变更只能按 `references/02-planning-change-levels.md` 形成 Change Set，不得静默覆盖既有规划基线。
 - Planning Execution Baseline 完整正文只由 13 承载；Change Set 完整历史只以 Decision Snapshot 追加到本期既有 `planning-runtime/decision-log.md`。`current-interaction.yaml`、14、15 和 Handoff 只保存或引用必要 revision。
 - 执行、测试或验收发现的问题必须先按 `references/07-planning-conversation-runtime.md` 分类；只有需要规划回流的分类才调用 `references/08-planning-recovery-runtime.md`。
+- 已确认 `implementation_defect` 且合同仍有效时读取 `references/14-bugfix-case-governance.md`；不得为快速修复新建一期、修改原 00–15 或把 Case 事实塞进原 14/15。
 - 增量修订只重建 Recovery Output 和 Change Set 明确列出的受影响文档、TEST、TASK 与尚未填写真实事实的框架占位；完整 13 不等于全部待执行队列，但原基线中尚未完成且仍有效的 TASK 必须继续进入增量 Handoff。
 - `11-测试方案与验收用例.md` 只定义测试设计：按什么业务顺序证明什么、测试类型、自动化等级、真实环境要求和预期证明结果。每个适用 P0/P1 FLOW 必须有本地业务或端到端证明要求；本期包含云端部署时，全部 P0 正向旅程以及部署敏感或受变更影响的 P1 FLOW 还必须有绑定部署版本的云端端到端复验要求。单元、组件、接口片段或纯视觉结果不得替代完整业务旅程证明。
 - 第二阶段的开发前配置引导只处理 09/10 已定义、12 归并的依赖：说明用途、配置位置、责任人、安全步骤、脱敏验证方式、最早需要阶段和阻断范围。不得索取或保存 Token、密码、私钥、Cookie、完整连接串或生产数据；用户或外部方必须在 Long 前提供而仍未就绪的依赖会阻断 `execution_ready`，只在云端测试或发布前需要的依赖则精确移交对应阶段。

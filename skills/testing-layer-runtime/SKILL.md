@@ -1,6 +1,6 @@
 ---
 name: testing-layer-runtime
-description: 通用测试治理 Skill，用于在 long-task-orchestrator 通过 Required Validation Gate 并完成 ready_for_local_test 后管理期次测试生命周期：读取 planning 的 FLOW 测试范围、环境前置、UI/UX 合同与带 revision 的 long 自动化交接，以业务旅程和端到端证明为主建立本地证据与部署后云端证据闭环，继承已通过自动化结果，指导必要的人工/真实设备/云端/外部能力/最终验收，对每个发现执行 Change Triage、修复回流、受影响证据失效与复测，并在完整上线时整理项目发布/安全流程移交材料。Use when Codex needs to manage phase business-journey testing, end-to-end coverage, manual acceptance, real-device validation, deployed-environment verification, UI/UX contract verification, final acceptance, test evidence/writeback, change triage, or release handoff. Do not use it to re-run long-owned automation unless an allowed reuse exception or a changed deployed environment requires it.
+description: 通用测试治理 Skill，用于在 long-task-orchestrator 通过 Required Validation Gate 并完成 ready_for_local_test 后管理期次测试生命周期；也消费 `bugfix-case/v1` 的 ready_for_bug_verification，执行原 Bug、受影响路径、相邻风险、生产复验和上线后同类型问题验证。期次模式读取 Planning FLOW、环境前置、UI/UX 合同与带 revision 的 Long 自动化交接；Bugfix 模式不建立完整 Test Plan，也不默认重跑全部 FLOW，并在部署后把“继续同类型问题验证”持久化为唯一下一步。Use when Codex needs to manage phase testing or close a durable Bugfix Case. Do not use it to re-run long-owned automation unless an allowed reuse exception or changed environment requires it.
 ---
 
 # Testing Layer Runtime
@@ -32,6 +32,7 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 - `references/03-evidence-format.md`：证据、截图、Manual Guidance 和最终报告格式。
 - `references/04-destructive-boundaries.md`：破坏性测试、服务器测试、上线测试和安全告警边界。
 - `references/05-test-writeback.md`：状态、阶段报告、证据索引、`test-execution-order.md` 和阻塞项回写规则。
+- `references/06-bugfix-verification.md`：Bugfix Case 定向测试、发布/生产复验、同类型问题验证、突出提醒和跨会话恢复。
 
 ## Project Path Binding
 
@@ -42,6 +43,7 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 <long_testing_handoff_path>
 <phase_testing_runtime_directory>
 <formal_acceptance_record_path>
+<bugfix_case_directory> # 仅 Bugfix Verification Mode
 ```
 
 - `<phase_testing_runtime_directory>` 是本期 `writeback_target`，不是固定目录名。
@@ -50,6 +52,7 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 - 本期测试状态、事件、证据索引、人工队列、依赖顺序和恢复数据只能写入 `<phase_testing_runtime_directory>`。
 - 项目根目录 `.runtime/` 只允许保存该 Skill 明确定义的跨期项目级环境索引或稳定配置；不得保存某一期测试状态、证据、队列、游标或恢复快照。
 - 不得沿用来源项目的项目名、期次名、绝对路径、固定文档编号或历史 Runtime 位置。
+- 输入为 `bugfix-case/v1` 时，`<bugfix_case_directory>` 本身就是唯一 writeback target；不要求创建期次 Testing Runtime，也不写回原 Planning 00–15。
 
 ## Long Testing Handoff
 
@@ -174,6 +177,7 @@ change_decision:
 - Test Governance Mode：管理人工测试、真实设备测试、外部能力验证和证据闭环。
 - Server Verification Mode：部署完成后验证服务器独有事实。
 - Release Handoff Mode：完整上线测试时整理发布/安全门禁移交信息；若项目提供专门 release/security skill 或流程，则切换过去。
+- Bugfix Verification Mode：按 `references/06-bugfix-verification.md` 只验证原 Bug、直接影响路径和相邻风险，继承 Long 证据，并在上线后完成原 Bug 生产复验和同类型问题验证。
 
 执行策略：
 
@@ -187,6 +191,14 @@ change_decision:
 - Release Handoff Strategy：把每个 `before_release` DEP 的 Planning 快照与 Testing 结果引用移交项目发布/安全流程；快照冻结 epoch、Planning/Long/Matrix revision、正式结果和完整部署身份，并由 Runtime 保存当前/失效指针。只生成快照，不输出 release pass 或维护发布后的状态。
 
 ## 执行顺序
+
+输入为 `bugfix-case/v1` 时不执行下面的完整期次顺序，改为完整读取并执行 `references/06-bugfix-verification.md`，在 intake、发布返回与关闭前运行：
+
+```bash
+bash <testing-skill-path>/scripts/validate-bugfix-case.sh <bugfix-case-directory>
+```
+
+关闭前追加 `--expect-state closed`。验证失败时保持 `workflow_completed: false`，不得关闭 Issue。
 
 1. 定位当前期次和 `writeback_target`。
 2. 读取 Long Testing Handoff，校验 baseline/change revision、TASK contract revision 与 `required_validation_gate`；缺失、blocked、stale 或证据不完整时进入 Test Intake Mode。
@@ -218,6 +230,7 @@ change_decision:
 - 不把测试入口删除、测试快捷操作删除或测试专用接口删除生成到某一期的独立测试用例；这类事项只在完整上线/最终发布门禁中移交项目定义的发布/安全流程。
 - 不把截图存在当作业务通过证据；必须同时有断言或人工内容。
 - 不执行生产上线门禁；上线测试必须交给项目定义的发布/安全流程。
+- 不把 `deployed` 或 `original_bug_production_verified` 当作 Bugfix Case 完成；同类型问题扫描与定向验证未完成时必须保持 Issue open，并突出恢复唯一下一步。
 - 不执行未确认的数据库迁移、生产数据修改、压测、安全扫描或外部破坏性操作。
 - 不读取、修改或输出真实密钥；环境配置只关注 `.env.example`、项目环境事实源或用户明确提供的脱敏配置。
 - 保留无关工作区改动；未经用户明确要求，不 stage、commit、push。

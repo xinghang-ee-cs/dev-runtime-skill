@@ -1,0 +1,61 @@
+{
+  "schema_version": "bugfix-case/v1",
+  "bug_id": "BUG-YYYYMMDD-NNN",
+  "issue": {
+    "provider": "github",
+    "number": 0,
+    "url": "",
+    "status": "open"
+  },
+  "origin": {
+    "phase_ref": "unassigned",
+    "planning_contract_ref": "",
+    "expected_behavior_source": "",
+    "observed_environment": "",
+    "deployed_revision": ""
+  },
+  "triage": {
+    "finding_type": "implementation_defect",
+    "disposition": "fix_in_execution",
+    "current_planning_contract_valid": true
+  },
+  "scope": {
+    "allowed_paths": [],
+    "regression_targets": [],
+    "adjacent_risk_targets": []
+  },
+  "delivery": {
+    "branch": "",
+    "pull_request_url": "",
+    "issue_link_mode": "refs",
+    "ci_status": "not_started",
+    "merge_commit": "",
+    "deployed_revision": "",
+    "version": "",
+    "rollback_ref": ""
+  },
+  "release_status": "not_started",
+  "original_bug_status": "pending",
+  "bugfix_status": "diagnosed",
+  "workflow_completed": false,
+  "next_required_action": {
+    "action": "long_bugfix_patch",
+    "primary_owner": "long-task-orchestrator",
+    "supporting_skill": "ai-code-inspection",
+    "target_record": "01-long-patch-result.md",
+    "status": "pending"
+  },
+  "similar_defect_review": {
+    "status": "not_started",
+    "new_bug_issue_refs": []
+  },
+  "pause": {
+    "paused_at": "",
+    "paused_reason": "",
+    "resume_action": ""
+  },
+  "timestamps": {
+    "created_at": "",
+    "updated_at": ""
+  }
+}

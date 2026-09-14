@@ -10,10 +10,10 @@
 
 | Skill | 适用任务 | 边界 |
 | --- | --- | --- |
-| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | 梳理需求、冻结执行基线、产出初始/增量交接，并在 Change Triage 准入后精确重入规划。 | 不写生产代码，不执行测试。 |
-| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | 按带 revision 的执行队列完成至少 4 个实现单元，保护未受影响和已完成工作，执行自动化验证并交接到 `ready_for_local_test`。 | 不负责人工验收，也不吸收未分流的合同变化。 |
-| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | 继承带 revision 的 long 自动化证据，管理人工、设备、服务器、外部能力和最终验收，并把发现分流到 Testing、Long 或 Planning。 | 期次状态只写绑定的 writeback target；不修改业务代码，不批准生产上线。 |
-| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | 按 10 种真实工作场景路由改动检查、根因诊断、确认修复、完整性核查、审计、重构评估、合并检查、hotfix 和规范治理。 | 场景 1–9 单次完成；只有规范治理使用交互式七步。项目运行态位于 `.runtime/ai-code-inspection/`。它不是发布或安全门禁。 |
+| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | 梳理需求、冻结执行基线、产出交接，并判断缺陷能否绕过 Planning。 | 不写生产代码；Fast Lane 不修改原 00–15。 |
+| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | 实现至少 4 个单元的正式功能，或消费 Bugfix Case 完成更小的精确补丁。 | 不负责人工验收，也不吸收合同变化。 |
+| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | 管理期次验收，以及 Bugfix 定向验证、生产复验和上线后同类型问题检查。 | 不修改业务代码，不批准生产上线。 |
+| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | 路由 10 种检查/诊断场景，并为受管 Fast Lane 创建持久 Bug Contract。 | 四 Skill 流程中由 Long 修改，而不是检查层；它不是发布或安全门禁。 |
 
 正常开发链路：
 
@@ -30,6 +30,20 @@ planning-layer-runtime
 
 Planning Execution Baseline 冻结后，已接受的需求或合同变化通过追加式 Change Set 和增量 Handoff 流转。Long 只消费被选中的执行队列，Testing 先分类再回流；默认不会重开或重跑整个期次。
 
+当前 Planning 合同仍有效的已确认实现缺陷，从 v1.1 起不再新建一期，而是进入 Bugfix Fast Lane：
+
+```text
+Issue + ai-code-inspection Bug Contract
+  -> 在来源期次追加 bugfix-case/v1
+  -> long-task-orchestrator 精确补丁
+  -> testing-layer-runtime 定向验证
+  -> PR/CI/合并/部署 + 原 Bug 生产复验
+  -> 上线后同类型问题验证
+  -> 关闭 Case 与 Issue
+```
+
+来源期次的 00–15 始终只读。`deployed` 和 `original_bug_production_verified` 都不是闭环状态：Testing 必须恢复持久化的 `post_release_similar_defect_verification` 下一步；如果发现另一个同类型问题，为它单独建立 Bug ID、Issue 和 Case。
+
 ## 版本与自动同步
 
 仓库采用两个版本层级：GitHub Release 表示一组经过共同验证的 Skill 快照，每个 Skill 在 [`skills-manifest.json`](skills-manifest.json) 中拥有独立 SemVer。README 和 `SKILL.md` 都不是版本事实源。
@@ -38,11 +52,11 @@ Planning Execution Baseline 冻结后，已接受的需求或合同变化通过�
 
 | 组件 | 版本 |
 | --- | --- |
-| 仓库 Release | `v1.0.0` |
-| `planning-layer-runtime` | `1.0.0` |
-| `long-task-orchestrator` | `1.0.0` |
-| `testing-layer-runtime` | `1.0.0` |
-| `ai-code-inspection` | `0.1.0` |
+| 仓库 Release | `v1.1.0` |
+| `planning-layer-runtime` | `1.1.0` |
+| `long-task-orchestrator` | `1.1.0` |
+| `testing-layer-runtime` | `1.1.0` |
+| `ai-code-inspection` | `0.2.0` |
 | 同步工具 | `0.1.1` |
 
 本表仅用于方便阅读，[`skills-manifest.json`](skills-manifest.json) 仍是唯一版本事实源。
@@ -68,11 +82,11 @@ python .runtime-skills/runtime-skills.py sync --project .
 
 ### Release Tag 与可直接使用的 Skill + Runtime 迁移 Prompt
 
-稳定 GitHub Release 的 Tag 统一采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是 `v1.0.0`。这个 Tag 标识一组经过共同验证的仓库快照；快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 可跟随最新稳定 Release；目标项目需要复现当前版本时，使用 `v1.0.0` 这个精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
+稳定 GitHub Release 的 Tag 统一采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是 `v1.1.0`。这个 Tag 标识一组经过共同验证的仓库快照；快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 可跟随最新稳定 Release；目标项目需要复现当前版本时，使用 `v1.1.0` 这个精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
 
-只更新 Skill 文件，并不会自动升级目标项目中已经生成的 Runtime 状态。对于 `v1.0.0` 尤其如此：前向状态账本、Planning 前置条件合同、Long 机器执行 receipt、Testing 证据摘要与部署绑定都比 1.0 之前严格。尚未结束的旧期次必须恢复到一个全新的当前版本 Runtime epoch 后重新验证，旧 Agent 自行写下的 `passed` 不能直接继承。
+只更新 Skill 文件，并不会自动升级目标项目中已经生成的 Runtime 状态。`v1.0.0` 的前向账本与验证 receipt 仍是未完成 pre-1.0 期次的兼容边界。v1.1 通过在来源期次旁追加 `bugfix-case/v1` 来管理新缺陷，不重写已关闭历史期次，也不改变原 00–15。
 
-把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release；需要固定版本时，在消息末尾补充类似 `目标 Release：v1.0.0` 即可。
+把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release；需要固定版本时，在消息末尾补充类似 `目标 Release：v1.1.0` 即可。
 
 ```text
 请在当前项目中接管或更新 Runtime Skills。
@@ -94,7 +108,7 @@ python .runtime-skills/runtime-skills.py sync --project .
 10. 从新安装的 Skill 目录运行全部适用 validator；如果第 2 步曾临时解除活动期次 pin，在停止前把它恢复到新 bundle。然后报告：已迁移与保持不动的期次路径、新 Runtime epoch/cycle、保留的旧来源、重建的合同/receipt、重跑项及结果、最终 pin 状态、未解决 blocker 和下一项唯一允许动作。除非我另行明确要求，不要开始功能实现、人工验收、部署、数据库迁移、commit 或 push。
 ```
 
-对已受管项目执行精确版本更新时，同步命令可以直接接收 Release Tag，例如 `--release v1.0.0`。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为稳定更新来源。
+对已受管项目执行精确版本更新时，同步命令可以直接接收 Release Tag，例如 `--release v1.1.0`。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为稳定更新来源。
 
 ## 部署到 Agent 项目
 
