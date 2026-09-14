@@ -1,5 +1,14 @@
 # Evidence Format
 
+## 目录
+
+- 自动化证据
+- 截图与页面分析
+- 业务旅程与端到端证据
+- 测试项证据绑定
+- Manual Guidance 与证据复用
+- 阶段报告与最终报告
+
 ## 自动化证据
 
 Testing Runtime 默认不重新执行 long-owned 自动化测试。继承 long 自动化结果时必须包含：
@@ -55,9 +64,36 @@ UX-SCN revision：
 
 截图证据必须服务业务、交互或已确认的前端合同断言。不得生成脱离 Planning TEST、PAGE/UX-SCN/ASSET revision 的模糊“对照 UI 图”卡；Long 明确移交且 Planning 已定义的视觉一致性、真机响应式、复杂 UX 或可访问性观察项可以生成独立人工项，但必须写明设备/视口、进入路径、操作、预期可见状态、对照 revision、允许差异与通过条件。
 
+## 业务旅程与端到端证据
+
+每条关闭 FLOW requirement 的证据必须说明：
+
+```text
+FLOW / TEST 引用：
+环境：local | deployed
+environment_revision_ref：
+合法业务入口：
+角色 / 账号 / 租户：
+前置业务事实：
+真实业务动作：
+关键中间断言：
+可观察终态：
+反向或恢复分支（适用时）：
+结果记录引用：
+证据索引引用：
+```
+
+规则：
+
+- 本地证据优先引用 Long Handoff 中与同一 FLOW/TEST 对应的有效业务或 E2E validation id；单元、组件、接口片段、类型检查或构建证据只能补充，不能单独关闭旅程。
+- 本地 required FLOW 的 evidence revision 必须匹配当前 Long readiness receipt 冻结的 repository revision，且 `path` 解析到真实非空持久化文件；只写 `passed`、虚构 revision 或不存在的路径不得关闭旅程。
+- 云端结果必须通过 `environment_revision_ref` 引用 `test-runtime-state.md#current_deployment_revision`；证据索引中的目标环境、部署/组件 revision 与 `runtime_configuration_identity` 必须精确匹配。代码或镜像不变但运行配置身份变化时，旧证据仍然失效。只有 URL 可访问、进程健康或单接口成功不能替代从业务入口到终态的证明。
+- 同一证据可以覆盖多个明确断言，但 `business-journey-test-matrix.md` 中每个 FLOW 仍须分别引用；不得用“整体测试通过”覆盖未映射旅程。
+- Planning/Long 合同或本地代码 revision 变化后，按真实影响标记本地证据失效。部署身份变化必须执行 `05-test-writeback.md#deployment-revision-reconciliation-gate`；历史证据保留用于闭环追踪，但只有当前完整部署身份的 new attempt/new evidence 才能关闭 required 云端旅程。
+
 ## 证据与测试项绑定规则
 
-每个测试项（`case_id`、`MANUAL-OP`、真实设备验证项、服务器验证项）的证据必须独立关联。
+`05-test-writeback.md` 唯一枚举的每个正式 `item_type` 都必须独立关联证据或明确的证据缺失原因；本文件不复制另一份类型清单。
 
 ### 证据最低要求
 
@@ -65,7 +101,7 @@ UX-SCN revision：
 
 | 状态 | 证据最低要求 |
 | --- | --- |
-| `reused_from_long` | long evidence 引用（路径或标识） |
+| `reused_from_long` | `source_validation_id` + Long readiness receipt 证据索引 |
 | `verified` | 至少一个证据引用 |
 | `verified_by_user_report` | 用户自然语言反馈或截图 |
 | `failed` | 失败描述 + 相关截图或日志 |
@@ -77,18 +113,7 @@ UX-SCN revision：
 
 ### 证据索引关联
 
-`test-evidence-index.md` 中的每个证据必须关联到具体 `item_id`。
-
-```yaml
-EVIDENCE-001:
-  item_id: TEST-001
-  evidence_type: long_automation
-  source: long-runtime-testing-summary.md
-  path: testing-handoff.md
-  description: long 自动化通过截图和断言
-  added_at: “2026-06-30T10:00:00+08:00”
-  valid: true
-```
+`test-evidence-index.md` 中的每个证据必须关联到具体 `item_id`，并采用 `05-test-writeback.md#test-evidence-indexmd-格式` 的唯一 schema。每个持久文件必须记录 `content_sha256`，由校验器重算后完全匹配。业务旅程 result 的 `covers` 必须包含对应 Planning TEST，证据 `flow_refs` 必须包含被关闭 FLOW。云端证据必须包含目标环境、revision kind、精确 revision、FLOW 引用、有效性和失效来源；本地证据必须绑定可重建的本地代码/公开配置 revision。
 
 不允许存在无法关联到 `item_id` 的游离证据条目。
 
@@ -219,7 +244,10 @@ evidence_missing_reason:
 测试范围：
 规划来源：
 Long Testing Handoff：
+Long Required Validation Gate：
 最终结果：
+本地业务/E2E 覆盖：
+部署后云端业务/E2E 覆盖：
 已继承自动化通过：
 已自动化通过：
 已人工确认：
@@ -228,6 +256,7 @@ Long Testing Handoff：
 未覆盖项：
 证据不足项：
 失败项：
+未闭环 finding：
 破坏性操作记录：
 reused_from_long：
 剩余风险：
@@ -239,11 +268,26 @@ Runtime 内部必须继续判断 `Long Runtime Completion Verified`，取值只�
 - `verified`
 - `not_verified`
 
+只有 Long Handoff 的 `required_validation_gate.result: passed`、matrix revision 与 effective validation ids 均可解析且有效时，才允许 `Long Runtime Completion Verified: verified`。
+
+Runtime 还必须判断 `Business Journey Coverage Verified`，取值只能是：
+
+- `verified`
+- `not_verified`
+
+只有 `business-journey-test-matrix.md` 中每个 required P0/P1 FLOW 的本地业务/E2E、合同定义的必需反向分支和 finding 闭环都满足，并且本期部署适用时全部 P0 正向旅程、部署敏感或受变更影响的 P1 FLOW 已在 `test-runtime-state.md#current_deployment_revision` 指向的完整部署身份上闭合，才允许为 `verified`。
+
 若 `Long Runtime Completion Verified` 为 `not_verified`：
 
 - 最终结果：`Blocked`
 - 不得进入 `Server Verification`
 - 不得进入 `Release Handoff`
+
+若 `Business Journey Coverage Verified` 为 `not_verified`：
+
+- 最终结果：`Blocked`
+- 必须列出精确 FLOW、缺失环境证据或未闭环 finding
+- 不得以测试数量、服务器 smoke 或部分用例通过替代
 
 若 `writeback_status` != `updated`：
 

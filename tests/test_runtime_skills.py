@@ -96,6 +96,19 @@ class RuntimeSkillsTests(unittest.TestCase):
         )
         self.assertEqual(runtime.main(["verify", "--project", str(self.project)]), 0)
 
+    def test_install_omits_files_excluded_from_the_managed_hash(self) -> None:
+        skill = self.source / "skills/example-skill"
+        (skill / "__pycache__").mkdir()
+        (skill / "__pycache__/generated.pyc").write_bytes(b"cache")
+        (skill / ".DS_Store").write_bytes(b"metadata")
+
+        self.assertEqual(self.install(), 0)
+        for root in (".agents/skills", ".claude/skills"):
+            installed = self.project / root / "example-skill"
+            self.assertFalse((installed / "__pycache__").exists())
+            self.assertFalse((installed / ".DS_Store").exists())
+        self.assertEqual(runtime.main(["verify", "--project", str(self.project)]), 0)
+
     def test_current_repository_bundle_installs_and_verifies(self) -> None:
         actual_project = self.root / "actual-project"
         manifest = json.loads(

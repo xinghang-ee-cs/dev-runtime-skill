@@ -1,5 +1,13 @@
 # 落地清单前置检查
 
+## 目录
+
+- 1–2. Preflight 用途与启动顺序
+- 3–4. Planning Handoff Intake 与 Runtime Bootstrap
+- 5–8. 计划、Capability、实现承接与依赖门禁
+- 9. Task Generation 输入检查
+- 10–11. 停止与完成条件
+
 本文件只定义 Preflight Gate：检查、停止条件、输出。
 
 ## 1. Preflight 用途
@@ -41,6 +49,8 @@ load_skill
 -> confirm formal execution and acceptance record files exist
 -> confirm Source of Truth
 -> load execution_constraints
+-> load execution_prerequisite_readiness
+-> confirm before_long_status = passed and unresolved_before_long = []
 -> create Phase Runtime Directory
 -> instantiate current-runtime-context.md
 -> instantiate checkpoint-runtime.md
@@ -83,6 +93,7 @@ Runtime Bootstrap completed != execution_gate_open
 -> 读取 assembled_documents
 -> 读取 handoff_role_mapping
 -> 读取 execution_constraints
+-> 读取并校验 execution_prerequisite_readiness
 -> 涉及 UI TASK 时执行 Frontend Contract Intake Gate
 -> 读取 Development Landing Checklist
 -> 确认正式执行记录与正式验收记录文件存在
@@ -104,6 +115,7 @@ Runtime Bootstrap completed != execution_gate_open
 - `assembled_documents` 只包含真实路径。
 - `handoff_role_mapping` 可解析。
 - `execution_constraints` 存在且语义完整。
+- `execution_prerequisite_readiness` 存在，只引用 Planning 09/10/12 的真实合同与 DEP；`before_long_status: passed`、`unresolved_before_long: []`，证据引用不包含秘密值。
 - 存在 UI TASK 时，`frontend_experience_binding.applicable: true`，`UI/UX Design` role 的真实路径可读，05 Manifest、13 TASK binding 与 Handoff 的 Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision、TEST refs 一致，并按 `frontend-experience-execution.md` 通过 Frontend Contract Intake Gate。
 - 不存在阻断执行的 P0 `blocking_open`。
 - 当前任务可追溯到正式 Planning 文档。
@@ -113,6 +125,7 @@ Runtime Bootstrap completed != execution_gate_open
 ```text
 planning_only_or_execution_handoff_false -> STOP
 execution_constraints_missing -> STOP
+execution_prerequisite_readiness_missing_or_not_passed -> STOP
 planning_baseline_revision_missing_or_conflicting -> STOP
 active_change_revision_missing_unexpected_or_conflicting -> STOP
 incremental_execution_contract_missing_or_invalid -> STOP
@@ -143,7 +156,8 @@ create Phase Runtime Directory
 -> instantiate checkpoint-runtime.md
 -> instantiate required Runtime State files
 -> inspect project environment
--> confirm package manager / lockfile / runtime / framework / existing modules
+-> confirm package manager / lockfile / runtime / framework / existing modules / delivery units
+-> derive Required Validation Matrix from actual delivery topology and execution paths
 -> write current phase project-execution-baseline.md
 -> mark project_execution_baseline_status = current
 -> write project_execution_baseline_file pointer into current-runtime-context.md
@@ -158,6 +172,12 @@ create Phase Runtime Directory
 - 清单对应的代码区域、已有实现、明显缺口和风险。
 - 外部能力适用时的环境变量、网络、回调、额度、限流和计费约束。
 - 项目现有包管理器、lockfile、Runtime/框架版本、现有模块与依赖政策。
+- 本次改变或被改变范围依赖的全部交付单元，以及各自真实 build/package/direct-source、artifact/load、start、readiness、minimum smoke 和 cleanup 入口。
+- Planning Test and Acceptance Plan 中每项 P0/P1 本地业务/E2E TEST 的自动化等级和环境要求；可安全自动化且属于 Long 的项映射到 Required Validation Matrix，人工/真机/真实外部环境项精确进入 `manual_required`，不得两边都遗漏。
+- 必需运行配置的键名、加载方式和目标进程绑定路径；只记录存在性和来源类型，不读取、输出或持久化值。
+- 本地或受控测试依赖的安全就绪方式；数据库必须区分配置、连接、Schema/Migration 和最小业务探针。
+
+环境检查结束前必须按 `validation-gates.md#required-validation-matrix-and-local-runnable-gate` 在 Baseline 实例中写入 `required_validation_matrix`。已有项目写真实命令/探针；绿地或脚手架任务允许引用当前执行队列中负责创建入口的已确认 TASK，标记 `planned_in_confirmed_task`。Matrix 缺少交付单元、现有/计划绑定或成功后置条件时，Baseline 不得标记为 `current`；不得用“Testing 后续启动”替代自动化本地可运行验证。
 
 Baseline 状态只能在环境检查完成并写入当前期次实例后变为 `current`。首次启动时 Baseline 尚不存在是正常 Bootstrap 输入：
 
@@ -194,10 +214,12 @@ Runtime Bootstrap 完成后，完整 Preflight 才继续执行以下门禁：
 
 ```text
 Capability Gate if applicable
+-> Database Physical Design Intake if persistence task
 -> Implementation Placement Gate
 -> Implementation Contract Completeness Intake
 -> Per-Task Frontend Binding Gate if UI task
 -> Dependency Governance Gate if applicable
+-> Required Validation Matrix Completeness Gate
 -> confirm task generation inputs
 ```
 
@@ -212,6 +234,7 @@ Capability Gate if applicable
 - 清单中的任务必须可追溯到 Planning 文档 ID；Planning ID 只作追踪，不得成为任何实现资产命名来源。涉及外部能力时还必须包含 CAP-ID。
 - 清单足以指导环境确认和任务生成。
 - UI TASK 的清单条目必须引用 05 的真实路径、Design Manifest、Prompt/PAGE/UI-MOD/UX-SCN/ASSET revision 和 TEST；不得只写“按设计图实现”。
+- 持久化 TASK 必须通过 Handoff 的 `contract_refs.architecture_and_database` 读取 09 当前唯一数据库合同：`reuse_existing_unchanged` 解析到真实 Schema 来源；`modify_existing | create_new` 解析到确切存储单元、字段、键、约束、索引和关系；`prohibited_extra_storage_units: true`。缺少任一项即停止并回写 Planning，Long 不得自行设计或额外创建持久化结构。
 
 检查 Capability Handoff：
 
@@ -322,6 +345,7 @@ dependency_governance_status = blocked
 - 每个执行单元已有稳定业务概念、实现承接策略、禁止实现命名和参数合同状态。
 - 执行顺序、依赖、所有权、共享边界、验证方式和完成证明具备生成依据。
 - 涉及外部能力的执行单元必须带 CAP-ID、官方 SoT、SDK/API 版本、最小验证方式和降级策略。
+- 每个执行单元必须能映射到 Baseline Matrix 中的交付单元和必要验证；不存在独立交付单元影响时也必须明确引用受影响单元。
 
 ## 10. 停止条件
 
@@ -330,6 +354,7 @@ missing_source_of_truth -> STOP
 invalid_planning_handoff_intake -> STOP
 invalid_planning_revision_or_execution_selection -> STOP
 missing_execution_constraints -> STOP
+missing_or_blocked_execution_prerequisite_readiness -> STOP
 upstream_plan_blocked -> STOP
 plan_conflict -> STOP
 implementation_placement_unconfirmed -> STOP
@@ -348,6 +373,9 @@ external_capability_auth_unclear -> STOP
 external_capability_contract_unclear -> STOP
 external_capability_real_validation_missing -> STOP
 missing_environment_baseline -> STOP
+missing_required_validation_matrix -> STOP
+incomplete_required_validation_matrix -> STOP
+unresolved_required_validation_command_probe_or_postcondition -> STOP
 unclear_ownership_boundary -> STOP
 unclear_shared_boundary -> STOP
 unreadable_required_reference -> STOP
@@ -361,6 +389,7 @@ planning_handoff_intake_passed
 planning_handoff_revision_consistency_passed
 incremental_execution_contract_loaded
 execution_constraints_loaded
+execution_prerequisite_readiness_passed
 phase_runtime_directory_created
 runtime_state_instantiated
 project_execution_baseline_status_current
@@ -372,6 +401,7 @@ implementation_contract_inputs_complete
 frontend_contract_intake_passed_or_not_applicable
 implementation_placement_inputs_complete
 environment_baseline_confirmed
+required_validation_matrix_complete
 dependency_governance_passed_or_not_applicable
 task_generation_inputs_ready
 no_blocking_question

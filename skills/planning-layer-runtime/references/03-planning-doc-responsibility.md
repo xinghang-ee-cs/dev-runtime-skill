@@ -1,5 +1,14 @@
 # 流程梳理阶段：文档职责与最小输出
 
+## 目录
+
+- 1. 文档结构
+- 2. 文档职责与最小必填输出
+- 2.1–2.5 各组文档职责边界
+- 3. 文档结构化依赖模板
+- 4. 阶段分界
+- 5. Planning Runtime Final Output
+
 ## 1. 文档结构
 
 规划文档使用规范目录，不默认全量生成。
@@ -46,11 +55,11 @@ planning handoff 给执行 skill 时，必须显式输出职责到路径的映�
 | 06 | 梳理 | 业务事实与状态合法性的唯一 SoT | 核心业务数据事实、业务事件、状态分类、状态枚举、状态唯一来源、是否持久化、允许迁移、非法迁移、迁移守卫、成功后的新事实、阻断事实、回滚或重试规则、旧对象/旧状态隔离映射、数据域治理边界、下游 API / PERM / TEST 映射 | 01、02、04 | 07、08、09、10、11 | 页面按钮、弹窗、接口路径、权限矩阵、数据库物理表结构、表名、字段类型、长度、索引、外键、SQL、ORM Schema、迁移脚本 |
 | 07 | 梳理 | 前后端读写、拒绝和恢复语义的 Canonical API Contract | API-ID、Contract Type、关联 FLOW/SCN/MODULE/PAGE、业务意图、触发业务事件、合法访问上下文、所需业务资格、状态与事实前置、请求允许/禁止字段、成功结果、拒绝结果、幂等与并发、旧流程边界、Canonical Physical Binding、关联 TEST | 02、04、06 | 08、09、10、11、12、13 | 完整角色权限矩阵、页面布局、视觉呈现、数据库实现细节 |
 | 08 | 梳理 | 后端不可绕过的访问决策、数据范围、拒绝分类、异常协助与历史访问策略 | PERM-ID、关联 FLOW/API/DOMAIN/STATE、动作、资源、允许主体、允许范围、业务资格、业务状态前置、数据域前置、允许结果、拒绝类型、拒绝原因码、只读边界、人工协助边界、旧流程禁止来源、关联 TEST | 02、06、07 | 09、10、11、12、13 | 接口参数、接口响应字段、页面按钮样式、业务状态枚举、数据库实现 |
-| 09 | 梳理 | 项目内部架构、依赖方向、逻辑承接位置、实现承接策略、数据库与持久化方向、前端体系承接、语义隔离、切换与回退决策 | 架构当前基线、目标逻辑架构、实现承接策略、数据库与持久化决策合同、环境拓扑、现有/远程数据库与资料状态、迁移/回退/数据治理边界、前端布局/主题/组件复用与允许扩展边界、Canonical Contract—Architecture Binding、Legacy Semantic Firewall、数据域/部署/发布边界、对 10/11/12/13 的输入 | Project Current Baseline、01、02、04、05、06、07、08 | 10、11、12、13 | 无 replace_current 决策时重写全局导航/主题/组件体系，真实凭证或连接串，具体文件/代码/表名/期次命名、实际实施结果、正式 RISK-ID |
+| 09 | 梳理 | 项目内部架构、依赖方向、逻辑承接位置、实现承接策略、数据库与持久化方向、前端体系承接、语义隔离、切换与回退决策 | 架构当前基线、目标逻辑架构、实现承接策略、数据库与持久化决策合同、环境拓扑、现有/远程数据库与资料状态、本期物理存储单元与字段/键/约束/索引/关系、迁移/回退/数据治理边界、前端布局/主题/组件复用与允许扩展边界、Canonical Contract—Architecture Binding、Legacy Semantic Firewall、数据域/部署/发布边界、对 10/11/12/13 的输入 | Project Current Baseline、01、02、04、05、06、07、08 | 10、11、12、13 | 无 replace_current 决策时重写全局导航/主题/组件体系，真实凭证或连接串，SQL/ORM/Migration 实现代码、期次命名、实际实施结果、正式 RISK-ID |
 | 10 | 梳理 | 外部能力选型与接入决策合同，决定是否需要、选什么、为什么选、具备什么边界与前提、未满足什么就不得进入开发或发布 | CAP-ID、服务的 FLOW / MODULE / SCN、候选能力来源、最终选型或候选状态、选型理由、官方事实来源、SDK / API / Provider 版本事实、适用端与运行环境要求、鉴权/权限/Scope/网络/额度/限流/计费/合规约束、能力边界、不支持范围、失败影响、Capability Development-Entry Evidence Gate、Capability Realization Requirement、Capability Acceptance Requirement、关联 ARCH / TEST / RISK | 01、03、04、09 | 11、12、13 | Adapter 文件位置、SDK 初始化代码、具体调用代码、环境变量命名或具体变量名、配置文件路径、代码读取方式、部署命令、接口字段实现、数据库实现、开发任务拆分、实际接入过程、实际测试结果、上线结论 |
-| 11 | 梳理 | 测试设计、业务测试顺序、前端一致性验证、自动化策略、验收用例与证明要求 | TEST-ID、关联业务合同、逻辑测试步骤、预期结果、反向路径、前端布局/组件/状态/适配一致性检查、自动化等级、真实环境与证据要求、覆盖矩阵 | 01、02、03、05、06、07、08、09、10 | 12、13、后续测试与验收承接方 | 测试代码/命令/fixture/调度、实际状态或结果、需求新增、实现方案 |
-| 12 | 梳理 | 正式 RISK / DEP / OPEN 的唯一 SoT，归并 01–11 的风险信号、依赖和待决策事项 | 唯一正式 RISK-ID、DEP-ID、OPEN-ID，风险等级、影响范围、阻断阶段、处理策略、关闭条件、依赖验证来源、最晚解除阶段、OPEN 回写目标、确认主体、状态 | 01、02、03、04、05、06、07、08、09、10、11 | 13，以及 13 确认后派生的 14、15 | 已确认业务规则、状态、接口、权限、UI 事实、重复 RISK-ID、替上游关闭 OPEN |
-| 13 | 梳理 | 开发任务合同、当前有效 TASK 视图与冻结 Planning Execution Baseline 的唯一正文；冻结后只追加受影响 TASK revision | TASK-ID、task_revision、当前有效 TASK 视图、执行处置、前端绑定、Ready Gate、完成合同、Planning Execution Baseline 冻结区块 | 首次：已确认且适用的 01–12；增量：既有 Baseline、active Change Set、本次受影响 SoT、Recovery Output | 首次确认后派生 14/15；增量时只更新受影响框架与 Handoff | 首次生成依赖尚不存在的 Baseline、覆盖历史基线快照、把完整 13 当作全部执行队列、删除 TASK 历史或写实际结果 |
+| 11 | 梳理 | 以 FLOW 为主线设计业务测试与端到端证明，区分本地开发期证据、人工/真实设备证据和部署后云端复验证据 | TEST-ID、关联 FLOW/业务合同、完整业务旅程步骤、正向与反向结果、本地业务/E2E 要求、本期部署适用时全部 P0 正向旅程及部署敏感或受变更影响 P1 FLOW 的云端 E2E 要求、前端合同一致性、自动化等级、真实环境与证据要求、覆盖矩阵 | 01、02、03、05、06、07、08、09、10 | 12、13、后续测试与验收承接方 | 测试代码/命令/fixture/调度、实际状态或结果、需求新增、实现方案、用单元/组件/接口片段替代完整业务旅程 |
+| 12 | 梳理 | 正式 RISK / DEP / OPEN 定义的唯一 SoT，归并 01–11 的风险信号、依赖和待决策事项，并保存 Planning 截止时的配置依赖就绪快照 | 唯一正式 RISK-ID、DEP-ID、OPEN-ID，风险等级、影响范围、阻断阶段、处理策略、关闭条件、依赖验证来源、最晚解除阶段、OPEN 回写目标、确认主体、状态；配置类 DEP 还需记录目标环境、责任人、最早需要阶段、脱敏验证方式和阻断范围 | 01、02、03、04、05、06、07、08、09、10、11 | 13，以及 13 确认后派生的 14、15 | 已确认业务规则、状态、接口、权限、UI 事实、重复 RISK-ID、替上游关闭 OPEN、秘密值或生产数据、覆盖下游运行期状态 |
+| 13 | 梳理 | 开发任务合同、当前有效 TASK 视图与冻结 Planning Execution Baseline 的唯一正文；冻结后只追加受影响 TASK revision | TASK-ID、task_revision、当前有效 TASK 视图、执行处置、前端绑定、Ready Gate、完成合同、Long 前配置依赖引用与聚合就绪结果、Planning Execution Baseline 冻结区块 | 首次：已确认且适用的 01–12；增量：既有 Baseline、active Change Set、本次受影响 SoT、Recovery Output | 首次确认后派生 14/15；增量时只更新受影响框架与 Handoff | 首次生成依赖尚不存在的 Baseline、覆盖历史基线快照、把完整 13 当作全部执行队列、删除 TASK 历史或写实际结果、复制配置值或建立第二份依赖清单 |
 | 14 | 派生框架 / 执行承载 | 由 planning skill 在 13 确认后派生并追加式维护的执行事实承载框架 | Planning Execution Baseline revision、TASK contract revision、active Change Set revision、允许执行范围、TASK 状态矩阵、EXEC、偏差/阻断/回写和测试交接位置 | 13、11、12、既有 14 真实事实 | 后续执行与测试承接方 | 重复定义 Baseline/Change Set 正文，覆盖/删除/重置真实事实，为未受影响 TASK 重建 EXEC，把旧事实绑定到新 TASK revision |
 | 15 | 派生框架 / 验收承载 | 验收、发布、复盘和下一期输入引用的事实承载框架；Planning 只维护未填写的受影响占位 | 验收基线、实际 TEST/CAP/RISK/DEP/发布事实区、PROJECT-CURRENT-BASELINE 更新条件与结果、复盘、Requirement Pool 引用 | 11、12、13、14、既有 15 真实事实 | 后续验收承接方、发布后的 Project Current Baseline | 覆盖真实验收/发布事实、复制延期需求正文形成第二来源、把框架状态冒充实际结果、提前更新生产基线 |
 
@@ -433,9 +442,9 @@ PROJECT-CURRENT-BASELINE.md
 - 每个关键逻辑模块必须选择 `extend_existing_domain`、`reuse_shared_capability` 或 `create_stable_business_domain` 之一作为实现承接策略。
 - `extend_existing_domain` 优先扩展现有稳定业务域；`reuse_shared_capability` 复用共享能力；不得创建期次专属实现。
 - 只有现有逻辑域无法合法承接时才允许 `create_stable_business_domain`。09 必须说明无法承接原因、长期业务概念、与现有模块的职责边界、跨期独立意义以及为何不用期次/阶段/版本命名。
-- 09 只确认稳定业务概念和逻辑承接策略，不定义具体目录、类名、数据库表名或迁移脚本名称。
+- 09 确认稳定业务概念和逻辑承接策略；不定义具体目录、类名或迁移脚本名称，但在本期改变持久化结构时必须确认确切物理名称和结构。
 - 本期涉及数据库或持久化时，09 必须按 `13-planning-database-persistence-contract.md` 形成唯一 `database_persistence_contract`，明确复用或新建、目标引擎、各环境拓扑、远程数据库状态、现有资料、迁移、回退、备份、保留删除、敏感数据和凭证边界。
-- `database_persistence_contract` 可以确认数据库产品和版本方向，但不得定义表名、字段类型、索引、外键、SQL、ORM Model、Migration 文件名、真实连接串或凭证。
+- `database_persistence_contract` 必须确认数据库产品和版本方向；本期新建或修改结构时还必须定义表/集合等物理单元、字段类型、键、约束、索引和关系，但不得生成 SQL、ORM Model 代码、Migration 文件名、真实连接串或凭证。
 - 没有实际证据的远程数据库、正式实例、备份、Schema 或脱敏数据只能写为候选、可提供、未知或阻断，不得写成已经就绪。
 - 用户没有技术偏好时可以提出推荐默认值，但必须在第二阶段用适配后的用户语言解释并取得确认；不得把推荐值直接写成用户已确认事实。
 - 纯技术选择只有在不改变业务结果、安全、兼容、成本等级和上线方式时才允许 `explicitly_delegated`，并必须写明委托边界和验证要求。
@@ -445,7 +454,7 @@ PROJECT-CURRENT-BASELINE.md
 - 09 不拥有正式 `RISK-ID`、风险等级和风险闭环；架构风险只移交 12。
 - 09 必须承接 05 的 `style_inheritance_decision`，明确是否复用现有组件、布局和主题体系，允许增加哪些稳定公共组件，并禁止页面内重复实现已有公共能力。
 - 没有 `replace_current` 决策时，09 禁止重写全局导航、主题或组件体系。
-- 数据库相关风险信号、远程库或现有资料依赖、迁移前提和未决选择只移交 12；相关 OPEN 未关闭或 DEP 未满足时，13 中对应 TASK 不得 Ready。
+- 数据库相关风险信号、远程库或现有资料依赖、迁移前提和未决选择只移交 12。相关 OPEN 未关闭时对应 TASK 不得 Ready；只有当前有效且 `earliest_required_stage: before_long` 的 DEP 未达到通过状态时才阻断 TASK Ready 或 execution-ready Handoff。`before_cloud_test | before_release` DEP 只阻断其 `blocking_scope` 对应的下游阶段，不得提前阻断本地 Long。
 
 ### 10-外部能力选型与接入决策
 
@@ -530,6 +539,10 @@ PROJECT-CURRENT-BASELINE.md
 - 不得把测试组织成孤立的页面测试、接口测试、权限测试后再临时拼接业务流程。
 - 必须先证明一条业务 FLOW 能从合法入口完整走到成功终态。
 - 再证明该 FLOW 不能被非法状态、越权、旧对象、旧审批、错误输入或环境污染绕过。
+- 每个适用的 P0/P1 FLOW 必须至少映射一项从真实业务入口走到可观察终态的本地业务测试或端到端证明；单元测试、组件测试、接口片段、类型检查或截图不能独立满足该要求。
+- 本期包含云端部署时，所有 P0 FLOW 的正向业务旅程必须再定义部署后云端端到端复验；P1 对域名、反向代理、云数据库、对象存储、回调、跨服务网络、云端秘密注入、部署构建、真实外部能力敏感或受当前变更影响时同样 required。其余 P1 或本期无部署目标时明确 `not_applicable` 和原因，不得机械重复全部本地测试。
+- 正向成功旅程之外，必须按已确认合同覆盖实际适用的非法跳步、权限拒绝、错误输入、依赖失败、重试/恢复、幂等或旧流程隔离分支；不得为追求数量添加无业务依据的分支。
+- 11 的覆盖矩阵必须能让后续 Testing 逐项判断每条 FLOW 的本地证据和部署后证据是否齐全，但不得填写实际执行结果。
 - 自动化测试通过不等于真实环境能力已验收。
 - 视觉评审通过不等于接口、权限、状态与旧流程隔离已证明。
 - 前端一致性测试必须验证布局体系、同类组件与交互行为、主次操作、空/错/加载/禁用/反馈状态、移动与桌面适配是否继承 05；还必须识别无规划依据的全页重绘和重复创建已有组件。
@@ -604,6 +617,17 @@ OPEN 的关闭
 
 关键 `OPEN` 未关闭时，相关任务不得进入 13。
 
+开发前配置类 `DEP` 规则：
+
+- 只承接 09/10 已定义的数据库、运行环境、账号、权限、外部工具、网络、回调、测试资料或秘密管理前提，不在 12 重新设计方案。
+- 每项必须采用 `04-planning-format-spec.md#12-risk--dep--open-format` 的唯一 DEP schema；本文件不重复定义字段或状态枚举。
+- `earliest_required_stage` 的阶段语义以该 schema 为准；由 Long 在已确认 TASK 中自行创建的配置资产不属于用户前置依赖，应作为 TASK 合同处理。
+- 轮到 12 确认时按 `10-planning-document-interaction-runtime.md` 执行一次集中安全配置引导；聊天只展示用途、配置位置、步骤和脱敏验证方式，不接收 Token、密码、私钥、Cookie、完整连接串、内网入口或生产数据。
+- 配置位置可以引用项目中已经存在并核实的公开示例键名、安全配置入口、官方控制台路径或批准的秘密管理渠道；不得由 Planning 臆造键名、路径或加载方式，也不得把秘密值写进 12。10 仍只定义能力前提，12 只承载 Planning 截止时的就绪事实与安全操作指引。
+- `before_long` 项未达到 DEP schema 的通过状态时，不得准备 `execution_ready` Handoff。`before_cloud_test | before_release` 项可以精确移交对应阶段，但不得伪装为已就绪。
+- `status: superseded` 的历史 DEP 不参与当前阶段聚合；必须按 canonical schema 的 `superseded_by` 解析到当前 DEP 或明确的无替代退役标记。仍被 TASK/Handoff 当作当前依赖引用时属于合同错误，不得静默忽略。
+- 12 的 `status` 是 Planning 截止快照，不是跨阶段持续更新的“当前状态”。`before_cloud_test` 的实际核验由 Testing Runtime 在 `test-validation-results.md` 引用同一 DEP；`before_release` 的后续状态由项目发布/安全流程持有，Testing 只生成带证据引用的 Release Handoff 快照。
+
 ### 13-开发任务合同与落地清单
 
 正式定位：
@@ -663,10 +687,12 @@ OPEN 的关闭
 - 规划阶段只确认逻辑影响面。
 - 文件、目录、代码位置和具体实现方式只能作为候选影响面，必须在后续执行前核实。
 - 每个 P0 TASK 必须关联稳定业务概念、09 实现承接策略和优先核实的现有业务域。
+- 涉及持久化结构的 TASK 必须精确引用 09 当前 `database_persistence_contract.physical_data_design`；`reuse_existing_unchanged` 只允许复用引用 Schema，`modify_existing | create_new` 只允许处理已列存储单元，禁止 TASK 自行增加表、集合、字段、键、约束、索引或关系。
 - TASK-ID 只用于 `trace_only`；不得推导目录、类、表、API、权限、事件、配置或迁移名称。
 - 若执行前核实发现必须创建新的长期业务模块，而 09 没有对应架构决策，应作为架构偏差回写 09，不得静默创建。
 - 13 只汇总实现合同参数的 `confirmed`、`explicitly_delegated`、`blocking_open`、`not_applicable` 状态；具体业务参数仍回写真正拥有该事实的 01–12。
 - `blocking_open` 未关闭时对应 TASK 不得 Ready；P0 主流程仍有 `blocking_open` 时不得准备正式交接。
+- 13 只引用 12 中与 Long 开始有关的配置类 DEP，并计算 `before_long` 聚合就绪结果；不复制配置步骤、值或完整依赖正文。任一 `before_long` DEP 未达到 `ready_verified | user_confirmed_ready | not_applicable` 时，13 可以保持草案并说明阻断，但不得确认执行就绪或准备正式 Handoff。
 - `explicitly_delegated` 必须写明执行层决策范围、项目既有规范、允许边界、验证方式和不得影响的业务结果，禁止只写“实现时决定”。
 - Task Completion 不等于最终验收、真实环境能力通过、已发布或 PROJECT-CURRENT-BASELINE 已更新。
 - UI TASK 必须绑定当前前端体验基线、参考页面、已确认设计资产、允许扩展和禁止重定义内容；所需资产仍须达到 `visual_confirmed` 才能 Ready。
@@ -772,7 +798,7 @@ planning skill 在 13 被确认后必须自动创建 15 的正式框架。
 planning skill 必须预填：
 
 - 本期验收范围。
-- FLOW 验收矩阵。
+- FLOW 验收矩阵，分别预置本地业务/E2E、部署后云端业务/E2E 与人工/真机证据位置。
 - TEST-ID 清单。
 - P0 / P1 / P2 验收门槛。
 - CAP 真实环境验证要求。

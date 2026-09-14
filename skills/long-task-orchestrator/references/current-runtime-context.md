@@ -1,5 +1,13 @@
 # 当前 Runtime 上下文模板
 
+## 目录
+
+- Schema
+- Template
+- Effective State Rule
+- Preflight Result Template
+- Example
+
 本文件是 Runtime State Template。
 
 实例化位置：
@@ -25,6 +33,8 @@ active_change_revision:
 incremental_execution_contract_snapshot:
 execution_constraints_source:
 execution_constraints_status:
+execution_prerequisite_readiness_source:
+execution_prerequisite_readiness_status:
 frontend_experience_binding_source:
 frontend_contract_intake_status:
 frontend_execution_snapshot:
@@ -68,6 +78,7 @@ last_updated:
 runtime_epoch: <project-phase-runtime-epoch>
 context_version: 1
 phase_runtime_directory: <phase_runtime_directory>
+project_root_ref: <从 phase_runtime_directory 到项目根目录的相对路径>
 runtime_mode: main
 based_on_plan: <confirmed Development Landing Checklist path>
 recovery_source: <confirmed Development Landing Checklist path>
@@ -84,6 +95,8 @@ incremental_execution_contract_snapshot:
   prohibited_actions: []
 execution_constraints_source: <field/path reference in Planning Handoff>
 execution_constraints_status: <passed | failed | invalidated>
+execution_prerequisite_readiness_source: <Planning Handoff path>#execution_prerequisite_readiness
+execution_prerequisite_readiness_status: <passed | blocked | invalidated>
 frontend_experience_binding_source: <Planning Handoff path>#frontend_experience_binding
 frontend_contract_intake_status: <passed | blocked | not_applicable | invalidated>
 frontend_execution_snapshot:
@@ -150,6 +163,8 @@ planning_baseline_revision: 当前实际消费的 Planning Execution Baseline re
 active_change_revision: 仅增量 Handoff 存在；初始 Handoff 必须省略字段而非写空值
 incremental_execution_contract_snapshot: 当前 Handoff 六类 TASK 队列和 prohibited_actions 的恢复快照
 frontend_execution_snapshot: 当前 Handoff 允许消费的 UI/UX 合同和资产 revision 指针；不复制 Prompt、合同正文或图片内容
+execution_prerequisite_readiness_source: 当前 Planning Handoff 的前置就绪聚合字段指针；不复制配置步骤、秘密或 DEP 正文
+execution_prerequisite_readiness_status: 当前 Handoff Intake 对 `before_long_status` 和 `unresolved_before_long` 的校验结果
 formal_acceptance_record: 只读路径指针，不授权 Long 创建或写入正式验收记录
 acceptance_status: Long 中固定为 not_started
 acceptance_owner_runtime: 固定为 testing-layer-runtime
@@ -160,7 +175,9 @@ acceptance_owner_runtime: 固定为 testing-layer-runtime
 ```text
 checkpoint-runtime.md and current-runtime-context.md must agree on current_effective_phase
 checkpoint-runtime.md and current-runtime-context.md must agree with Planning Handoff revisions and execution queue snapshot
+checkpoint-runtime.md and current-runtime-context.md must agree on execution prerequisite readiness source and status
 dependency_governance_status must agree with Preflight Result, checkpoint, baseline, and active task
+execution_prerequisite_readiness_status must be passed before task runtime generation and must agree with the current Planning Handoff
 project_execution_baseline_file remains null during first bootstrap until the Baseline instance is written and marked current
 once written, project_execution_baseline_file must point to current Phase Runtime Directory
 patch segment must update current_effective_status
@@ -180,12 +197,14 @@ planning_handoff_intake_passed = false
 planning_handoff_revision_consistency_passed = false
 incremental_execution_contract_loaded = false
 execution_constraints_loaded = false
+execution_prerequisite_readiness_passed = false
 frontend_contract_intake_passed_or_not_applicable = false
 phase_runtime_directory_created = false
 runtime_state_instantiated = false
 implementation_contract_complete_for_task = false
 implementation_placement_confirmed_for_task = false
 dependency_governance_passed_or_not_applicable = false
+required_validation_matrix_complete = false
 preflight_passed = false
 task_runtime_generated = false
 runtime_context_valid = false
@@ -214,6 +233,8 @@ incremental_execution_contract_snapshot:
   prohibited_actions: []
 execution_constraints_source: <Planning Handoff path>#execution_constraints
 execution_constraints_status: passed
+execution_prerequisite_readiness_source: <Planning Handoff path>#execution_prerequisite_readiness
+execution_prerequisite_readiness_status: passed
 frontend_experience_binding_source: <Planning Handoff path>#frontend_experience_binding
 frontend_contract_intake_status: passed
 frontend_execution_snapshot:

@@ -1,5 +1,15 @@
 # 上下文生命周期
 
+## 目录
+
+- Context Metadata
+- Runtime State Ownership
+- 失效条件
+- 首次 Runtime Bootstrap 与已有 Runtime 恢复
+- 恢复与版本升级
+- 快照压缩与 Checkpoint Runtime
+- 清理
+
 ## Context Metadata
 
 ```yaml
@@ -59,6 +69,8 @@ store_project_validation_record_in_skill_references
 store_project_decision_record_in_skill_references
 delete_phase_runtime_directory_during_cleanup
 ```
+
+`long-workflow-state.json` 只保存跨阶段前向账本，不复制 TASK 状态、Matrix 或证据。初始 cycle 为 `preflight -> execution -> completion_validation -> ready_for_local_test`；patch 通常从 ready 以递增 cycle 开始 `patch_execution -> patch_validation -> ready_for_local_retest`。若进入 `completion_validation | patch_validation` 后发现必须改 source、合同或证据，也必须从当前验证阶段开启递增 patch cycle，不倒退或改写旧 cycle。只允许脚本原子追加 hash-chained transition；禁止手改、跳级、覆盖历史或把 blocker 表达为回退。同一阶段内部继续按 `task.md` 依赖关系串行或并行，不把单项命令拆成 workflow stage。
 
 ## 失效条件
 

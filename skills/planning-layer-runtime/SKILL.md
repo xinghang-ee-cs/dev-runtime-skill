@@ -1,6 +1,6 @@
 ---
 name: planning-layer-runtime
-description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并以业务白话逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。第二阶段根据长期用户画像与本期交互调整术语解释，形成可确认的数据库与持久化决策；涉及前端时生成可复制设计 Prompt、页面实现合同、UX 状态迁移合同、版本化设计资产绑定和可由执行/测试层精确消费的 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
+description: 交互式规划层运行时。用于读取目标项目当前基线、在第一阶段先核实可查事实并以业务白话逐轮持久化规划访谈、维护跨期需求池、创建 Planning Context，创建、更新、审查和修复目标项目正式规划目录下的开发规划文档，以及在规划、执行、测试或验收阶段对新增需求、规划遗漏、设计漂移和变更回流进行范围准入、精确失效传播、增量任务合同与增量 Handoff。第二阶段根据长期用户画像与本期交互调整术语解释，形成可确认的数据库与持久化决策，并在不收集秘密值的前提下引导用户完成 Long 开始前必需的环境、账号、外部工具和数据依赖配置；测试设计以业务旅程和端到端证明为主，区分本地证据与部署后云端证据。涉及前端时生成可复制设计 Prompt、页面实现合同、UX 状态迁移合同、版本化设计资产绑定和可由执行/测试层精确消费的 Handoff。覆盖完整一期从当前事实、00–13、Planning Execution Baseline、14/15 框架、执行交接，到实际发布后项目基线更新和期次关闭的规划合同；不能填写测试代码、命令、执行状态、实际测试结果、验收或发布事实。
 ---
 
 # 规划层运行时（Planning Layer Runtime）
@@ -23,7 +23,7 @@ description: 交互式规划层运行时。用于读取目标项目当前基线�
 - `references/07-planning-conversation-runtime.md`：Planning Conversation 行为运行层；编排逐轮持久化、事实调研、需求池核对、完整一期生命周期、三个变更门禁、Planning Execution Baseline 冻结、Implementation Naming / Contract Completeness Gate、增量 Handoff 完整性、前端体验绑定和期次关闭。
 - `references/08-planning-recovery-runtime.md`：上下文压缩与中断恢复、Change Triage 后的精确 Planning Recovery、失效传播、恢复门禁、Runtime Audit 日志与用户隔离。
 - `references/09-execution-intent-guard.md`：Execution Boundary Kernel。所有输入的 execution intent 判定、阻断结果和语义转向规则的唯一事实来源。
-- `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、批量草案装配、依次确认、05 UI/UX Prompt 与设计图收集交互、13 开发前准备总结、最终人话总结确认和状态回写规则。
+- `references/10-planning-document-interaction-runtime.md`：Planning Document Mode 的用户反馈事务、批量草案装配、依次确认、05 UI/UX Prompt 与设计图收集交互、第二阶段开发前配置引导、13 开发前准备总结、最终人话总结确认和状态回写规则。
 - `references/11-planning-ui-ux-execution-contract.md`：涉及正式页面或用户可见交互时必读；定义 copy-ready Prompt、页面/模块实现合同、UX 状态迁移、版本化资产、精确 Handoff 绑定及 UI/UX Execution Readiness Gate。
 - `references/12-planning-ui-ux-execution-example.md`：生成或审查 execution-ready 05 时按需读取的完整结构示例；示例值不得当作目标项目事实。
 - `references/13-planning-database-persistence-contract.md`：涉及业务数据持久化、数据库、现有/远程数据库、数据迁移或数据库环境时必读；定义第一阶段业务化数据发现、用户画像驱动的第二阶段术语解释、09 数据库决策合同和确定性校验。
@@ -71,7 +71,7 @@ Execution Boundary Kernel 的完整定义见 `references/09-execution-intent-gua
 
 `.runtime/planning-layer-runtime/` 是项目级规划启动上下文。
 
-它用于在规划访谈开始前理解当前用户、稳定项目身份、规划偏好和上下文入口。
+它用于在规划访谈开始前理解当前用户、稳定项目/部署身份、紧凑历史运行边界、规划偏好和上下文入口。
 
 结构：
 
@@ -95,7 +95,7 @@ Execution Boundary Kernel 的完整定义见 `references/09-execution-intent-gua
 - `README.md` 不是必建文件；只有确实需要向人说明本地边界时才按需创建。
 - `user-profile.yaml` 是长期稳定用户交互倾向和规划协作偏好的唯一来源。
 - 第二阶段解释专业规划内容前，把 `user-profile.yaml` 中无冲突的高置信长期偏好与本期 Discovery 表现合并为 `current-interaction.yaml.explanation_adaptation`；当前明确表达优先，无法判断时默认先用人话解释术语。
-- `environment-profile.yaml` 存放后续 Planning 需要复用的稳定项目与开发环境事实，不得保存任何凭证。
+- `environment-profile.yaml` 存放后续 Planning 需要复用的稳定开发/部署身份及历史日志脱敏聚合结果；不保存凭证、原始日志、逐点采样或业务数据。部署身份只在缺失或用户明确迁移时重新判断，运行摘要不进入第一阶段业务提问。
 - `project-profile.yaml` 只存放项目身份、稳定项目描述和项目当前基线文件路径。
 - `context-index.yaml` 只在确有多个稳定上下文入口时创建，并且只存放入口路径。
 
@@ -170,6 +170,7 @@ project_current_baseline_path:
 Execution Boundary Kernel（09）
 -> Planning Intent routing（07）
 -> Load .runtime/planning-layer-runtime Bootstrap Context（按需）
+-> 复用部署身份，并静默消费上一运行窗口的脱敏聚合摘要；缺失时不猜测
 -> Bind requirement_pool_path 与本期工作包路径
 -> 创建本期 current-interaction.yaml，保存初始需求与 discovery_checkpoint
 -> Project Current State Gate（07）
@@ -194,10 +195,18 @@ Execution Boundary Kernel（09）
 本期涉及数据库或持久化
   -> 06 只确认业务事实、持久化需求、状态与数据域语义
   -> 09 按 13 形成数据库与持久化决策合同
-  -> 第二阶段直接向用户展示复用/新建、数据库类型、环境拓扑、远程库、现有资料、迁移/回退与数据治理摘要
+  -> 第二阶段直接向用户展示复用/新建、数据库类型、环境拓扑、确切物理存储设计、远程库、现有资料、迁移/回退与数据治理摘要
   -> 按 explanation_adaptation 决定术语解释深度；用户当前反馈优先
   -> 运行 Database And Persistence Decision Gate 与确定性校验
   -> blocking_open 移交 12 并阻断对应 TASK Ready
+
+requires_execution_handoff: true
+  -> 11 以 FLOW 为主线定义本地业务/端到端证明；本期包含云端部署时，为全部 P0 正向旅程以及部署敏感或受变更影响的 P1 FLOW 定义云端端到端复验要求
+  -> 轮到 12 确认时，汇总 09/10/12 中全部开发前配置与外部依赖
+  -> 按最早需要阶段区分 Long 前、云端测试前和发布前依赖
+  -> 对必须由用户或外部方在 Long 前完成的项执行第二阶段安全配置引导
+  -> 只核对配置存在性、责任人与脱敏证据，不在聊天或文档接收秘密值
+  -> Long 前必需项全部就绪后，才允许准备 execution_ready Handoff
 
 存在正式页面或用户可见交互变化
   -> 按 11 生成可复制 Prompt、UI Implementation Contract、UX Interaction Contract 与版本化资产索引
@@ -272,7 +281,8 @@ Planning Document Mode 的批量草案装配、跨文档校验、依次解释确
 - Planning Execution Baseline 完整正文只由 13 承载；Change Set 完整历史只以 Decision Snapshot 追加到本期既有 `planning-runtime/decision-log.md`。`current-interaction.yaml`、14、15 和 Handoff 只保存或引用必要 revision。
 - 执行、测试或验收发现的问题必须先按 `references/07-planning-conversation-runtime.md` 分类；只有需要规划回流的分类才调用 `references/08-planning-recovery-runtime.md`。
 - 增量修订只重建 Recovery Output 和 Change Set 明确列出的受影响文档、TEST、TASK 与尚未填写真实事实的框架占位；完整 13 不等于全部待执行队列，但原基线中尚未完成且仍有效的 TASK 必须继续进入增量 Handoff。
-- `11-测试方案与验收用例.md` 只定义测试设计：按什么业务顺序证明什么、测试类型、自动化等级、真实环境要求和预期证明结果。
+- `11-测试方案与验收用例.md` 只定义测试设计：按什么业务顺序证明什么、测试类型、自动化等级、真实环境要求和预期证明结果。每个适用 P0/P1 FLOW 必须有本地业务或端到端证明要求；本期包含云端部署时，全部 P0 正向旅程以及部署敏感或受变更影响的 P1 FLOW 还必须有绑定部署版本的云端端到端复验要求。单元、组件、接口片段或纯视觉结果不得替代完整业务旅程证明。
+- 第二阶段的开发前配置引导只处理 09/10 已定义、12 归并的依赖：说明用途、配置位置、责任人、安全步骤、脱敏验证方式、最早需要阶段和阻断范围。不得索取或保存 Token、密码、私钥、Cookie、完整连接串或生产数据；用户或外部方必须在 Long 前提供而仍未就绪的依赖会阻断 `execution_ready`，只在云端测试或发布前需要的依赖则精确移交对应阶段。
 - 规划文档不得定义测试代码、测试命令、fixture 脚本、测试执行调度、失败重试命令、实际执行状态、实际证据内容或实际测试结果。
 
 ## Static Skill And Project Runtime Boundary

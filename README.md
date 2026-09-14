@@ -34,6 +34,19 @@ After the planning baseline is frozen, accepted requirement or contract changes 
 
 The repository has two version levels: a GitHub Release identifies one jointly validated bundle, while each Skill has its own SemVer in [`skills-manifest.json`](skills-manifest.json). Neither the README nor `SKILL.md` is a version source.
 
+The current bundle declared by the manifest is:
+
+| Component | Version |
+| --- | --- |
+| Repository Release | `v1.0.0` |
+| `planning-layer-runtime` | `1.0.0` |
+| `long-task-orchestrator` | `1.0.0` |
+| `testing-layer-runtime` | `1.0.0` |
+| `ai-code-inspection` | `0.1.0` |
+| Synchronization tool | `0.1.1` |
+
+This table is a human-readable snapshot only. [`skills-manifest.json`](skills-manifest.json) remains the authoritative version source.
+
 An installed target project receives:
 
 ```text
@@ -53,11 +66,13 @@ Compatible patch updates are applied automatically by default. Minor and major u
 
 See [Versioning and updates](src/content/docs/reference/versioning-and-updates.md) for the full command and release policy.
 
-### Release tags and a copy-ready migration/update prompt
+### Release tags and a copy-ready Skill + Runtime migration prompt
 
-Stable GitHub Release tags use `vMAJOR.MINOR.PATCH`, for example `v0.2.0`. The tag identifies the jointly validated repository bundle; the versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release or an exact tag such as `v0.2.0` when the target project must reproduce a specific bundle. After installation, `runtime-skills.lock.json` records what that project actually uses.
+Stable GitHub Release tags use `vMAJOR.MINOR.PATCH`; the current manifest declares `v1.0.0`. The tag identifies the jointly validated repository bundle; the versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release or an exact tag such as `v1.0.0` when the target project must reproduce this bundle. After installation, `runtime-skills.lock.json` records what that project actually uses.
 
-Paste the following prompt directly into the Agent that is working in the target project. It handles both an existing managed installation and an older unversioned copy. It uses the latest stable Release as-is; append an exact target such as `Target Release: v0.2.0` when required.
+Updating Skill files does not upgrade Runtime state already created inside a project. This matters for `v1.0.0`: the forward workflow ledgers, Planning prerequisite contracts, Long machine-execution receipts, Testing evidence hashes, and deployment bindings are intentionally stricter than the pre-1.0 formats. An unfinished legacy phase must be recovered into a fresh current-version Runtime epoch and revalidated; a prior Agent-written `passed` value is not grandfathered.
+
+Paste the following prompt directly into the Agent that is working in the target project. It handles the managed/unversioned Skill copies and the current project's unfinished legacy Runtime state. It uses the latest stable Release as-is; append an exact target such as `Target Release: v1.0.0` when required.
 
 ```text
 Adopt or update Runtime Skills in the current project.
@@ -68,14 +83,18 @@ Target Release: latest stable, unless I explicitly provide a vMAJOR.MINOR.PATCH 
 Take responsibility for the workflow from inspection through verification. Treat the current project root as the only target; do not ask me to move or edit files manually.
 
 1. Inspect runtime-skills.lock.json, .runtime-skills/runtime-skills.py, AGENTS.md, CLAUDE.md, and supported project-level Skill roots such as .agents/skills/, .claude/skills/, and .github/skills/. Identify the currently installed Runtime Skills, every destination copy, the Agent platforms in use, local Git changes, and any active phase pin. Do not scan unrelated projects.
-2. If the lock file exists, treat this as a managed installation even when the project-local synchronization entry point or a managed copy is missing. When the entry point is healthy, first run verify and remote status, then run diff against the requested Release. When it is missing or verify reports drift, use a temporary trusted copy of the tool from the locked/requested Release to diagnose it; do not reclassify the project as an unmanaged installation or repair it without approval. If an active phase is pinned, do not update or bypass the pin; report the installed version and defer the update. Apply a compatible patch through sync. For a minor or major change, summarize the affected Release, Skill versions, added/modified/removed files, and compatibility impact, then wait for my explicit confirmation before running update with the required --allow level.
+2. If the lock file exists, treat this as a managed installation even when the project-local synchronization entry point or a managed copy is missing. When the entry point is healthy, first run verify and remote status, then run diff against the requested Release. When it is missing or verify reports drift, use a temporary trusted copy of the tool from the locked/requested Release to diagnose it; do not reclassify the project as an unmanaged installation or repair it without approval. Apply a compatible patch through sync. For a minor or major change, summarize the affected Release, Skill versions, added/modified/removed files, and compatibility impact, then wait for my explicit confirmation before running update with the required --allow level. Never silently bypass an active phase pin: normally defer the update; when the requested major update is specifically needed to migrate an unfinished legacy Runtime, offer one controlled transition for explicit confirmation—record the old lock/pin and Runtime sources, unpin with the tool, perform the approved update and steps 7–10, then pin the active phase to the new bundle again. If I do not approve that transition, leave everything pinned and unchanged.
 3. If Runtime Skill directories exist without a lock file, treat them as unmanaged legacy copies. Obtain the requested stable Release from the source repository in a temporary location. Infer the exact existing Skill names and destination roots without adding or removing Skills. Run the install command once without --overwrite-local-changes so the tool reports the incoming additions, modifications, and removals. Show that comparison and wait for my explicit approval before rerunning with --overwrite-local-changes to adopt the Release, create runtime-skills.lock.json, and install .runtime-skills/runtime-skills.py.
 4. If neither a managed installation nor legacy Runtime Skill copies exist, stop and tell me this is a first installation; ask only for any Agent platform or Skill selection that cannot be determined from the current project, then use the repository's installation flow.
 5. Preserve all project-specific instructions. Merge only applicable routing and safety rules into AGENTS.md, and maintain the CLAUDE.md import when Claude Code is used. Never replace either file wholesale. Never silently overwrite local Skill changes, mix copies from different Releases, downgrade a Skill, expose credentials, modify business code, run database migrations, deploy, commit, or push.
-6. After an approved migration or update, run verify. Report the previous Release and Skill versions -> installed Release and Skill versions, the exact destinations, lock-file state, phase-pin state, merged instruction files, and any unresolved drift or decisions. If remote access is unavailable, say so and distinguish local verification from a successful latest-version check.
+6. After an approved Skill migration or update, run verify. Report the previous Release and Skill versions -> installed Release and Skill versions, the exact destinations, lock-file state, phase-pin state, merged instruction files, and any unresolved drift or decisions. If remote access is unavailable, say so and distinguish local verification from a successful latest-version check.
+7. After Skill verification, inspect only the current project's Planning, Long, and Testing state locations referenced by the project instructions, handoffs, and active phase. Classify each phase as: no Runtime state, closed historical state, unfinished legacy state, or already-current state. Never rewrite a closed historical phase merely to make it match the new schema.
+8. For every unfinished pre-1.0 legacy phase, preserve its confirmed source-of-truth documents, requirement pool, user profile, interaction/event history, task facts, findings, and evidence as read-only migration sources. Do not fabricate a forward-state history or mutate old failed/blocked evidence into passed. Use the newly installed Skill's recovery/entry procedure to create a fresh current-version Runtime epoch from those sources; only an already-current Runtime may resume or open a new forward cycle. Retain traceability to the legacy location, and ask only about facts that remain genuinely unknown; do not ask the user to repeat already recorded answers.
+9. Rebuild only the current contracts required by the installed Skills. Planning must restore persisted discovery, requirement-pool, user-profile, and environment-profile state. Reuse a known deployment identity unless the user declared a move, and migrate only sanitized project-process extrema/anomaly summaries rather than raw logs. For persistence, unchanged reuse must cite the real schema; created or changed storage must confirm every physical unit, field, key, constraint, index, and relation while forbidding extra tables. Planning must also validate applicable UI/UX contracts and prove every before-Long prerequisite. Long must declare project_root_ref, complete source_roots, a current Required Validation Matrix, and one machine_execution probe per success postcondition; treat the phase as the formal validation closure, enter the forward workflow in order, and rerun every current required item through run-long-validation.sh or run-long-validation.ps1 so each passed result cites a new machine-execution receipt. Testing may inherit only a currently valid Long readiness receipt, must bind reused validations to their source receipt/evidence hashes, and must rebuild the applicable local/cloud/release state and deployment identity through forward transitions. Treat legacy pass/ready/accepted labels as historical claims until the current validator proves them; never skip directly to a ready or final state.
+10. Run every applicable validator from the newly installed Skill directories; if step 2 temporarily removed an active phase pin, restore that pin to the new bundle before stopping. Then report: migrated and untouched phase paths, the new Runtime epoch/cycle, preserved legacy sources, regenerated contracts/receipts, rerun checks and outcomes, final pin state, unresolved blockers, and the exact next permitted action. Do not start feature implementation, manual acceptance, deployment, database migration, commit, or push unless I separately requested it.
 ```
 
-For an exact managed update, the synchronization commands accept the Release tag directly, for example `--release v0.2.0`. Do not use a tag that has not been published as a GitHub Release.
+For an exact managed update, the synchronization commands accept the Release tag directly, for example `--release v1.0.0`. Moving from a pre-1.0 Release requires explicit `update --allow major`; `sync` will report it but will not silently cross that boundary. Do not use a tag that has not been published as a GitHub Release.
 
 ## Install in an Agent project
 

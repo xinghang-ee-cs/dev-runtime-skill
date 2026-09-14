@@ -1,4 +1,4 @@
 interface:
   display_name: "Testing Layer Runtime"
-  short_description: "Validate long evidence, UI/UX contracts, and acceptance."
-  default_prompt: "Use $testing-layer-runtime for phase testing, revision-aware long handoff reuse, exact UI/UX contract and asset verification, test ordering, manual/device/server/external validation, final acceptance evidence, change triage, and release handoff. Reuse valid long automation, bind manual UI checks to PAGE, UX-SCN, ASSET revisions, and pass durable writeback/progression gates for every test item."
+  short_description: "Close local and deployed business-journey testing."
+  default_prompt: "Use $testing-layer-runtime only after Long's frozen readiness receipt verifies. Advance only through the coarse forward test stages without turning commands or manual actions into micro-stages; preserve the existing per-item progression gate while allowing a test runner's safe internal parallelism. Map every in-scope FLOW to durable local business/E2E evidence; when deployed, bind cloud evidence to the complete identity, reconcile each identity change, verify release dependencies with their own prerequisite results, and keep findings open through retest closure."

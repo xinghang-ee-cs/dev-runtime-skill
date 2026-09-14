@@ -1,5 +1,12 @@
 # Task 状态机
 
+## 目录
+
+- 1–3. 状态枚举、流转与进入条件
+- 4. task.md 结构与 Current Task State Table
+- 5. 状态更新规则
+- 6. 状态证据写入位置
+
 本文件定义 `task.md` 的运行态状态机。
 
 `task.md` 是运行期执行控制表，不是正式计划来源。
@@ -104,13 +111,17 @@ INVALIDATED -> DONE
 - 实现动作已完成。
 - 已记录实际改动文件。
 - 已确认不存在架构/合同偏差；存在时必须转入 `BLOCKED`。
-- 准备执行验证门禁。
+- 当前实现单元的局部检查与主 Agent 实现复核已完成。
+- 等待全部 scope 内实现物化后，由本期唯一 Required Validation Matrix 统一执行正式验证。
+
+`WAITING_VALIDATION` 是“实现已完成、等待本期验证”的稳定状态，不是单个 TASK 的正式闭环。不得为了让一个 TASK 提前 `DONE` 而重复运行本期 Matrix。
 
 ### IN_REVIEW
 
 进入条件：
 
-- 已执行验证，或已记录验证不可用原因。
+- 本期 Required Validation Matrix 已统一执行，当前 TASK 映射的项已有该次本期验证证据；只有 `optional | not_applicable` 项允许记录不可用原因。
+- 任一 `required` 项不可执行、失败、阻断或缺失时转入 `BLOCKED`，不得进入 `IN_REVIEW`。
 - 验证结果已写入 `Phase Runtime Directory/validation-results.md`。
 - 如使用 subAgent，subAgent 输出已返回。
 - 等待主 Agent 复核是否可采纳。
@@ -120,11 +131,22 @@ INVALIDATED -> DONE
 进入条件：
 
 - 完成证明成立。
-- 验证证据成立，或验证不可用原因已记录。
+- 本期正式验证已完成；当前 TASK 映射的所有 `required` 验证均有当前 matrix revision 下的最新 `passed` 证据，全部成功后置条件成立。
+- optional 验证不可用时已记录原因；不存在用 optional 结果补偿 required 缺失的情况。
 - 主 Agent 已复核。
 - 无未处理高风险偏差。
 - `execution_constraint_validation.result = passed`。
 - 已同步正式执行记录。
+
+以下情况即使实现文件存在、类型检查通过或主 Agent 已复核，也不得 `DONE`：
+
+```text
+required_validation_missing
+required_validation_failed_or_blocked
+required_validation_not_run_or_skipped
+required_postcondition_not_proven
+validation_evidence_matrix_revision_stale
+```
 
 ### PARTIAL
 
@@ -143,6 +165,7 @@ INVALIDATED -> DONE
 - 上游计划冲突。
 - 依赖缺失。
 - 验证命令不可确认且无替代证据。
+- Required Validation Matrix 不完整、当前 TASK 映射缺失，或 required 验证失败、阻断、未运行、后置条件未证明。
 - 所有权边界冲突。
 - 继续执行可能破坏接口、权限、状态、数据或共享环境。
 - 业务/合同参数缺失或为 `blocking_open`。
@@ -210,6 +233,9 @@ Static Task Definition 只包含静态字段。
 - 是否允许并行：是/否
 - 是否允许委派：是/否
 - 验证方式：
+- Delivery Unit Refs：
+- Required Validation Matrix Revision：
+- Required Validation Refs：
 - 完成证明：
 - Planning 追踪来源：
 - Planning Baseline Revision：
@@ -240,6 +266,8 @@ Static Task Definition 只包含静态字段。
 字段规则：
 
 - Planning 追踪来源只引用 Planning ID 与路径，不作为实现命名来源。
+- Delivery Unit Refs 和 Required Validation Refs 只引用 `project-execution-baseline.md.required_validation_matrix` 中的 ID，不复制命令、探针、后置条件或另建要求清单。
+- Required Validation Matrix Revision 必须与当前 Baseline 一致；revision 变化时按影响范围失效旧验证，不得沿用 stale evidence。
 - Active Change Revision 在初始 Handoff 中必须省略；增量 Handoff 中必须与 Planning Handoff 一致。
 - Execution Disposition 只允许 `execute_only`、`resume_only`、`reexecute_affected_part`；`context_only`、`completed_locked`、`cancelled` 不得生成可执行 Static Task Definition。
 - 稳定业务概念不得使用期次、阶段、Sprint、版本或 Planning ID。

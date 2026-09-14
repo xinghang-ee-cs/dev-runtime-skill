@@ -1,5 +1,14 @@
 # Planning Document Interaction Runtime
 
+## 目录
+
+- 0. 交互目标与用户反馈事务
+- 1. 文档确认规则
+- 2–4. 批量装配、输入完整性与确认门禁
+- 5. Role-Based Document Explanation Gate
+- 6. User-Facing ID Translation Rule
+- 7–8. 最终人话确认、偏好合并与结束回复
+
 本文件是 Planning Document Mode 中批量草案装配、依次解释确认、定向修正和状态回写的唯一事实来源。
 
 本文件不新增规划生命周期，不新增 Runtime 状态机，不替代 `03-planning-doc-responsibility.md`、`04-planning-format-spec.md`、`06-planning-capability-governance.md` 或 `07-planning-conversation-runtime.md`。
@@ -37,6 +46,7 @@ Discovery 问答事务由 `07` 维护；本文件从执行交接分支确认与�
 - 执行交接分支确认。
 - 批量装配因事实不足而回流第一阶段时的阻断事实确认。
 - 05 确认过程中的 UI/UX Prompt 交付、设计图接收与视觉确认。
+- 12 确认过程中的开发前配置引导、脱敏就绪反馈和阻断确认。
 - 文档草案生成后确认。
 - 用户要求解释后的再次确认。
 - 风险或冲突确认。
@@ -153,6 +163,8 @@ Freeze Document Assembly Plan
 -> Select first confirmation item
 -> Persist draft_confirmation Target
 -> If current item is 05 and required design assets are not visual_confirmed: run Design Asset Collection Interaction Gate
+-> If current item is 12 and requires_execution_handoff is true: run Second-Stage Execution Prerequisite Readiness Interaction
+-> If next item is 13 and before_long readiness is unresolved or invalidated: temporarily return to the same 12 prerequisite interaction before presenting 13
 -> Role-Based Document Explanation Gate
 -> Receive feedback and persist before processing
 -> Validate Feedback Binding
@@ -255,7 +267,7 @@ assembly_status: <batch_assembling | awaiting_confirmation | confirming | rebuil
 09/10/11 文档确认门禁：
 
 - Architecture Binding Gate：每条 P0 FLOW 都有逻辑架构承接位置；每个关键模块已选择实现承接策略并关联稳定业务概念；`create_stable_business_domain` 已说明现有域无法承接的原因和跨期独立意义；每个 Canonical API Contract 都有 Architecture Binding；每项旧资产都明确允许复用什么技术基础、禁止复用什么业务语义；旧审批、旧入口、旧状态无法进入新 Command、新 State 或新 Decision View；外部能力未完成 10 选型时，不得伪装为具体 Provider 已确认；架构风险只移交 12，不在 09 重复定义正式 RISK。不满足时，09 不得确认。
-- Database And Persistence Decision Gate：本期涉及数据库或持久化时，06 已明确持久业务事实与数据域语义，09 已按 `13-planning-database-persistence-contract.md` 形成唯一合同；现有库、目标引擎、环境拓扑、远程库、可提供材料、迁移、回退、隔离、备份、保留删除、敏感数据和凭证边界均已覆盖；当前事实、候选默认值、用户确认和明确委托没有混写；默认校验通过 `scripts/validate_database_persistence_contract.py <09-path>`。`blocking_open` 只允许批量草案使用 `--allow-blocked` 校验，09 不得确认且相关 TASK 不得 Ready。不满足时，09 不得确认。
+- Database And Persistence Decision Gate：本期涉及数据库或持久化时，06 已明确持久业务事实与数据域语义，09 已按 `13-planning-database-persistence-contract.md` 形成唯一合同；现有库、目标引擎、环境拓扑、远程库、可提供材料、物理存储设计、迁移、回退、隔离、备份、保留删除、敏感数据和凭证边界均已覆盖；复用旧结构有真实 Schema 来源，改变结构时表/集合等单元与字段、键、约束、索引、关系已确认且禁止额外新增；当前事实、候选默认值、用户确认和明确委托没有混写；默认校验通过 `scripts/validate_database_persistence_contract.py <09-path>`。`blocking_open` 只允许批量草案使用 `--allow-blocked` 校验，09 不得确认且相关 TASK 不得 Ready。不满足时，09 不得确认。
 - Capability Decision Gate：每项外部能力都有 CAP-ID；每个 CAP 都关联 FLOW、MODULE、ARCH、TEST 和 RISK；每个 CAP 都明确候选方案、选型状态、选择理由、官方事实和关键前提；官方事实、权限、鉴权、版本、配额、计费、目标端兼容性未确认时，必须标记阻断范围；页面可打开、JSSDK ready、Mock 成功、代码存在，均不得视为真实能力成功；未完成 Capability Development-Entry Evidence Gate 的 CAP，不得进入相关开发任务；planning 阶段不得标记 `real_environment_verified` 或 `release_ready`。不满足时，10 不得确认。
 - Test Design Gate：每条 P0 FLOW 都有正向业务流程测试；每条 P0 FLOW 都有前置阻断、状态、接口、权限、旧流程和回归测试；涉及外部能力的 FLOW 都有真实环境能力测试；涉及页面和交互的 FLOW 都有 UI 行为或 UX 测试；每条测试都明确自动化等级；11 中的测试顺序与 01 FLOW 顺序一致；11 不记录实际测试结果。不满足时，11 不得确认。
 
@@ -414,6 +426,54 @@ Read 05 asset plan and exact Prompt revisions
 - 数据库是复用还是新建、开发与正式环境如何隔离、远程库和已有资料是否就绪，以及仍有哪些数据库依赖会阻断任务。
 - 是否仍存在会让开发中途停止的关键参数缺口；存在时不得引导用户确认 13。
 
+### 5.3 Second-Stage Execution Prerequisite Readiness Interaction
+
+本 Gate 只在 `requires_execution_handoff: true` 时适用，首次在轮到 12 确认时进入；若用户暂缓、就绪证据失效或准备 13 时仍有 `before_long` 未就绪项，只针对这些项恢复同一交互，直到通过或用户暂停本期。它复用 12 的 `document / draft_confirmation`（已确认 12 时使用 `supplement`）交互目标、`latest_feedback` 事务和 12 中的 DEP；不新增配置 Runtime、环境台账、秘密文件或第二份依赖清单。
+
+目标：在 Long 开始前，尽可能把必须由用户或外部方完成的环境、账号、外部工具、数据库资料、网络、回调、权限和秘密管理前提准备好，而不是等 Long 执行到一半才发现缺失。
+
+本交互只更新 Planning 期间的同一 DEP 快照。`before_cloud_test` 与 `before_release` 在这里说明责任人、位置、最早阶段和安全验证方法，但不要求提前完成；进入下游后，实际状态分别写入 Testing 正式结果与项目发布/安全流程，并继续引用同一 DEP-ID，不回写 12。
+
+唯一顺序：
+
+```text
+读取已确认 09/10 与当前 12 草案
+-> 归并配置类 DEP，去重并保留上游合同引用
+-> 区分 agent_provisionable_in_confirmed_task 与 user_or_external_prerequisite
+-> 按 earliest_required_stage 分类 before_long / before_cloud_test / before_release
+-> 对 before_long 的 user_or_external_prerequisite 生成集中安全配置引导
+-> 先写 active_interaction 的当前 12 draft_confirmation 目标和 expected_user_action
+-> 再向用户展示可执行步骤
+-> 用户反馈后先写 latest_feedback，再更新同一 DEP 状态与脱敏证据引用
+-> 未就绪项说明责任人、阻断范围和恢复条件
+-> 重新计算 before_long 聚合就绪；12 可以确认真实阻断事实，13 不得确认执行就绪且不得准备 execution_ready Handoff，直到聚合结果通过
+```
+
+用户态每项必须按实际情况说明：
+
+1. **要准备什么**：先用业务白话说明用途，必要术语按 `explanation_adaptation` 解释。
+2. **为什么现在需要**：说明它会阻断哪个开发任务、启动验证或最小业务流程。
+3. **在哪里配置**：只给项目已有配置入口、公开官方控制台路径、秘密管理渠道或负责人，不展示真实秘密位置和内容。
+4. **怎么完成**：提供最短安全步骤；多个互不依赖的简单项可以同批给出，存在真实依赖时按顺序拆分。
+5. **如何确认**：优先使用不显示值的存在性检查、项目公开示例键对照、受控连接/权限探针或用户“已在批准渠道配置”的明确反馈。
+6. **完成后会怎样**：说明 Long 可以完成哪些范围；仍未就绪时明确只阻断什么。
+
+安全边界：
+
+- 禁止要求用户在聊天、规划文档、截图或 Runtime 中发送 Token、密码、私钥、Cookie、完整连接串、内网地址、生产账号或生产数据。
+- 工具能够安全检查时，只检查键、文件、授权对象或资源是否存在以及目标进程是否具备读取路径，不读取、输出或持久化值；不能安全检查时接受用户的明确就绪确认，并标记 `user_confirmed_ready`，不得伪造 `ready_verified`。
+- 需要用户登录外部控制台、授权第三方、创建付费资源、改变生产环境或提供敏感资料时，只提供指导并等待用户完成；Planning 不代替用户执行外部配置。
+- 项目代码或已确认 TASK 能在 Long 内安全创建的本地容器、配置模板、测试替身或脚手架，不得变成用户前置动作；在 13 中作为正常 TASK 合同承接。
+- 只在云端测试或发布前需要的项保留为精确 DEP 并移交对应阶段，不得为了提前完成 Planning 要求用户现在配置生产秘密，也不得把它们错误阻断 Long。
+
+交互规则：
+
+- 配置反馈属于当前 12 文档目标的 `supplement` 或 `correct`，不自动确认 12；全部需要的反馈应用并回读后，才重新输出 12 人话总结并请求文档确认。
+- 用户不理解时先解释业务影响和推荐路径；用户有明确技术方案时，以不违反安全和已确认业务合同的当前反馈为准。
+- 用户选择暂不完成 `before_long` 项时，12 保持可确认的依赖事实，但 Planning 不得准备 `execution_ready` Handoff；应说明恢复所需的一个下一步，而不是把阻断转移给 Long。
+- 12 已确认后才收到“已配置”反馈时，必须把确认目标临时切回同一 12 的 `supplement`，先持久化反馈并更新 DEP/聚合结果，再重新派生受影响的 13 草案；不得修改聊天记忆后直接放行 13，也不得要求用户重新确认未变化的全部 12 内容。
+- `before_long` 状态只能来自项目脱敏证据或用户明确反馈；“文档中已经写了配置要求”“存在 `.env.example`”“代码里有读取逻辑”都不等于已经配置完成。
+
 错误示例：
 
 ```text
@@ -500,12 +560,14 @@ Planning Context COMPLETE
 - Handoff 标记为 `execution_ready`。
 - 13 已确认，14/15 已派生且 Execution and Acceptance Framework Derivation Gate 已通过。
 - Task Contract Gate、Implementation Naming Gate、Implementation Contract Completeness Gate 已通过。
+- Execution Prerequisite Readiness Gate 已通过。
 - Handoff 已包含 `execution_constraints`，且不存在 P0 `blocking_open` 参数。
+- Handoff 的 `execution_prerequisite_readiness.before_long_status` 为 `passed`，不存在需要用户或外部方在 Long 前完成却仍未就绪的 DEP。
 
 当 `requires_execution_handoff: false`：
 
 - Handoff 标记为 `planning_only`。
-- Handoff 不包含 13、14、15 对应职责，也不包含针对代码实现的 `execution_constraints`。
+- Handoff 不包含 13、14、15 对应职责，也不包含针对代码实现的 `execution_constraints` 或 `execution_prerequisite_readiness`。
 - 不存在阻断本期规划结束的 OPEN。
 - 不要求 13、14、15 或实现类 Gate。
 
@@ -580,6 +642,8 @@ planning_only：确认后，本期规划正式结束；当前不形成开发执�
 | 现有模块承接 | 已明确优先核实范围 | 执行前仍需核实现有代码 |
 | 新模块 | 是否需要及架构原因 | 未经 09 确认不得新建 |
 | 数据库与数据环境 | 复用/新建方向、开发与正式环境隔离、远程库和现有资料状态 | 未确认或未满足的数据库依赖阻断对应任务 |
+| 开发前环境与外部工具 | Long 前必需项是否已通过脱敏证据或用户确认就绪 | 未就绪时规划可保留，但不能交给 Long 开始执行 |
+| 云端测试与发布前准备 | 当前尚待配置的云端、回调、账号或正式环境依赖 | 不阻断本地 Long 时精确移交 Testing / 发布流程，不冒充已就绪 |
 | 关键业务参数 | 已确认或尚缺失 | 仍有关键缺口时不能开始对应任务 |
 | 技术参数 | 已明确委托范围 | 执行层只可在边界内决定 |
 

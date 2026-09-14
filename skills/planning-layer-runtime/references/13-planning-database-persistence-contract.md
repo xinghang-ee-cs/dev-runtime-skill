@@ -1,11 +1,21 @@
 # Database And Persistence Planning Contract
 
+## 目录
+
+- 1–2. Scope 与职责边界
+- 3. 第一阶段业务化数据发现
+- 4. 用户画像驱动的解释适配
+- 5. 第二阶段数据库与持久化合同
+- 6–7. 安全默认建议与用户确认
+- 8. Gate And Validation
+
 ## 1. Scope
 
 本文档负责数据库与持久化规划在两个阶段中的边界：
 
 - 第一阶段只发现会影响数据方案的业务事实，并保持引导式、业务化表达。
 - 第二阶段在 `06` 解释业务数据与状态，在 `09` 形成并向用户确认数据库与持久化决策合同。
+- 第二阶段把数据库方案中必须由用户或外部方准备的实例、结构资料、脱敏数据、访问授权或秘密管理入口转成安全配置引导，并由 12 承接 Planning 截止状态快照；云端测试或发布阶段的实际核验状态由对应下游运行时承载。
 - 根据长期用户画像与本期 Discovery 表现调整第二阶段术语解释深度。
 - 把数据库依赖、风险、待决策项和执行门禁精确传递给 `12`、`13`、Handoff、Long 与 Testing。
 
@@ -16,7 +26,7 @@
 - 现有数据库是否复用、是否可提供或是否可以安全访问尚未明确。
 - 06、09、12、13 或 Handoff 正在生成、确认或恢复，且存在数据库相关任务。
 
-本文件不定义数据库表名、字段类型、索引、外键、SQL、ORM Model、Migration 文件名、连接串、账号、密码或实际执行命令。
+本文件不生成 SQL、ORM 代码、Migration 文件名、连接串、账号、密码或实际执行命令；但本期会新增或改变持久化结构时，必须在 09 确认长期稳定的物理存储单元、字段、键、索引与关系，防止执行阶段自行猜测或额外造表。
 
 ## 2. Responsibility Boundary
 
@@ -30,7 +40,7 @@
 -> 业务事实、是否持久化、状态来源、状态迁移与数据域语义
 
 09
--> 数据库与持久化决策合同、环境拓扑、复用/新建、远程依赖、迁移与回退边界
+-> 数据库与持久化决策合同、环境拓扑、物理存储设计、远程依赖、迁移与回退边界
 
 12
 -> 尚未满足的远程库、现有库材料、访问授权、备份、迁移或数据政策 RISK / DEP / OPEN
@@ -42,7 +52,7 @@
 规则：
 
 - `06` 不定义物理数据库实现；它回答“哪些业务事实必须长期保留，以及怎样变化才合法”。
-- `09` 是数据库与持久化实现方向的唯一规划 SoT；它回答“复用什么、选什么、各环境放在哪里、如何迁移和回退”。
+- `09` 是数据库与持久化实现方向的唯一规划 SoT；它回答“复用什么、选什么、各环境放在哪里、需要哪些确切存储结构、如何迁移和回退”。
 - `12` 不复制数据库方案正文，只承接尚未关闭的风险、依赖和待决策项。
 - `13` 不使用“开发时再看”替代数据库决策，只引用 `09` 的已确认或明确委托结论。
 - 不新增独立数据库规划文档、数据库 Runtime、数据库资产台账或第二份用户画像。
@@ -148,7 +158,7 @@ ORM 和 Migration 怎么做？
 
 ```yaml
 database_persistence_contract:
-  contract_version: database-persistence/v1
+  contract_version: database-persistence/v2
   applicable: true
   decision_status: <confirmed | explicitly_delegated | blocking_open | not_applicable>
   decision_source: <project_evidence | user_confirmation | recommended_default_confirmed | explicit_delegation>
@@ -184,7 +194,42 @@ database_persistence_contract:
     backup_restore: <备份与恢复要求或不适用>
     retention_deletion: <保留、删除与审计边界>
     sensitive_data: <脱敏、禁止复制与访问边界>
+  physical_data_design:
+    design_mode: <reuse_existing_unchanged | modify_existing | create_new | not_applicable>
+    storage_model: <relational | document | key_value | file_or_object | external_managed | not_applicable>
+    schema_source_refs: []
+    prohibited_extra_storage_units: true
+    storage_units:
+      - storage_unit_id: <09 内稳定引用，如 DATASTORE-CUSTOMER>
+        unit_kind: <table | collection | keyspace | object_prefix | external>
+        physical_name: <跨期稳定且可直接实现的确切名称>
+        change_action: <reuse | create | alter | retire>
+        business_object_refs: []
+        fields:
+          - physical_name: <确切字段或属性名>
+            storage_type: <目标存储可实现的类型及必要长度/精度>
+            nullable: <true | false>
+            default_or_generation: <默认值、生成规则或 not_applicable>
+            business_meaning: <对应的业务事实>
+            fact_or_state_refs: []
+            sensitive_classification: <public | internal | personal | sensitive | secret_reference>
+        identity_key: []
+        unique_constraints: []
+        indexes: []
+        relations: []
+        tenant_and_access_boundary: <租户、所有权与访问边界>
+        lifecycle_and_deletion: <创建、保留、软/硬删除与审计规则>
+        migration_and_backfill: <迁移、回填、兼容与回退要求或 not_applicable>
   credential_boundary: <不在规划文档或聊天保存凭证；实际凭证只由批准的秘密管理渠道提供>
+  execution_prerequisites:
+    - prerequisite_ref: <09 内稳定引用>
+      purpose: <支持哪个开发、启动或最小业务验证>
+      responsible_party: <agent_task | user | external_party>
+      earliest_required_stage: <before_long | before_cloud_test | before_release>
+      provision_channel: <项目配置入口、批准的秘密管理渠道、受控资料交付方式或 not_applicable>
+      safe_verification: <只验证存在性、权限或受控就绪结果，不显示值>
+      secret_handling: <never_in_chat_or_planning_docs | not_applicable>
+      covers_contract_paths: []
   blocking_items: []
   delegation_boundary: <非委托时写 not_applicable；委托时写允许选择、既有规范、禁止影响和验证方式>
   verification_requirements: []
@@ -197,7 +242,24 @@ database_persistence_contract:
 - `blocking_open` 必须至少有一个 `blocking_items`，并移交 `12` 的 OPEN / DEP / RISK。
 - `explicitly_delegated` 只适用于不会改变已确认业务结果、安全边界、兼容性、成本等级或上线方式的纯技术选择；必须填写非空 `delegation_boundary` 和验证要求。
 - 数据库引擎、复用/替换、正式环境位置、生产数据迁移和敏感数据处理会改变业务或风险时，不得静默委托。
-- 任何状态都不得包含真实连接串、账号、密码、Token、私钥、内网地址或生产数据内容。
+- `physical_data_design` 是 09 内数据库合同的一部分，不建立第二份数据模型文档。`06` 仍只拥有业务事实和状态语义；09 把这些事实绑定到可执行的物理结构。
+- `reuse_existing_unchanged` 必须提供真实 `schema_source_refs`，允许 `storage_units: []`，表示 Long 严格复用且不得改表；`modify_existing | create_new` 必须列出全部本期允许创建、修改或退役的存储单元及确切字段、键、约束、索引和关系。
+- `prohibited_extra_storage_units` 必须为 `true`。Long 不得创建合同外表、集合、Keyspace、对象前缀或等价持久化单元；发现缺口必须回写 09，而不是在执行中补猜。
+- `storage_unit_id` 只用于规划追踪，`physical_name` 才是长期实现名称；二者都必须唯一，物理名称不得含期次、阶段、Sprint、版本或 Planning ID。
+- `business_object_refs`、`fact_or_state_refs`、`identity_key`、`unique_constraints`、`indexes` 和空 `relations` 使用单行 YAML 列表；索引与唯一约束必须包含稳定名称及字段组合，例如 `idx_customer_tenant_status(tenant_id,status)`，不得只写“按需索引”。非空关系必须写明目标存储单元、两侧字段、基数与删除/更新行为。
+- `table | collection | keyspace` 且 `change_action: create | alter` 时必须有字段；`object_prefix | external` 允许 `fields: []`，但仍须写清名称、边界、生命周期和迁移规则。
+- 任何状态都不得包含真实连接串、数据库 URI、账号、密码、Token、私钥、内网地址或生产数据内容；只允许公开配置入口、秘密引用标识和不显示值的核验结果。
+- `execution_prerequisites` 只定义前提和安全验证方式；Planning 截止时的就绪状态、责任人确认和阻断范围由 12 的同一配置类 DEP 承载，不在 09 建立第二份状态清单。下游实际核验必须引用该 DEP，不反向改写 09/12。
+- `responsible_party: agent_task` 表示 Long 可按已确认 TASK 创建本地实例、模板或测试替身，不得要求用户提前手工完成；`user | external_party` 且 `earliest_required_stage: before_long` 时必须在第二阶段进入安全配置引导。
+- `unknown | 未知` 是已核实的“不知道”事实，不是模板占位符。v2 中每个此类字段必须由且只由一个 `execution_prerequisites[].covers_contract_paths` 写入从合同根开始的相对路径；该前提的 `earliest_required_stage` 决定阻断阶段。没有绑定的未知事实不得通过校验，绑定到 `before_cloud_test | before_release` 的未知事实不得反向阻断本地 Long。
+- `covers_contract_paths` 只列当前值确为 `unknown | 未知` 的合同字段；已知字段写入此列表、同一未知字段被多个前提认领或 `prerequisite_ref` 重复都属于合同错误。
+- 同一 mapping 或同一前提项中禁止重复 YAML key。正式校验以唯一字段为准，不允许利用解析器“首个值/最后值”差异形成两种合同语义。
+
+版本兼容规则：
+
+- 新生成或被本期重新确认的合同必须使用 `database-persistence/v2`；v2 的 `physical_data_design` 与 `execution_prerequisites` 均为必填，并按上述字段校验。
+- 已存在且没有未知事实的 `database-persistence/v1` 合同允许继续校验和读取；v1 可以没有以上两个结构，不得因此阻断未触及数据库合同的旧项目。v1 存在 `unknown | 未知` 时必须先迁移为 v2 并建立唯一前提绑定。
+- 本期一旦修改数据库方案、数据结构、执行前提或重建 09，必须把 v1 迁移为 v2；迁移必须忠实记录已确认物理结构，不得借版本升级改变业务事实或凭空新增存储单元。
 
 ## 6. Safe Recommendation Defaults
 
@@ -226,13 +288,16 @@ database_persistence_contract:
 - 正式阶段是否需要远程数据库，目前是否已具备。
 - 使用什么数据库及为什么适合。
 - 是否需要旧数据、结构资料、脱敏样例、迁移与回退。
+- 本期会复用、创建、修改或退役哪些表/集合等存储单元，以及关键字段、键、索引和关系；用当前画像决定是否逐项补白话解释。
 - 哪些资料由谁在什么时候提供，缺失会阻断什么。
 - 当前采用的是证据结论、用户确认、推荐默认值还是明确委托。
+- 哪些本地数据环境、Schema/Migration、脱敏资料、受控权限或秘密管理配置可由 Long 自行创建，哪些必须由用户或外部方在 Long 前完成。
+- 对必须提前完成的项说明安全配置入口和不显示值的验证方式；不得要求用户把连接串或密码发到聊天。
 
 `plain_language` 示例：
 
 ```text
-这份草案建议开发时先在本机启动一套独立数据环境，不连接正式业务数据；正式上线再使用单独的远程数据库。这样开发出错不会影响真实记录。这里写的 PostgreSQL 是保存多人业务数据的软件，你不需要配置它，只需要确认这个方向是否可以。
+这份草案建议开发时先在本机启动一套独立数据环境，不连接正式业务数据；正式上线再使用单独的远程数据库。这样开发出错不会影响真实记录。这里写的 PostgreSQL 是保存多人业务数据的软件。你现在先确认方向；如果本地环境能由开发任务自动创建，就不需要你操作。如果必须由你提供远程实例或授权，我会在开发开始前给出安全步骤，只确认是否已经配置，不会让你在聊天里发送密码或连接串。
 ```
 
 `technical_concise` 示例：
@@ -250,9 +315,11 @@ Database And Persistence Decision Gate：
 - 06 已说明哪些事实需要持久化及数据域语义。
 - 09 存在唯一 `database_persistence_contract`。
 - 当前事实、候选、用户确认、默认推荐和委托没有混写。
-- 现有库复用或新建、目标引擎、各环境拓扑、远程库状态、可提供材料、迁移、回退、隔离、备份、保留删除和敏感数据边界均已覆盖。
+- 现有库复用或新建、目标引擎、各环境拓扑、远程库状态、可提供材料、物理存储单元与字段/键/约束/索引/关系、迁移、回退、隔离、备份、保留删除和敏感数据边界均已覆盖。
 - 用户态解释已按 `explanation_adaptation` 输出；专业文档可以保留术语，但不得把裸术语作为用户确认对象。
 - 无真实凭证、连接串、生产数据或伪造的远程就绪结论。
+- 每个实际数据库前提均已在 `execution_prerequisites` 分类责任人与最早需要阶段；需要用户或外部方在 Long 前完成的项已移交 12 的配置类 DEP 和第二阶段安全配置引导。
+- `reuse_existing_unchanged` 有真实 Schema 来源；新增或修改结构已完整列出且 `prohibited_extra_storage_units: true`，Long 无需也无权补猜物理结构。
 - `blocking_open` 已移交 12；相关 TASK 不得 Ready。
 - `explicitly_delegated` 有完整边界和验证要求。
 

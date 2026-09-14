@@ -1,5 +1,18 @@
 # 流程梳理阶段：AI Runtime Format Specification
 
+## 目录
+
+- 1. 文件位置
+- 2. 一级标题
+- 3. 固定边界章节
+- 4. 文档 ID、决策状态与各类合同格式
+- 5. 引用规范
+- 6. 状态机格式规范
+- 7. 风险等级规范
+- 8. 下游验证结果引用规范
+- 9–12. 流程、接口、JSON 与命令格式
+- 13. 企业级 SaaS 固定检查项
+
 ## 1. 文件位置
 
 ```text
@@ -69,7 +82,7 @@
 其中：
 
 - `user-profile.yaml` 是长期交互习惯和规划协作偏好的唯一来源，不保存完整聊天、原始消息、一次性情绪、临时抱怨、项目业务事实、期次内容、心理画像或未经确认的身份推断。
-- `environment-profile.yaml` 只保存稳定项目与开发环境事实，不保存任何凭证或完整敏感配置。
+- `environment-profile.yaml` 只保存跨期可复用的部署身份、稳定开发环境事实和由历史日志导出的紧凑运行摘要，不保存凭证、完整敏感配置、原始日志或连续采样明细。
 - `project-profile.yaml` 只保存项目身份与当前基线入口。
 - `context-index.yaml` 只在确有多个稳定上下文入口时创建。
 - 新推断的用户倾向必须包含 `confidence` 与 `last_updated`；证据不足时不得把单次行为升级为高置信长期偏好。
@@ -105,10 +118,33 @@ project_tech_stack: []
 stable_project_paths: []
 stable_startup_rules: []
 environment_boundaries: []
+deployment_identity:
+  status: <known | unknown>
+  mode: <local | docker | cloud | hybrid | unknown>
+  environment_ref: <脱敏稳定标识或 not_available>
+  confirmed_at:
+  relocation_revision: 0
+runtime_observation:
+  status: <current | stale | unavailable>
+  observation_window: <起止时间或 not_available>
+  source_export_refs: []
+  project_process_extremes:
+    cpu_peak_and_sustained_windows: []
+    memory_baseline_peak_end_and_growth: []
+    restart_or_stall_windows: []
+  database_connection_extremes: []
+  frontend_load_summary: []
+  verified_concurrency_envelope: <已验证范围或 not_available>
+  anomaly_windows: []
+  generated_at:
 last_updated:
 ```
 
-仅写后续 Planning 确实需要复用的稳定环境事实；路径必须脱敏，不写个人 Home 全路径。
+仅写后续 Planning 确实需要复用的稳定环境事实和聚合结果；路径必须脱敏，不写个人 Home 全路径。运行摘要只保留项目进程 CPU 峰值与持续异常窗口、内存基线/峰值/结束值与增长趋势、重启或停滞窗口、数据库连接极值、前端加载摘要、已验证并发边界和异常时间窗；禁止保存整机泛化指标、逐点采样、原始日志正文、请求内容、业务数据或秘密值。
+
+`deployment_identity` 只在没有可靠身份时识别一次；已有 `status: known` 时持续复用，除非用户明确说明迁移、部署方式变化或环境证据冲突，才递增 `relocation_revision` 并重新确认。不得每期重复询问。
+
+每期 Planning 启动时优先消费上一期上线后到当前时点的运行摘要：已有当前摘要时静默使用；只有项目已有日志与受控导出/分析入口时，才执行或向用户提供项目派生的脱敏导出命令。无数据时写 `unavailable`，不得生成通用采集命令、猜测性能或要求用户开放监控接口。该摘要不进入第一阶段业务访谈问题，只在第二阶段生成 09/11/12/13 时作为容量、部署、验证与风险佐证；用户方案明显超过已验证环境边界时必须解释冲突并请用户确认调整。
 
 ### 1.2 `current-interaction.yaml` 最小格式
 
@@ -1703,6 +1739,7 @@ manual_or_real_environment_required
 
 ```text
 PROJECT-CURRENT-BASELINE.md
+.runtime/planning-layer-runtime/environment-profile.yaml（存在当前运行摘要时；只引用摘要 revision/时间窗，不复制原始日志）
 ```
 
 09 必须明确区分：
@@ -1714,6 +1751,7 @@ PROJECT-CURRENT-BASELINE.md
 - 本期允许复用的技术基础。
 - 本期禁止复用的旧业务语义。
 - 本期涉及数据库或持久化时，当前数据库基线、现有资料与远程环境的证据状态。
+- 当前部署身份与已验证运行边界；摘要缺失或过期时明确写 `unavailable | stale`，不得猜测容量。
 
 本期涉及数据库或持久化时，09 还必须包含 `13-planning-database-persistence-contract.md#5-second-stage-database-and-persistence-decision-contract` 定义的唯一 `database_persistence_contract`。本文件不复制该结构；数据库合同格式、默认建议、用户画像适配、阻断状态和校验命令均以 13 reference 为准。
 
@@ -1786,7 +1824,7 @@ ARCH 决策记录最小格式：
 - 默认优先核实并扩展已有稳定业务域，或复用共享能力。
 - `create_stable_business_domain` 必须说明现有域无法承接的原因、长期业务概念、职责边界、跨期独立意义和非临时命名依据。
 - 稳定业务概念必须来自目标项目真实存在且可跨期复用的业务对象、业务任务、处理记录或证据资产，不得使用期次、阶段或版本表达。
-- 09 不定义具体目录、类名、表名、ORM Model 或迁移名称；这些必须在执行前基于真实代码架构核实。
+- 09 不定义具体目录、类名、ORM Model 代码或迁移名称；但本期改变持久化结构时，必须在 `database_persistence_contract.physical_data_design` 基于真实基线确认确切物理名称、字段、键、约束、索引与关系，执行层不得补猜。
 - 不得使用“按实现时决定”“视情况复用”“后续再看”。
 
 09 必须包含：
@@ -1929,6 +1967,7 @@ Capability Acceptance Requirement：
 
 ```text
 business_flow
+business_journey_e2e
 state_transition
 api_contract
 permission_scope
@@ -2000,6 +2039,11 @@ manual_or_real_environment_required
 
 反向 / 禁止路径：
 
+环境证明要求：
+- 本地业务 / E2E：<required | not_applicable>，说明从真实入口到业务终态要证明什么
+- 部署后云端业务 / E2E：<required | not_applicable>；本期部署适用时 P0 正向旅程必须 required，P1 在部署敏感或受变更影响时 required，并说明选择依据与要证明什么
+- 云端证据绑定：<部署分支、提交、构建或部署 revision；规划阶段只定义要求，不填写实际值>
+
 自动化等级：
 - mandatory_automated
 - automated_preferred
@@ -2017,8 +2061,8 @@ manual_or_real_environment_required
 ```markdown
 ## FLOW—测试覆盖矩阵
 
-| FLOW | 正向流程 | 状态测试 | API 测试 | 权限测试 | 旧流程测试 | CAP 测试 | UI/UX 测试 | 自动化等级 | 最终验收来源 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FLOW | 正向业务旅程 / E2E | 必需反向分支 | 本地业务 / E2E | 部署后云端业务 / E2E | 状态 / API / 权限 | 旧流程 / CAP / UI-UX | 自动化等级 | 最终验收来源 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ```
 
 业务测试顺序必须继承 01 的 FLOW：
@@ -2034,10 +2078,13 @@ manual_or_real_environment_required
 -> 外部能力与发布门禁
 ```
 
-每条 P0 FLOW 至少必须覆盖：
+每条适用 P0/P1 FLOW 至少必须覆盖：
 
-- 正向业务流程。
+- 从合法业务入口到可观察终态的正向业务旅程；单元、组件、接口片段、构建/类型检查或截图不能独立替代。
 - 状态与前置阻断。
+- Planning 合同实际定义的非法跳步、权限拒绝、错误输入、依赖失败、恢复/重试、幂等或旧流程隔离分支。
+- 本地业务/E2E 证明要求。
+- 本期包含云端部署时，每条 P0 FLOW 的正向业务旅程都必须具有绑定精确部署 revision 的云端业务/E2E 证明要求；P1 在部署敏感或受变更影响时 required。P1 不敏感且不受影响，或本期明确无部署目标时才可写 `not_applicable` 并给出原因，不得机械重复整套本地测试。
 - API 合同。
 - 权限与范围。
 - 旧流程隔离。
@@ -2171,13 +2218,32 @@ DEP 格式：
 - external_decision
 - project_baseline
 - environment
+- configuration_prerequisite
 - sequencing
 - cross_team
 - release
 
+上游合同引用：
+
+required_for：
+
+target_environment：
+
+owner：
+
+earliest_required_stage：
+- before_long
+- before_cloud_test
+- before_release
+- not_applicable
+
 必须满足的事实：
 
-阻断范围：
+blocking_scope：
+
+safe_verification：
+
+ready_evidence_refs：
 
 验证来源：
 
@@ -2185,13 +2251,27 @@ DEP 格式：
 
 关联 RISK：
 
-状态：
-- unknown
-- pending
-- verified
-- unavailable
+superseded_by：
+
+status：
+- ready_verified
+- user_confirmed_ready
+- pending_user_action
+- external_pending
+- blocked
+- not_applicable
 - superseded
 ```
+
+DEP 字段与状态规则：
+
+- 本节是 12 中所有正式 DEP 的唯一字段与状态枚举来源；其他文档只能引用，不得另建 DEP schema 或状态枚举。
+- `configuration_prerequisite` 必须填写全部字段。其他 DEP 对不适用的 `required_for`、`target_environment`、`safe_verification` 或 `earliest_required_stage` 明确写 `not_applicable`，不得省略字段或用空值制造歧义。当前有效 DEP 的 `superseded_by` 固定为 `not_applicable`。
+- `earliest_required_stage` 只允许 `before_long | before_cloud_test | before_release | not_applicable`；配置类 DEP 禁止使用 `not_applicable`。
+- `ready_verified` 必须引用不暴露秘密值的项目证据；工具不能安全核验、但用户已明确在批准渠道完成时使用 `user_confirmed_ready`。
+- `pending_user_action` 表示等待用户安全操作；`external_pending` 表示等待外部主体；`blocked` 表示当前无法满足；`not_applicable` 表示经确认不适用。`superseded` 只表示保留的历史 DEP 已被替换或退役：`superseded_by` 必须填写当前替代 DEP-ID，确实无替代项时填写 `retired_without_replacement`；它不参与当前阶段聚合，也不得作为 Handoff 的当前依赖。
+- 旧 DEP 必须在进入新 Handoff 前一次性迁移：`pending` 按责任主体转为 `pending_user_action | external_pending`；`verified` 有可解析脱敏证据时转为 `ready_verified`，否则转为相应 pending/blocked；`unknown` 按已确认 owner 转为对应 pending，owner 或恢复动作也无法确认时转为 `blocked`；`unavailable` 转为 `blocked`，只有已确认不再适用时才转为 `not_applicable`；`superseded` 保持历史状态并补齐 `superseded_by`。迁移不得把不确定状态提升为通过，也不得让历史 DEP 继续进入当前聚合。
+- 12 只保存 Planning 截止时的依赖事实快照。`before_cloud_test` 在 Testing 中的实际就绪结果、`before_release` 在发布/安全流程中的实际就绪结果，必须引用同一 `DEP-ID` 写入各自运行时，不回写或复制 12 成为第二份持续状态源。
 
 OPEN 格式：
 
@@ -2454,7 +2534,7 @@ Task Completion Contract 必须明确：
 - 规划阶段只确认逻辑影响面。
 - 文件、目录、代码位置和具体实现方式只能作为候选影响面，必须在后续执行前核实。
 - 带有期次或版本标识的 TASK-ID 只用于追踪，不得推导实现名称。
-- 13 不生成具体表名、类名、模块目录、权限点、API 物理命名空间或迁移名称。
+- 13 不重新生成具体表名、类名、模块目录、权限点、API 物理命名空间或迁移名称；数据类 TASK 必须精确引用 09 已确认的 `physical_data_design`，不得改写或扩张。
 - 若 09 未确认 `create_stable_business_domain`，13 不得暗示需要创建新物理模块。
 - “独立数据域”不得作为创建任何期次、阶段或版本物理命名空间的依据。
 - 执行前若发现必须新建长期业务模块而 09 无对应决策，必须作为架构偏差回写 Planning。
@@ -2663,8 +2743,8 @@ Task Completion Contract 必须明确：
 FLOW 验收矩阵：
 
 ```markdown
-| FLOW | 关联 TEST | 自动化证据 | 人工 / 真实环境证据 | RISK 关闭条件 | 验收状态 | 发布影响 |
-| --- | --- | --- | --- | --- | --- | --- |
+| FLOW | 关联 TEST | 本地业务 / E2E 证据 | 部署后云端业务 / E2E 证据 | 人工 / 真机证据 | RISK 关闭条件 | 验收状态 | 发布影响 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ```
 
 planning skill 只允许预填：
@@ -3077,7 +3157,8 @@ Capability Acceptance Requirement：
 
 - 11 定义业务逻辑测试顺序、测试依赖关系、测试前置业务事实、测试类型、自动化等级、真实环境要求和预期证明结果。
 - 11 不定义测试命令、测试代码、fixture 脚本、测试执行调度、失败重试命令、实际执行状态、实际证据内容或测试通过/失败结果。
-- P0 FLOW 必须覆盖正向流程、状态测试、API 测试、权限测试、旧流程测试和回归测试。
+- 每个适用 P0/P1 FLOW 必须覆盖正向业务旅程、本地业务/E2E 和合同定义的必需反向分支；P0 还必须覆盖状态、API、权限、旧流程和回归测试。
+- 本期包含云端部署时，全部 P0 正向旅程以及部署敏感或受变更影响的 P1 FLOW 必须定义云端业务/E2E 复验及部署 revision 证据要求；本地测试数量、单元/组件/API 片段、构建成功或服务器 smoke 不得替代。
 - 涉及外部能力时，必须包含真实环境能力测试。
 - 涉及页面和交互时，必须包含 UI 行为或 UX 测试。
 - API 合同、状态迁移、权限、范围、幂等、并发和旧流程隔离默认必须自动化。
@@ -3088,8 +3169,10 @@ Capability Acceptance Requirement：
 
 生成 `11-测试方案与验收用例.md` 时必须检查：
 
-- 每条 P0 FLOW 是否都有正向业务流程测试。
+- 每条适用 P0/P1 FLOW 是否都有从真实入口到业务终态的正向业务旅程与本地业务/E2E 证明要求。
 - 每条 P0 FLOW 是否都有前置阻断、状态、接口、权限、旧流程和回归测试。
+- 本期包含云端部署时，每条 P0 正向旅程以及部署敏感或受变更影响的 P1 FLOW 是否都有绑定部署 revision 的云端业务/E2E 证明要求；其余 P1 或无部署目标项是否明确 `not_applicable` 及原因。
+- 单元、组件、接口片段、构建、类型检查、截图或服务器 smoke 是否未被当作完整 FLOW 证明。
 - 涉及外部能力的 FLOW 是否有真实环境能力测试。
 - 涉及页面和交互的 FLOW 是否有 UI 行为或 UX 测试。
 - 每条 TEST 是否明确自动化等级。

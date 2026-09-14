@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Iterator, Sequence
 
 
-TOOL_VERSION = "0.1.0"
+TOOL_VERSION = "0.1.1"
 SUPPORTED_SCHEMA_VERSION = 1
 MANIFEST_NAME = "skills-manifest.json"
 LOCK_NAME = "runtime-skills.lock.json"
@@ -459,8 +459,14 @@ def highest_change(changes: dict[str, str]) -> str:
 
 def copy_to_stage(source: Path, destination: Path) -> None:
     if source.is_dir():
-        shutil.copytree(source, destination)
+        destination.mkdir(parents=True)
+        for source_file in iter_content_files(source):
+            target_file = destination / source_file.relative_to(source)
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_file, target_file)
     elif source.is_file():
+        if source.is_symlink():
+            raise RuntimeSkillsError(f"Symlinks are not supported in managed content: {source}")
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
     else:

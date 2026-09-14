@@ -1,5 +1,16 @@
 # User Discovery Runtime
 
+## 目录
+
+- Scope
+- User Profile
+- Adaptive Interview 与 Project Current State Discovery
+- Discovery Lifecycle 与增量持久化
+- 事实调研、数据持久化引导与 Discovery Output
+- Business Translation 与 First Principles Interview
+- Understanding Verification 与 Discovery Sufficiency Gate
+- Runtime Event Logging
+
 ## 1. Scope
 
 本文档仅负责：

@@ -1,5 +1,15 @@
 # 流程梳理阶段核心规则
 
+## 目录
+
+- 目标与项目当前基线
+- 规划数据保存边界
+- 最高优先级、结构化 Runtime 与 Trace ID 规则
+- 高风险与低风险不确定项
+- 文档依赖链与 Project Current State Gate
+- Execution Boundary
+- Planning Runtime 最终输出
+
 ## 1. 目标
 
 流程梳理阶段的目标不是写代码，而是建立 AI 可稳定理解的开发上下文。
@@ -77,7 +87,7 @@ Planning 相关数据按职责只允许落在四个位置：
 - Skill 中不得保存 `runtime-*`、用户画像、环境档案、当前交互、Event、Decision、Audit 或 Summary 的独立运行文件；运行时根据 `04-planning-format-spec.md` 的内联字段规范，直接在项目合法目录按需创建。
 - 正式业务事实只能进入对应 00–15 SoT；Runtime State、Event、Decision、Audit 和 Summary 均不得替代 SoT。
 - `.runtime/planning-layer-runtime/user-profile.yaml` 是用户长期交互倾向的唯一来源，只保存反复体现且具有长期价值的倾向。
-- `.runtime/planning-layer-runtime/environment-profile.yaml` 只保存后续 Planning 需要复用的稳定环境事实，例如操作系统、Shell、语言运行时、包管理器、常用工具、技术栈、稳定目录与启动方式、测试/预发布/生产的基本区分。
+- `.runtime/planning-layer-runtime/environment-profile.yaml` 只保存后续 Planning 需要复用的稳定开发/部署身份，以及从项目历史日志导出的最小运行极值与异常摘要；不得保存原始日志、逐点采样、业务数据或凭证。
 - `.runtime/planning-layer-runtime/` 禁止保存 Token、密码、私钥、Cookie、主机账号、可识别个人的完整 Home 路径、内网 IP、机器序列号、完整敏感环境变量、生产密钥或可直接调用外部服务的配置。
 - 包含本地用户或电脑环境信息的 `.runtime/planning-layer-runtime` 文件默认视为项目本地启动上下文；写入前先检查现有忽略策略，没有明确版本管理要求时建议加入 `.gitignore`，不得未经判断改变项目已有策略。
 - `.runtime/planning-layer-runtime/` 和期次 `planning-runtime/` 默认按本地私有数据处理；Skill 打包、分享或上传不得携带这两个项目目录。
@@ -170,7 +180,7 @@ REQ POOL FLOW SCN DOMAIN MODULE STATE API PERM ARCH CAP TASK TEST RISK DEP OPEN 
 
 “新业务事实”“独立数据域”“重新开始”“旧数据不得进入新流程”默认只表示业务语义、数据来源、状态来源、权限与访问范围、新旧流程写入边界、生产/测试数据隔离，以及旧对象不得成为新流程生效来源。
 
-它们不自动表示必须新建物理表、独立模块、复制业务模型、API 命名空间或期次权限点。是否新增物理模型或模块，必须由执行前真实代码架构检查决定，并采用长期稳定的业务领域名称。
+它们不自动表示必须新建物理表、独立模块、复制业务模型、API 命名空间或期次权限点。是否新增物理模型必须在第二阶段基于真实基线写入 09 的唯一数据库合同；模块承接也必须在执行前确认，并统一采用长期稳定的业务领域名称。
 
 ## 4. 高风险不确定项
 

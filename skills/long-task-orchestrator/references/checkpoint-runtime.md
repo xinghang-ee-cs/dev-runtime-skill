@@ -1,5 +1,13 @@
 # Runtime Checkpoint 模板
 
+## 目录
+
+- Schema 与 Template
+- Current Effective State 与 Current SoT
+- Completed、Pending 与 Validation State
+- Risks、Blockers 与 Manual Required
+- Resume Entry 与 Example
+
 本文件是 Runtime State Template。
 
 实例化位置：
@@ -105,10 +113,15 @@ project_execution_baseline_status: <current | stale | missing | invalidated>
 
 ## Validation State
 
+这里只保存 Baseline matrix revision、`validation-results.md` 的结果引用和恢复状态，不复制 Required Validation Matrix、命令、后置条件或证据正文。
+
 | item | status |
 | --- | --- |
 | source of truth | `<status>` |
 | project execution baseline | `<current | stale | missing | invalidated>` |
+| execution prerequisite readiness | `<Planning Handoff field ref + passed | blocked | invalidated>` |
+| required validation matrix | `<matrix revision + current | stale | incomplete>` |
+| local runnable gate | `<validation result refs + passed | blocked | pending>` |
 | task runtime | `<status>` |
 | execution gate | `<status>` |
 

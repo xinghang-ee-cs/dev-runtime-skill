@@ -1,6 +1,6 @@
 ---
 name: testing-layer-runtime
-description: 通用测试治理 Skill，用于在 long-task-orchestrator 完成 ready_for_local_test 后管理期次测试生命周期：读取 planning 测试范围、UI/UX 合同与带 revision 的 long 自动化交接，继承已通过自动化结果，按精确 PAGE/UX-SCN/ASSET revision 规划人工视觉与交互验证，指导人工/真实设备/云端/外部能力/最终验收，对测试发现做 Execution/Test Change Triage，并在完整上线时整理项目发布/安全流程移交材料。Use when Codex needs to manage phase testing, manual acceptance, real-device validation, UI/UX contract verification, server verification, external capability validation, final acceptance, test evidence/writeback, change triage, or release handoff. Do not use it to re-run long-owned vitest/jest/integration/api-test/playwright automation unless an allowed reuse exception applies.
+description: 通用测试治理 Skill，用于在 long-task-orchestrator 通过 Required Validation Gate 并完成 ready_for_local_test 后管理期次测试生命周期：读取 planning 的 FLOW 测试范围、环境前置、UI/UX 合同与带 revision 的 long 自动化交接，以业务旅程和端到端证明为主建立本地证据与部署后云端证据闭环，继承已通过自动化结果，指导必要的人工/真实设备/云端/外部能力/最终验收，对每个发现执行 Change Triage、修复回流、受影响证据失效与复测，并在完整上线时整理项目发布/安全流程移交材料。Use when Codex needs to manage phase business-journey testing, end-to-end coverage, manual acceptance, real-device validation, deployed-environment verification, UI/UX contract verification, final acceptance, test evidence/writeback, change triage, or release handoff. Do not use it to re-run long-owned automation unless an allowed reuse exception or a changed deployed environment requires it.
 ---
 
 # Testing Layer Runtime
@@ -17,7 +17,7 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 
 `long-task-orchestrator` 截止到 `ready_for_local_test`，负责开发、重构、迁移、自动化测试代码、单元测试、业务测试、自动化执行和自动化测试结果记录。`vitest`、`jest`、`integration`、`api-test`、`playwright` 默认属于 long。
 
-`testing-layer-runtime` 截止到 release handoff，负责自动化结果汇总与继承、测试规划、人工测试、真实设备测试、云端验证、外部能力验证、最终验收和上线前验证移交。禁止重新执行 long 已完成且通过的自动化测试。
+`testing-layer-runtime` 截止到 release handoff，负责核对 Required Validation Gate、按 FLOW 建立业务旅程覆盖矩阵、汇总与继承本地自动化证据、管理必要人工/真实设备验证、对部署完成的精确版本执行云端业务/E2E 复验、闭环测试发现、最终验收和上线前验证移交。禁止无环境变化地重新执行 long 已完成且通过的自动化测试。
 
 ## 必读文件
 
@@ -66,12 +66,14 @@ Long Runtime 必须提供：
 planning_baseline_revision:
 active_change_revision: # 初始 Handoff 省略
 executed_task_contract_revisions: []
+required_validation_gate:
 automated_passed:
 automated_failed:
 automated_skipped:
 manual_required:
 coverage:
 frontend_contract_validation_summary:
+validator_receipt_ref: long-readiness-receipt.json
 ```
 
 Testing Runtime 必须继承 `automated_passed`，并把继承状态记录为：
@@ -80,7 +82,7 @@ Testing Runtime 必须继承 `automated_passed`，并把继承状态记录为：
 reused_from_long
 ```
 
-Testing 必须核对 Long Handoff 的 baseline/change revision 与其所引用 Planning Handoff 一致，且 `executed_task_contract_revisions` 不包含 `context_only`、`completed_locked` 或 `cancelled`。UI/UX 适用时还必须核对 `frontend_contract_validation_summary` 与 Planning `frontend_experience_binding` 的设计文档、Manifest、合同和资产 revision 一致，且 `unresolved_mismatch` 为空。若 long handoff 缺失、字段不完整、revision 冲突或证据不存在，进入 Test Intake Mode 并报告缺口；不得用测试层重复执行来掩盖 handoff 缺失或过期交接。
+Testing 必须核对 Long Handoff 的 `runtime_epoch`、`planning_handoff_ref`、baseline/change revision 与 Long Runtime 及其所引用 Planning Handoff 一致，且 `executed_task_contract_revisions` 不包含 `context_only`、`completed_locked` 或 `cancelled`。`required_validation_gate.result` 必须为 `passed`，并重算 `validator_receipt_ref` 的 v2 receipt 与其中冻结的 Matrix、effective validation ids、repository revision、Long workflow、每个 effective validation 的 machine execution receipt 和全部文件摘要；缺失、变化或证据不完整时 Intake 不得通过。UI/UX 适用时还必须核对 `frontend_contract_validation_summary` 与 Planning `frontend_experience_binding` 的设计文档、Manifest、合同和资产 revision 一致，且 `unresolved_mismatch` 为空。不得用测试层重跑来掩盖过期交接。
 
 ## Automated Result Reuse Rule
 
@@ -109,15 +111,19 @@ Testing 必须核对 Long Handoff 的 baseline/change revision 与其所引用 P
 - 进入任何测试模式前，必须解析 `current_test_epoch`。
 - `current_test_epoch` 来源优先级：long handoff 的 `source_of_truth` / `runtime_epoch` / formal execution record；planning test plan 路径中的期次目录；用户明确指定的期次。
 - `writeback_target` 必须绑定为 `<phase_testing_runtime_directory>`，并与当前期次 Handoff、项目目录约定和既有 Runtime 事实一致。
+- epoch、writeback target、Planning/Long Handoff、Planning revision、Long runtime epoch、Required Validation Matrix revision 和 Gate 结果必须按 `references/05-test-writeback.md` 持久化为 `test-runtime-state.md.intake_binding`；恢复时重新核对，禁止只依赖聊天记忆或目录名。
 
 动作：
 
 - Long Testing Handoff、Test Intake Gate、Test Planning Phase、依赖顺序生成、人工测试操作、用户自然反馈、服务器验证、release handoff 和最终报告前，按 `references/05-test-writeback.md` 回写。
-- 每个测试项（`case_id`、`MANUAL-OP`、真实设备验证项、服务器验证项）开始前，必须完成 Per-Test Durable Writeback Rule 的前置检查点回写（`references/01-test-runtime-core.md`）；检查点写入成功后方可执行或引导该测试项。
+- `test-validation-results.md` 中每个正式 `item_type` 开始前，都必须完成 Per-Test Durable Writeback Rule 的前置检查点回写（`references/01-test-runtime-core.md`）；这包括 case、人工操作、真实设备、部署后 E2E、服务器验证、环境前置核验和自动化继承。检查点写入成功后方可执行、继承或引导该项。
 - 每个测试项结束后，必须完成 Per-Test Durable Writeback Rule 的完成检查点回写；回写成功后方可推进到下一个测试项。
 - Test Planning Phase 必须生成或更新 `test-execution-order.md`。
+- Test Planning Phase 必须生成或更新 `business-journey-test-matrix.md`，把每个适用 FLOW 的本地业务/E2E 证据，以及本期部署适用时全部 P0 正向旅程、部署敏感或受变更影响 P1 FLOW 的云端 E2E 证据映射到正式测试结果；该文件只维护覆盖关系，不成为第二个测试状态源。
 - 每次用户回传自然语言、截图或简短反馈后，AI 必须结构化判断并回写验证状态。
 - 推进到下一个测试项前，必须通过 Test Progression Gate（`references/01-test-runtime-core.md`）。
+- 只通过脚本按 `intake -> local_testing -> cloud_testing（适用时）-> release_handoff` 推进粗粒度前向状态。状态机不拆单条命令、截图或人工动作；Long 已允许的独立任务并行不受影响，Testing 同一自动化项内部可使用测试运行器的安全并行，跨测试项仍遵守既有 Test Progression Gate。同一 Testing Runtime 的阶段迁移只由主 Runtime owner 串行调用。使用 `--advance-workflow <stage>`；部署 revision 变化完成 reconciliation 后使用 `--cycle-kind deployment_revision --new-cycle`，Release 后本地复测使用 `--cycle-kind retest --new-cycle`，都只新增 cycle、不倒拨旧 cycle。
+- Intake/恢复完成后、进入 cloud-required 测试前、失效 Release Handoff 后运行 `scripts/validate-testing-runtime.sh`（Windows 用 `.ps1`）。最终报告与 Release Handoff 前后追加 `--expect-final`；失败时保持当前阶段和 `overall_status: blocked`，不得手改 `testing-workflow-state.json` 或口头放行。
 - 最终报告输出前，必须先完成 Runtime 回写。
 
 禁止项：
@@ -156,12 +162,15 @@ change_decision:
 
 `reopen_current_planning` 必须停止受影响测试并把 triage 证据交给 planning-layer-runtime；只有新的增量 Planning Handoff、Long 实现及对应 Long Testing Handoff 完成后，受影响测试才能恢复。未受影响且依赖仍成立的测试与已完成证据不得无条件失效或重跑。
 
+`fix_in_execution` 也必须形成闭环：等待 Long patch 返回新的 task revision、`required_validation_gate: passed` 和受影响验证证据；精确失效旧证据，恢复本地受影响 FLOW 的证据映射。若该 FLOW 需要云端复验，则等待同一修复版本重新部署后再执行受影响云端业务/E2E。只有原问题不再复现、相关断言有新证据且依赖项重新计算后，才允许关闭 finding。
+
 ## 执行模式与策略
 
 执行模式：
 
 - Test Intake Mode：测试来源、long handoff、环境或用例范围不清楚时使用。
 - Test Planning Phase：根据 Planning Handoff 指定的 Test and Acceptance Plan 和 Long Testing Handoff 生成 `test-execution-order.md`，输出自动化已完成、自动化失败、待人工验证、待服务器验证、待上线验证。
+- Business Journey Coverage Mode：以 Planning FLOW 为主线生成 `business-journey-test-matrix.md`，优先复用 Long 的本地业务/E2E 证据；本期部署适用时识别全部 P0 正向旅程、部署敏感或受变更影响 P1 FLOW 的云端复验，并列出所有未覆盖分支。
 - Test Governance Mode：管理人工测试、真实设备测试、外部能力验证和证据闭环。
 - Server Verification Mode：部署完成后验证服务器独有事实。
 - Release Handoff Mode：完整上线测试时整理发布/安全门禁移交信息；若项目提供专门 release/security skill 或流程，则切换过去。
@@ -169,30 +178,32 @@ change_decision:
 执行策略：
 
 - Automated Reuse Strategy：继承 long 自动化结果，不重复执行。
+- Business Journey First Strategy：每个适用 P0/P1 FLOW 必须由真实入口到可观察终态的业务测试或 E2E 证据覆盖；单元、组件、接口片段、类型检查、构建成功或截图只能作为辅助证据。先闭合成功旅程，再覆盖 Planning 已定义的非法跳步、权限拒绝、错误输入、依赖失败、恢复/重试、幂等和旧流程隔离分支。
 - Manual Operation De-duplication Strategy：人工测试拆解必须先按用户实际操作去重。同一 actor、entry、precondition、operation、data_domain 的人工动作只能引导用户执行一次。一个人工动作可以覆盖多个 case / assertion。后续 case 若依赖同一动作，必须复用既有证据，只补缺失观察点，不得要求用户重复完整流程。
 - Guided Manual Operation Strategy：人工测试开始后，AI 必须从 `manual-test-queue.md` 中选择当前第一个 `queue_state = ready`、`depends_on` 全部通过、`blocked_by` 为空、`covered_by_evidence = false`、MANUAL-OP 在 `test-validation-results.md` 中不存在或 `status = pending`、当前环境可执行的操作，主动给出用户可照做的具体步骤。不得只输出 case 名称或任务名称。
 - Frontend Contract Manual Strategy：仅将 Long 未自动化且由 Planning TEST 明确要求的视觉一致性、真机响应式、复杂 UX 或可访问性观察项加入人工队列；每项必须绑定 PAGE/UX-SCN/ASSET revision、设备/视口、进入路径、操作、预期可见状态和通过条件，不得生成模糊“看看是否一致”卡片。
 - Manual Guidance Strategy：无法可靠自动化的交互操作使用；用户自然反馈，AI 负责追问、结构化、证据判断和 Runtime 回写。
-- Server Verification Strategy：只验证本地和 long 无法证明的云端事实。
-- Release Handoff Strategy：只整理上线门禁移交，不输出 release pass。
+- Deployed Environment E2E Strategy：部署完成后绑定 `test-runtime-state.md` 中唯一当前部署身份；完整身份同时覆盖目标环境、部署/组件 revision 与脱敏运行配置身份。先做安全入口/依赖 smoke；随后执行全部 P0 正向业务旅程，以及部署敏感或受变更影响的 P1 FLOW。任一身份部分变化都必须完整执行 `references/05-test-writeback.md#deployment-revision-reconciliation-gate`；不得把整套本地单元/组件/接口测试无差别搬到云端，也不得以服务器 smoke 代替业务闭环。
+- Release Handoff Strategy：把每个 `before_release` DEP 的 Planning 快照与 Testing 结果引用移交项目发布/安全流程；快照冻结 epoch、Planning/Long/Matrix revision、正式结果和完整部署身份，并由 Runtime 保存当前/失效指针。只生成快照，不输出 release pass 或维护发布后的状态。
 
 ## 执行顺序
 
 1. 定位当前期次和 `writeback_target`。
-2. 读取 Long Testing Handoff，校验 baseline/change revision 与 TASK contract revision；缺失或冲突时进入 Test Intake Mode 并报告 handoff 缺口。
-3. 读取 Planning Handoff 指定的 Test and Acceptance Plan；UI/UX 适用时同时读取指定 05 与 `frontend_experience_binding`，只提取精确验证目标。
-4. 进入 Test Planning Phase，先继承 `automated_passed`，标记 `reused_from_long`。
-5. 对 `automated_failed`、`automated_skipped`、`manual_required`、服务器验证和上线验证建立分类与阻塞关系。
-6. 基于已继承、失败、跳过、人工、服务器和上线验证范围，生成或更新 `test-execution-order.md`。
-7. 对人工测试候选项执行 Manual Operation De-duplication Gate。
-8. 生成或更新 `manual-test-queue.md`，确保它是用户实际操作队列，不是 case 清单。
-9. 选择下一个可执行测试项时，必须完成 Per-Test Durable Writeback Rule 的前置检查点回写；检查点写入成功后方可执行或引导该测试项。
-10. 每个测试项完成后，必须完成 Per-Test Durable Writeback Rule 的完成检查点回写；回写成功后方可推进到下一个测试项。
-11. 推进到下一个测试项前，必须通过 Test Progression Gate。
-12. 只执行依赖已通过的人工/真实设备/服务器验证。
-13. 每次用户反馈并完成 Runtime 回写后，若仍存在下一个可执行人工操作，必须主动引导下一个操作；若存在阻塞、证据不足、破坏性确认、服务器信息缺失或测试完成，则说明当前状态和下一步。
-14. 每个失败、偏差或新反馈先执行 Execution/Test Change Triage；按 disposition 在 Testing 修正、交回 Long、重入 Planning、延期或拒绝。
-15. 完成非上线验证后输出验收结论；完整上线时进入 Release Handoff Mode。
+2. 读取 Long Testing Handoff，校验 baseline/change revision、TASK contract revision 与 `required_validation_gate`；缺失、blocked、stale 或证据不完整时进入 Test Intake Mode。
+3. 读取 Planning Handoff 指定的 Test and Acceptance Plan 与 `execution_prerequisite_readiness`；为每个 `before_cloud_test` / `before_release` DEP 在 `test-validation-results.md` 建立引用同一 DEP-ID 的环境前置结果项。UI/UX 适用时同时读取指定 05 与 `frontend_experience_binding`，只提取精确验证目标。
+4. 进入 Test Planning Phase，先继承 `automated_passed`，标记 `reused_from_long`；把 Long 已通过的本地业务/E2E 结果映射到对应 FLOW。
+5. 生成或更新 `business-journey-test-matrix.md`，逐条检查适用 P0/P1 FLOW 的成功旅程、合同定义的反向分支和本地证据；本期部署适用时，还要检查全部 P0 正向旅程以及部署敏感或受变更影响 P1 FLOW 的云端证据，不允许未映射项静默遗漏。
+6. 对 `automated_failed`、`automated_skipped`、`manual_required`、云端验证和上线验证建立分类与阻塞关系；Long 应有的本地 required 证据缺失时返回 Long，不以人工或云端测试补偿。
+7. 基于业务旅程矩阵和已继承、失败、跳过、人工、云端、上线验证范围，生成或更新 `test-execution-order.md`。
+8. 对人工测试候选项执行 Manual Operation De-duplication Gate。
+9. 生成或更新 `manual-test-queue.md`，确保它是用户实际操作队列，不是 case 清单。
+10. 选择下一个可执行测试项时，必须完成 Per-Test Durable Writeback Rule 的前置检查点回写；检查点写入成功后方可执行或引导该测试项。
+11. 每个测试项完成后，必须完成 Per-Test Durable Writeback Rule 的完成检查点回写；回写成功后方可推进到下一个测试项。
+12. 推进到下一个测试项前，必须通过 Test Progression Gate。
+13. 本地业务旅程证据闭合后，只有当前精确部署身份、目标环境、测试账号/租户、数据范围和 `before_cloud_test` 正式结果就绪，才进入部署后云端业务/E2E；部署身份变化时先完成唯一的 Deployment Revision Reconciliation Gate，再执行当前身份的 required 范围。
+14. 每次用户反馈并完成 Runtime 回写后，若仍存在下一个可执行人工操作，必须主动引导下一个操作；若存在阻塞、证据不足、破坏性确认、云端信息缺失或测试完成，则说明当前状态和下一步。
+15. 每个失败、偏差或新反馈先执行 Execution/Test Change Triage；按 disposition 在 Testing 修正、交回 Long、重入 Planning、延期或拒绝。Planning/Long 合同变化时只失效受影响证据；部署身份变化时只触发第 13 步引用的 canonical reconciliation gate，不在本文件复制失效顺序。
+16. 只有业务旅程覆盖门禁通过、所有 required 本地/云端证据闭合且无未处理 finding，才输出非上线验收结论；完整上线时进入 Release Handoff Mode，生成包含全部 `before_release` DEP、Testing 结果引用、证据和下游 owner 的快照后交给项目发布/安全流程。
 
 ## 硬边界
 
@@ -201,6 +212,8 @@ change_decision:
 - 不从 testing 反向定义需求、范围、P0/P1/P2、UI 或验收标准。
 - 不把 `implementation_defect`、`test_defect`、`planning_gap`、`requirement_change` 与 `design_drift` 混为同一种 Bug，也不绕过 triage 直接返工。
 - 不重新执行 long 已通过且有证据的 `vitest`、`jest`、`integration`、`api-test`、`playwright`。
+- 不以单元、组件、接口片段、构建成功、页面截图或服务器 smoke 替代 Planning FLOW 的完整业务/E2E 证明。
+- 不在 `required_validation_gate` 缺失、blocked、stale 或证据不完整时进入正式测试；不以 Testing 重跑掩盖 Long 错误放行。
 - 不把纯 UI 图对照、页面截图差异或视觉验收生成独立人工测试用例；UI 状态只能作为业务用例附属证据，或由自动化快照/组件测试覆盖。
 - 不把测试入口删除、测试快捷操作删除或测试专用接口删除生成到某一期的独立测试用例；这类事项只在完整上线/最终发布门禁中移交项目定义的发布/安全流程。
 - 不把截图存在当作业务通过证据；必须同时有断言或人工内容。
@@ -216,10 +229,11 @@ change_decision:
 - 当前阶段和执行范围。
 - 已继承的自动化结果。
 - 待人工、待服务器、待上线验证项。
+- 本地业务/E2E 覆盖与部署后云端业务/E2E 覆盖。
 - 已获得的证据摘要。
 - 结果：通过、未通过、阻塞、证据不足或 deferred。
 - 问题、风险和下一步。
 - 需要用户继续操作时，只提出当前一个下一步操作或一个确认问题。
 - 需要用户继续操作时，必须输出“下一个测试操作”的具体引导，包括：使用哪个角色/账号、进入哪个页面/入口、前置状态、具体点击/输入/提交步骤、需要观察什么、需要反馈什么。不得只说“请测试某某功能”。
 
-最终报告必须明确区分 `已继承自动化通过`、`已人工确认`、`服务器已验证`、`证据不足`、`上线门禁未执行/已移交`。
+最终报告必须明确区分 `Long Required Validation Gate 已核验`、`本地业务/E2E 已继承或已确认`、`部署后云端业务/E2E 已验证`、`已人工确认`、`证据不足`、`未闭环 finding`、`上线门禁未执行/已移交`。

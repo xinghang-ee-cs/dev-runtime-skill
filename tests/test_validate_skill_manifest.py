@@ -60,7 +60,7 @@ class ManifestVersionGateTests(unittest.TestCase):
                 "url": "https://github.com/example/runtime-skills",
                 "channel": "stable",
             },
-            "tool": {"version": "0.1.0", "path": "scripts/runtime-skills.py"},
+            "tool": {"version": "0.1.1", "path": "scripts/runtime-skills.py"},
             "skills": {
                 "example-skill": {
                     "version": skill_version,

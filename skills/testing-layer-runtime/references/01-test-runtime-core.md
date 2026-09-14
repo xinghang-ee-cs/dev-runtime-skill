@@ -1,5 +1,16 @@
 # Test Runtime Core
 
+## 目录
+
+- 核心目标、边界与输入
+- Long Handoff 与自动化结果复用
+- Test Intake、Planning 与业务旅程覆盖
+- 环境前置与 Change Triage
+- 人工操作去重与引导
+- 单一事实源、执行规则与停止条件
+- Per-Test Durable Writeback
+- 状态、attempt 与单项持久化顺序
+
 ## 核心目标
 
 Testing Runtime 的目标是管理测试生命周期：
@@ -52,9 +63,12 @@ Test and Acceptance Plan 只用于识别测试范围，不得从中继承执行�
 Testing Runtime 启动时必须优先读取 long 测试交接文件。Long Runtime 必须提供：
 
 ```yaml
+runtime_epoch:
+planning_handoff_ref:
 planning_baseline_revision:
 active_change_revision: # 初始 Handoff 省略
 executed_task_contract_revisions: []
+required_validation_gate:
 automated_passed:
 automated_failed:
 automated_skipped:
@@ -63,12 +77,15 @@ coverage:
 frontend_contract_validation_summary:
 ```
 
-启动时必须确认 Long Testing Handoff 的 `planning_baseline_revision`、可选 `active_change_revision` 与其引用的当前 Planning Handoff 一致，并确认 `executed_task_contract_revisions` 只来自 `execute_only`、`resume_only` 或 `reexecute_affected_part`。revision 缺失、冲突、过期或包含 `context_only`、`completed_locked`、`cancelled` 时，Test Intake Gate 不得通过。
+启动时必须确认 Long Testing Handoff 的 `runtime_epoch` 与 Long Runtime 一致、`planning_handoff_ref` 指向实际消费的唯一 Planning Handoff，其 `planning_baseline_revision`、可选 `active_change_revision` 与该 Handoff 一致，并确认 `executed_task_contract_revisions` 只来自 `execute_only`、`resume_only` 或 `reexecute_affected_part`。epoch、引用或 revision 缺失、冲突、过期，或任务集合包含 `context_only`、`completed_locked`、`cancelled` 时，Test Intake Gate 不得通过。
 
 字段含义：
 
 | 字段 | testing 处理 |
 | --- | --- |
+| `runtime_epoch` | 必须与 Long Runtime 事实一致，并回写到 `intake_binding.long_runtime_epoch` |
+| `planning_handoff_ref` | 必须指向 Long 实际消费且 Testing 本次核对的 Planning Handoff |
+| `required_validation_gate` | 必须核对 `result: passed`、当前 matrix revision 与 effective validation ids；缺失、blocked、stale 或证据不可解析时 Test Intake Gate 阻断 |
 | `automated_passed` | 继承为 `reused_from_long` |
 | `automated_failed` | 对应自动化 case 的 `status: failed`，依赖该项的后续测试标记为 `blocked_by_dependency`；不得用人工测试覆盖 |
 | `automated_skipped` | 判断是否需要人工、服务器或用户确认 |
@@ -81,6 +98,7 @@ frontend_contract_validation_summary:
 - 进入 Test Intake Mode。
 - 报告 `long_testing_handoff_missing` 或 `long_testing_handoff_incomplete`。
 - 不得通过重复执行自动化测试来替代 long handoff。
+- 不得以 Testing 人工操作、云端 smoke 或重新运行部分测试补偿 `required_validation_gate` 未通过。
 
 ## Automated Result Reuse Rule
 
@@ -96,12 +114,15 @@ frontend_contract_validation_summary:
 
 ```yaml
 status: reused_from_long
+source_validation_id: <Long required_validation_gate.effective_validation_ids 中的唯一 ID>
 evidence_refs:
-  - <long testing handoff 中对应 evidence 引用>
+  - <指向 long-readiness-receipt.json 的 Testing evidence id>
+evidence_reuse: true
 writeback_status: updated
 ```
 
 - long testing handoff 只提供自动化来源事实和证据来源。
+- `source_validation_id` 必须解析到 Long `automated_passed` 与 effective validation ids 的精确交集；证据索引必须绑定已冻结且摘要匹配的 Long readiness receipt，禁止只写 Handoff 标题锚点。
 - 正式测试项状态只能写入 `test-validation-results.md`。
 - 不得使用 `runtime result`、`evidence source` 作为独立结果字段。
 - 禁止重新执行。
@@ -125,8 +146,12 @@ current_test_epoch:
 writeback_target:
 planning_baseline_revision:
 active_change_revision:
+current_deployment_revision:
 long_testing_handoff:
+required_validation_gate:
 planning_test_scope:
+execution_prerequisite_readiness:
+business_journey_scope:
 frontend_experience_binding:
 frontend_contract_validation_summary:
 manual_required:
@@ -149,6 +174,7 @@ Test Intake Gate 之后必须进入 Test Planning Phase。
 
 输出：
 
+- `business-journey-test-matrix.md`
 - `test-execution-order.md`
 - 自动化已完成
 - 自动化失败
@@ -162,10 +188,55 @@ Test Intake Gate 之后必须进入 Test Planning Phase。
 - 从 long handoff 读取自动化事实。
 - UI/UX 适用时从 Planning Handoff 读取精确设计合同与资产 revision，并与 Long `frontend_contract_validation_summary` 交叉校验；`unresolved_mismatch` 非空时阻断受影响测试。
 - 对 `automated_passed` 直接写入 `reused_from_long`。
+- 先按 Planning FLOW 生成业务旅程覆盖矩阵；每个适用 P0/P1 FLOW 都必须具有本地业务/E2E 证明要求。本期包含云端部署时，全部 P0 正向旅程以及部署敏感或受变更影响的 P1 FLOW 还必须具有云端业务/E2E 证明要求。
+- 本地 required 证明优先映射 Long Handoff 的有效业务/E2E 证据；Long 应负责的本地 required 证据缺失时必须报告 coverage gap 并返回 Long，不得用人工、云端或单元测试补偿。
 - 对 `manual_required` 建立人工测试卡。
 - 对服务器和 release 事项只建立验证/移交项。
+- 对 Planning Handoff 中每个 `before_cloud_test_dependency_refs` 和 `before_release_dependency_refs`，在 `test-validation-results.md` 建立引用同一 DEP-ID 的 `environment_prerequisite` 结果项；12 仍只是 Planning 截止快照，Testing 不回写 Planning SoT。
 - 不生成脱离 Planning TEST 和合同 revision 的纯审美对照项；允许为 Long 明确移交且 Planning 已定义的视觉一致性、真机响应式、复杂 UX 或无障碍观察生成合同绑定人工项，但必须同时包含 PAGE/UX-SCN/ASSET revision、设备/视口、业务进入路径、操作、可见断言与通过条件。
 - 不生成某一期的测试入口删除、测试快捷操作删除或测试专用接口删除测试项；这些只在最终上线门禁中移交。
+
+## Business Journey Test Matrix And Coverage Gate
+
+`<phase_testing_runtime_directory>/business-journey-test-matrix.md` 是本期业务旅程覆盖关系的唯一 Testing 实例。它从 Planning Test and Acceptance Plan 读取 FLOW/TEST 范围，从 Long Handoff 与 `test-validation-results.md` 读取证据引用；不重新定义业务规则，也不保存测试项正式状态。
+
+它与 Long 的 `required_validation_matrix` 职责不同：Long Matrix 定义并门禁开发期自动化验证；本矩阵只按 FLOW 汇总 Long 结果与 Testing 后续人工、真机和部署后云端证据，不复制 Long 的命令、后置条件或正式结果状态。
+
+唯一字段格式见 `05-test-writeback.md#business-journey-test-matrixmd-格式`；本文件只定义覆盖与完成规则，不复制 schema。
+
+规则：
+
+- 每个适用 P0/P1 FLOW 必须唯一映射，不得因已有大量单元、组件、接口或页面测试而省略完整旅程。
+- `local_business_e2e.result_refs` 和 `deployed_environment_e2e.result_refs` 只能引用 `test-validation-results.md` 的正式结果或其已索引 Long evidence；矩阵不得另写 `passed/failed` 形成第二个状态源。
+- 成功旅程必须从已确认合法入口开始，经过关键业务动作，到达可观察终态。反向覆盖只包含 Planning 已定义且实际适用的非法跳步、权限拒绝、错误输入、依赖失败、重试/恢复、幂等或旧流程隔离分支。
+- 单元测试、组件测试、接口片段、构建/类型检查、截图和服务器 smoke 只能作为辅助证据，不能独立关闭 FLOW 的业务/E2E requirement。
+- 本期包含云端部署时，每个 P0 FLOW 的正向旅程都要求云端 E2E；P1 仅在部署差异可能改变结果或受当前变更影响时要求，例如反向代理、域名/CORS、秘密注入、云数据库/对象存储、跨服务网络、真实回调、云端权限或外部能力。其余 P1 或本期无部署目标时明确 `not_applicable` 和原因，不得机械重跑。
+- Matrix revision、Planning/Long revision 或受影响合同变化时，只失效真实命中的 journey/result refs，未受影响证据保持有效。部署身份变化是例外，必须完整执行 `05-test-writeback.md#deployment-revision-reconciliation-gate`；本文件不复制切换顺序。
+- 部署身份比较必须覆盖目标环境、组件/部署 revision 与脱敏 `runtime_configuration_identity`；同一代码或镜像在公开配置、路由/代理、域名/CORS、基础设施绑定或秘密版本绑定变化后属于新部署身份，旧 cloud-required 证据不得沿用。
+
+Business Journey Coverage Gate 只有同时满足以下条件才通过：
+
+```text
+every in-scope P0/P1 FLOW mapped exactly once
++ every required local business/E2E journey has valid evidence
++ when deployment is in scope, every P0 success journey and every deployment-sensitive or change-affected P1 journey has evidence for the exact deployed revision
++ all contract-defined required negative branches have valid evidence
++ no required coverage gap is failed, blocked, missing, evidence_insufficient, or backed by stale/invalid/revision-mismatched evidence
++ no unresolved finding affects a required journey
+```
+
+本 Gate 未通过时，Testing 最终结果不得为通过，也不得进入 release-ready handoff。
+
+## Environment Prerequisite Result Lifecycle
+
+Planning Handoff 中的 `before_cloud_test_dependency_refs` 与 `before_release_dependency_refs` 只是 DEP 引用和 Planning 截止快照，不代表 Testing 时已经就绪。Testing 必须按 `05-test-writeback.md#test-validation-resultsmd-格式` 为每个 DEP 创建唯一 `item_type: environment_prerequisite` 结果项：
+
+- 初始为 `pending`；开始安全核验前写 `in_progress` 检查点。
+- 工具通过不显示秘密值的探针核验时为 `verified`；工具不能安全读取但用户明确说明已在批准渠道完成时为 `verified_by_user_report`。
+- 探针已实际执行但前提不满足时写 `failed`；无法开始写 `blocked`；已有信息不足以判断写 `evidence_insufficient`。不得把 Planning 的 `ready_verified` 等 DEP 状态值复制成 Testing `status`。
+- 未就绪时只阻断 `blocking_scope` 命中的 FLOW/环境；其他本地结果和无关云端旅程继续有效。
+- 需要用户操作时，一次只引导当前一个安全动作，说明业务用途、已核实的配置入口或责任主体、最短步骤、脱敏验证方式和完成后解锁范围；不得要求用户在聊天中发送秘密值、连接串、内网入口或生产数据。
+- `before_release` 项可以在 Testing 中提前取得证据，但发布后的实际状态由 Release Handoff 指定的项目发布/安全流程拥有；Testing 不输出 release pass。
 
 ## Execution/Test Change Triage Gate
 
@@ -201,6 +272,8 @@ change_decision:
 - `reopen_current_planning`：停止受影响测试，将 triage 证据交给 planning-layer-runtime；等待新的增量 Planning Handoff、Long 实现和 Long Testing Handoff。
 - `defer_to_next_phase` / `reject_change`：记录确认依据和对当前验收的影响，不得静默忽略。
 - 只失效 `affected_ids` 及依赖传播真实命中的测试；未受影响的测试、已完成证据和 Long 自动化继承结果保持有效，除非 revision 或依赖事实证明它们也受影响。
+- `fix_in_execution` 恢复前必须读取 patch 后新的 Long Handoff，核对受影响 TASK revision、`required_validation_gate: passed` 和有效 evidence；随后更新业务旅程矩阵。需要云端证据的 FLOW 必须等待同一修复 revision 重新部署后复验。
+- finding 只有在原观察结果不再复现、所有受影响断言已有新证据、依赖重新计算且业务旅程覆盖门禁重新通过后才能关闭；仅“代码已改”“Long 已完成”或“云端已重新部署”都不等于闭环。
 
 ## Manual Operation De-duplication Gate
 
@@ -271,7 +344,7 @@ TEST-003:
 
 ### test-validation-results.md
 
-作为每个测试项最终执行状态的唯一事实源。每个 `case_id`、`MANUAL-OP`、真实设备验证项、服务器验证项都必须有独立记录。
+作为每个测试项最终执行状态的唯一事实源。每个 `case_id`、`MANUAL-OP`、真实设备验证项、部署后业务/E2E 验证项、服务器验证项都必须有独立记录。
 
 至少包含：
 
@@ -308,21 +381,7 @@ writeback_status:
 
 只负责 Runtime 游标和整体状态，不得承担每项完整结果。
 
-至少包含：
-
-```yaml
-current_phase:
-current_environment:
-current_item:
-current_item_status:
-last_completed_item:
-next_executable_item:
-last_durable_checkpoint_at:
-resume_required:
-overall_status:
-blockers:
-last_updated_at:
-```
+完整唯一 schema 见 `05-test-writeback.md#test-runtime-statemd-格式`。本文件只约束职责：它必须持久化 `intake_binding`、当前完整部署身份、部署切换事务、当前 Release Handoff 指针、Runtime 游标和整体状态，不复制单项结果。`intake_binding` 缺失或与当前 Planning/Long Handoff、epoch、revision、Required Validation Gate 不一致时，Runtime 必须阻断。
 
 若它与 `test-validation-results.md` 冲突，必须以 `test-validation-results.md` 为准，并立即修复 Runtime 游标。
 
@@ -429,7 +488,9 @@ Testing Runtime 必须优先使用 `manual-test-queue.md` 中 `MANUAL-OP` 的 `d
 
 ## 执行规则
 
+- 先核验 Long `required_validation_gate`，再继承结果和生成业务旅程矩阵；Gate 缺失、blocked、stale 或证据不可解析时不得进入正式测试。
 - 先继承 long 自动化结果，再决定人工/服务器/release 验证。
+- 业务旅程覆盖优先于测试数量；每条适用 P0/P1 FLOW 的本地业务/E2E 证据必须先闭合，再进入需要部署后复验的云端 FLOW。
 - 人工测试必须先做 operation_signature 去重，再进入 Manual Guidance Strategy。
 - 已有证据可覆盖的 case，不得再次引导用户重复操作。
 - 人工测试开始后，AI 必须主动选择并引导下一个可执行人工操作。
@@ -442,6 +503,7 @@ Testing Runtime 必须优先使用 `manual-test-queue.md` 中 `MANUAL-OP` 的 `d
 - 人工测试缺少截图或描述时，先按对话规则追问；最终仍无法形成证据时，在 Runtime 内部标记证据不足。
 - 服务器部署状态未确认时，不进入 Server Verification Mode。
 - release 测试请求必须切换到项目定义的发布/安全流程或可选 release/security skill。
+- 测试发现回流 Long 或 Planning 后，必须等待新 Handoff，按合同影响精确失效本地证据并重算 `business-journey-test-matrix.md`；若产生新部署身份，只触发 `05-test-writeback.md#deployment-revision-reconciliation-gate`，不在本文件另建失效步骤。
 - 每个测试项开始前，必须完成 Per-Test Durable Writeback Rule 的前置检查点回写；检查点写入成功后方可执行或引导该测试项。
 - 每个测试项结束后，必须完成 Per-Test Durable Writeback Rule 的完成检查点回写；回写成功后方可推进到下一个测试项。
 - 推进到下一个测试项前，必须通过 Test Progression Gate 的全部条件。
@@ -452,6 +514,11 @@ Testing Runtime 必须优先使用 `manual-test-queue.md` 中 `MANUAL-OP` 的 `d
 出现以下情况立即停止并报告：
 
 - Long Testing Handoff 缺失且当前任务依赖 long 自动化事实。
+- Long `required_validation_gate` 缺失、blocked、stale 或 effective validation evidence 不可解析。
+- Planning `execution_prerequisite_readiness` 中当前阶段必需依赖未就绪。
+- `deployment_revision_reconciliation.status` 为 `in_progress | blocked`，或完成事务与当前部署身份不一致。
+- `intake_binding` 缺失，或其中 epoch、writeback target、Planning/Long Handoff、Planning revision、Matrix revision、Required Validation Gate 与当前来源不一致。
+- `active_release_handoff.status: current` 但快照封套、冻结 revision、业务旅程矩阵或完整部署身份与当前 Runtime 不一致。
 - long 自动化失败且用户没有明确要求处理失败。
 - 依赖测试未通过。
 - 证据缺失且经过自然语言追问后仍无法判断。
@@ -461,6 +528,7 @@ Testing Runtime 必须优先使用 `manual-test-queue.md` 中 `MANUAL-OP` 的 `d
 - `writeback_target` 缺失。
 - Planning/Long Handoff revision 缺失、冲突或过期。
 - 测试发现尚未完成 Change Triage，或 disposition 要求 Planning 重入但尚无新增量 Handoff。
+- required FLOW 未映射、本地或部署后业务/E2E 证据缺失，或影响 required FLOW 的 finding 尚未闭环。
 - Runtime 回写失败。
 - 存在 `interrupted_pending_reconcile` 项且无法通过已有证据恢复。
 - 当前项的 Per-Test Durable Writeback 检查点写入失败。
@@ -470,13 +538,7 @@ Testing Runtime 必须优先使用 `manual-test-queue.md` 中 `MANUAL-OP` 的 `d
 
 ### 总则
 
-每一个以下对象都必须成为独立、可恢复、可审计的执行单元：
-
-- `case_id`（每个测试用例）
-- `MANUAL-OP`（每个人工操作项）
-- 真实设备验证项
-- 服务器验证项
-- 自动化结果继承项（按具体 case_id 写入）
+`05-test-writeback.md#test-validation-resultsmd-格式` 唯一枚举的每个正式 `item_type` 都必须成为独立、可恢复、可审计的执行单元；自动化结果继承仍按具体 `case_id` 建立正式项。这里不复制另一份类型清单。
 
 任何测试项不得只在对话中被认为完成。必须先完成 Runtime 持久化回写，才允许推进到下一个独立测试项。
 
@@ -493,6 +555,7 @@ item_id:
 item_type:
 attempt:
 environment:
+environment_revision_ref:
 status: in_progress
 started_at:
 completed_at: null
@@ -535,6 +598,7 @@ writeback_status: updated
 item_id:
 attempt:
 environment:
+environment_revision_ref:
 status:
 completed_at:
 result_summary:
@@ -618,18 +682,22 @@ test-validation-results.md
 test-execution-events.md
 manual-test-queue.md
 test-execution-order.md
+business-journey-test-matrix.md
 test-evidence-index.md
+release-handoff.md（存在时）
 ```
 
 恢复逻辑：
 
-1. 只要 `test-validation-results.md` 中任一项 `status = in_progress`，无论 `writeback_status` 是否为 `updated`，恢复时都必须进入 `interrupted_pending_reconcile` 流程。
-2. 将每个 `in_progress` 项改为 `interrupted_pending_reconcile`。
-3. 更新 `test-runtime-state.md`：`resume_required: true`、`overall_status: blocked`。
-4. 禁止选择任何新测试项。
-5. 按 `started_at` 从早到晚逐条恢复。
-6. 每项恢复后重新计算 `next_executable_item`。
-7. 所有 `interrupted_pending_reconcile` 项处理完成前，不得恢复正常执行。
+1. 先校验 `test-runtime-state.md.intake_binding` 与当前 Planning/Long Handoff、epoch、revision 和 Required Validation Gate 一致；缺失或冲突时保持阻断，不得继续恢复测试项。
+2. 校验部署切换事务与 `active_release_handoff`；存在未完成事务、当前快照与冻结载荷不一致或旧快照尚未失效时，先按 `05-test-writeback.md` 恢复对应事务。
+3. 只要 `test-validation-results.md` 中任一项 `status = in_progress`，无论 `writeback_status` 是否为 `updated`，恢复时都必须进入 `interrupted_pending_reconcile` 流程。
+4. 将每个 `in_progress` 项改为 `interrupted_pending_reconcile`。
+5. 更新 `test-runtime-state.md`：`resume_required: true`、`overall_status: blocked`。
+6. 禁止选择任何新测试项。
+7. 按 `started_at` 从早到晚逐条恢复。
+8. 每项恢复后重新计算 `next_executable_item`。
+9. 所有 `interrupted_pending_reconcile` 项处理完成前，不得恢复正常执行。
 
 `writeback_status = updated` 仅表示当前检查点已成功持久化，不表示测试已完成。
 
@@ -705,7 +773,7 @@ writeback_status: updated
 
 ## 状态枚举
 
-所有测试项（`case_id`、`MANUAL-OP`、真实设备验证项、服务器验证项）共享以下状态枚举：
+所有测试项（`case_id`、`MANUAL-OP`、真实设备验证项、部署后业务/E2E 验证项、服务器验证项、环境前置核验项）共享以下状态枚举：
 
 | 状态 | 含义 | 使用约束 |
 | --- | --- | --- |
@@ -815,9 +883,9 @@ evidence_missing_reason: <缺失的观察点描述>
 
 ### 开始一个测试项
 
-无论是 case、MANUAL-OP、真实设备、服务器验证，还是自动化结果继承，都必须按以下顺序：
+每个 canonical `item_type` 以及自动化结果继承都必须按以下顺序：
 
-1. 先在 `test-validation-results.md` 创建或更新该项，写入 `status: in_progress`、`writeback_status: updated`、`started_at`、`attempt`、`environment`、`depends_on_check`、`expected_evidence`、`completed_at: null`、`result_summary: null`、`evidence_refs: []`、`evidence_missing_reason: null`、`blocker_or_failure_reason: null`、`covers: []`、`covered_by: []`、`evidence_reuse: false`。
+1. 先在 `test-validation-results.md` 创建或更新该项，写入 `status: in_progress`、`writeback_status: updated`、`started_at`、`attempt`、`environment`、`environment_revision_ref`、`depends_on_check`、`expected_evidence`、`completed_at: null`、`result_summary: null`、`evidence_refs: []`、`evidence_missing_reason: null`、`blocker_or_failure_reason: null`、`covers: []`、`covered_by: []`、`evidence_reuse: false`。
 2. 再更新 `test-runtime-state.md` 的 `current_item`、`current_item_status: in_progress`、`last_durable_checkpoint_at`。
 3. 最后在 `test-execution-events.md` 追加 `test_started` 事件。
 

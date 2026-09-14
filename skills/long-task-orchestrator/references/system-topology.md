@@ -1,5 +1,13 @@
 # 系统拓扑
 
+## 目录
+
+- 边界等级（P0–P3）
+- 禁止并行与允许并行
+- 委派约束
+- 拓扑升级
+- 例外协议
+
 本文件只定义 boundary classification、parallel constraints、delegation constraints 和 topology escalation。
 
 ## 边界等级

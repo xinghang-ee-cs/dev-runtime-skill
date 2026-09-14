@@ -34,6 +34,19 @@ Planning Execution Baseline 冻结后，已接受的需求或合同变化通过�
 
 仓库采用两个版本层级：GitHub Release 表示一组经过共同验证的 Skill 快照，每个 Skill 在 [`skills-manifest.json`](skills-manifest.json) 中拥有独立 SemVer。README 和 `SKILL.md` 都不是版本事实源。
 
+当前清单声明的版本如下：
+
+| 组件 | 版本 |
+| --- | --- |
+| 仓库 Release | `v1.0.0` |
+| `planning-layer-runtime` | `1.0.0` |
+| `long-task-orchestrator` | `1.0.0` |
+| `testing-layer-runtime` | `1.0.0` |
+| `ai-code-inspection` | `0.1.0` |
+| 同步工具 | `0.1.1` |
+
+本表仅用于方便阅读，[`skills-manifest.json`](skills-manifest.json) 仍是唯一版本事实源。
+
 安装后，目标项目会得到：
 
 ```text
@@ -53,11 +66,13 @@ python .runtime-skills/runtime-skills.py sync --project .
 
 完整命令、退出行为和版本升级规则见[版本与更新机制](src/content/docs/reference/versioning-and-updates.md)。
 
-### Release Tag 与可直接使用的迁移/更新 Prompt
+### Release Tag 与可直接使用的 Skill + Runtime 迁移 Prompt
 
-稳定 GitHub Release 的 Tag 统一采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`，例如 `v0.2.0`。这个 Tag 标识一组经过共同验证的仓库快照；快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 可跟随最新稳定 Release；目标项目需要复现固定版本时，使用 `v0.2.0` 这类精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
+稳定 GitHub Release 的 Tag 统一采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是 `v1.0.0`。这个 Tag 标识一组经过共同验证的仓库快照；快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 可跟随最新稳定 Release；目标项目需要复现当前版本时，使用 `v1.0.0` 这个精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
 
-把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”和“旧版无锁副本的迁移”。原样使用时更新到最新稳定 Release；需要固定版本时，在消息末尾补充类似 `目标 Release：v0.2.0` 即可。
+只更新 Skill 文件，并不会自动升级目标项目中已经生成的 Runtime 状态。对于 `v1.0.0` 尤其如此：前向状态账本、Planning 前置条件合同、Long 机器执行 receipt、Testing 证据摘要与部署绑定都比 1.0 之前严格。尚未结束的旧期次必须恢复到一个全新的当前版本 Runtime epoch 后重新验证，旧 Agent 自行写下的 `passed` 不能直接继承。
+
+把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release；需要固定版本时，在消息末尾补充类似 `目标 Release：v1.0.0` 即可。
 
 ```text
 请在当前项目中接管或更新 Runtime Skills。
@@ -68,14 +83,18 @@ python .runtime-skills/runtime-skills.py sync --project .
 请从检查到验证完整负责本次操作。只把当前项目根目录视为目标，不要要求我手动搬运或编辑文件。
 
 1. 检查 runtime-skills.lock.json、.runtime-skills/runtime-skills.py、AGENTS.md、CLAUDE.md，以及 .agents/skills/、.claude/skills/、.github/skills/ 等受支持的项目级 Skill 目录。识别当前已有的 Runtime Skill、所有副本位置、正在使用的 Agent 平台、本地 Git 改动和活动期次锁定；不要扫描无关项目。
-2. 只要锁文件存在，就按“受管安装”处理，即使项目内同步入口或某个受管副本已经缺失。同步入口正常时，先执行 verify 和远端 status，再对目标 Release 执行 diff；入口缺失或 verify 报告漂移时，从锁定或目标 Release 临时取得可信同步工具做诊断，不得把项目误判为无版本安装，也不得未经同意修复。存在活动期次锁定时，不更新、不绕过锁定，只报告当前版本并延后更新。兼容的修订版本更新通过 sync 执行；遇到次版本或主版本变化时，先汇总目标 Release、各 Skill 版本、增加/修改/删除的文件以及兼容性影响，得到我的明确确认后，才使用所需的 --allow 级别执行 update。
+2. 只要锁文件存在，就按“受管安装”处理，即使项目内同步入口或某个受管副本已经缺失。同步入口正常时，先执行 verify 和远端 status，再对目标 Release 执行 diff；入口缺失或 verify 报告漂移时，从锁定或目标 Release 临时取得可信同步工具做诊断，不得把项目误判为无版本安装，也不得未经同意修复。兼容的修订版本更新通过 sync 执行；遇到次版本或主版本变化时，先汇总目标 Release、各 Skill 版本、增加/修改/删除的文件以及兼容性影响，得到我的明确确认后，才使用所需的 --allow 级别执行 update。绝不静默绕过活动期次锁定：通常应延后更新；如果这次主版本更新正是为了迁移尚未结束的旧 Runtime，可以提出一次“受控切换”并等待我明确确认——先记录旧 lock/pin 和 Runtime 来源，再用工具解除 pin，执行获批更新和第 7–10 步，最后把活动期次重新 pin 到新 bundle。如果我不批准，就保持原 pin 和全部文件不变。
 3. 如果已有 Runtime Skill 目录但没有锁文件，按“无版本旧副本”处理。从来源仓库把目标稳定 Release 临时取到本机；根据现有目录准确识别 Skill 名称和目标根目录，不自行增删 Skill。先不带 --overwrite-local-changes 执行一次 install，让工具列出将增加、修改和删除的内容；把差异展示给我，并等待我明确同意。得到同意后，才能带 --overwrite-local-changes 重新执行，以采用该 Release、生成 runtime-skills.lock.json 并安装 .runtime-skills/runtime-skills.py。
 4. 如果既没有受管安装，也没有旧版 Runtime Skill 副本，停止更新并说明这是首次安装；只询问当前项目无法判断的 Agent 平台或 Skill 选择，然后按来源仓库的首次安装流程执行。
 5. 保留项目自己的全部指令。只把适用的路由和安全规则合并进 AGENTS.md；使用 Claude Code 时继续维护 CLAUDE.md 的导入，绝不整体覆盖这两个文件。不得静默覆盖 Skill 本地修改，不得混用不同 Release 的副本，不得降级 Skill，不得暴露凭证，也不要修改业务代码、执行数据库迁移、部署、commit 或 push。
-6. 经我确认并完成迁移或更新后，执行 verify。报告原 Release 和 Skill 版本 -> 当前 Release 和 Skill 版本、全部实际安装位置、锁文件状态、期次锁定状态、合并过的指令文件，以及仍未解决的漂移或待决事项。如果远端不可用，明确区分“本地校验通过”和“已成功检查最新版本”。
+6. 经我确认并完成 Skill 迁移或更新后，执行 verify。报告原 Release 和 Skill 版本 -> 当前 Release 和 Skill 版本、全部实际安装位置、锁文件状态、期次锁定状态、合并过的指令文件，以及仍未解决的漂移或待决事项。如果远端不可用，明确区分“本地校验通过”和“已成功检查最新版本”。
+7. Skill 校验通过后，只检查当前项目说明、Handoff 和活动期次实际引用的 Planning、Long、Testing 状态位置。把各期次分成：没有 Runtime、已关闭的历史 Runtime、未结束的旧版 Runtime、已是当前版本 Runtime。不要为了套用新 schema 而重写已经关闭的历史期次。
+8. 对每个未结束的 1.0 之前旧版期次，把已确认的正式文档、需求池、用户画像、交互/事件历史、任务事实、finding 和 evidence 保留为只读迁移来源。不得伪造前向状态历史，也不得把旧的 failed/blocked 证据修改成 passed。使用刚安装的新 Skill 的 recovery/entry 流程，从这些来源创建全新的当前版本 Runtime epoch；只有已经采用当前 schema 的 Runtime 才能恢复原流程或开启新的前向 cycle。保留到旧位置的可追踪引用；只询问真正未知的事实，不得让用户重复回答已有记录。
+9. 只重建当前 Skill 明确要求的合同。Planning 需要恢复持久化 discovery、需求池、用户画像和环境档案；部署身份已有可靠记录且用户未声明迁移时直接复用，历史运行数据只迁移脱敏后的项目进程极值/异常摘要，不复制原始日志。校验适用的数据库合同：复用未变结构必须引用真实 Schema，新增或修改结构必须确认全部物理存储单元、字段、键、约束、索引和关系并禁止额外造表；同时校验 UI/UX 合同并证明全部 before-Long 前置条件。Long 需要声明 project_root_ref、完整 source_roots、当前 Required Validation Matrix，并为每条 success postcondition 配置一个 machine_execution 探针；以整期为正式验证闭环，按顺序进入前向流程并通过 run-long-validation.sh 或 run-long-validation.ps1 重跑每个当前 required 项，让每个 passed 都引用新生成的机器执行 receipt。Testing 只能继承当前有效的 Long readiness receipt，复用验证必须绑定源 receipt/证据摘要，并通过前向迁移重建适用的本地、云端、发布状态和 deployment identity。旧的 pass/ready/accepted 只作为历史声明，在当前 validator 证明前均不生效；禁止直接跳到 ready 或 final。
+10. 从新安装的 Skill 目录运行全部适用 validator；如果第 2 步曾临时解除活动期次 pin，在停止前把它恢复到新 bundle。然后报告：已迁移与保持不动的期次路径、新 Runtime epoch/cycle、保留的旧来源、重建的合同/receipt、重跑项及结果、最终 pin 状态、未解决 blocker 和下一项唯一允许动作。除非我另行明确要求，不要开始功能实现、人工验收、部署、数据库迁移、commit 或 push。
 ```
 
-对已受管项目执行精确版本更新时，同步命令可以直接接收 Release Tag，例如 `--release v0.2.0`。尚未发布为 GitHub Release 的 Tag 不能作为稳定更新来源。
+对已受管项目执行精确版本更新时，同步命令可以直接接收 Release Tag，例如 `--release v1.0.0`。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为稳定更新来源。
 
 ## 部署到 Agent 项目
 

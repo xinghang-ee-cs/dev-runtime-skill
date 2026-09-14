@@ -1,5 +1,14 @@
 # 执行复盘闭环
 
+## 目录
+
+- 前置条件
+- 证据来源
+- 复盘规则
+- Runtime 生命周期摘要
+- Retrospective Boundary
+- 禁止项
+
 本文件只定义 Runtime Evidence Consolidation Protocol。
 
 ## 前置条件
@@ -71,6 +80,7 @@ remaining_risk -> agent-decisions.md
 - unit validation result
 - automated business/integration/api/ui validation result
 - capability minimum validation
+- Required Validation Matrix coverage 与 Local Runnable Gate result refs
 - Long Testing Handoff summary
 - remaining risks before testing-layer-runtime takeover
 
@@ -93,7 +103,7 @@ remaining_risk -> agent-decisions.md
 NOT_EXECUTED
 ```
 
-并写入 Long Testing Handoff 的 `manual_required`，不得隐式通过，也不得作为 long 未完成项阻塞 `ready_for_local_test`。
+并写入 Long Testing Handoff 的 `manual_required`，不得隐式通过，也不得作为 long 未完成项阻塞 `ready_for_local_test`。本条只适用于人工、真实设备、服务器/部署环境和最终验收；自动化构建/装载/启动、配置绑定、必需依赖就绪及最小行为 smoke 属于 Required Validation Matrix，不得放入 `manual_required` 规避 Local Runnable Gate。
 
 ## 禁止
 
