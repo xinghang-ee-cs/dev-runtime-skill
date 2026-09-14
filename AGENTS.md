@@ -17,10 +17,10 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 
 | Skill | 主要用途 | 典型触发语句 | 是否允许修改文件 | 是否需要项目初始化 | 依赖档案或 reference | 不适用场景 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ai-code-inspection` | 按 10 种真实工作场景路由通用代码检查、诊断、只读审计、已确认 Bug/紧急补丁闭环和受控规范矫正 | “检查当前 Git 变更”“定位这个报错”“核查需求是否实现完整”“修复这个已确认 Bug”“检查 PR 合并准备”“按规范矫正这些文件” | 依场景决定；场景 1–9 单次完成，只有场景 10 交互执行七步；代码与真实数据库权限独立 | 是；首次使用从模板初始化项目级 `.runtime/ai-code-inspection/` | 项目级环境档案和 Runtime、Step references、按需 Profiles | 上线发布、生产门禁、严格安全验收、无准入的猜测修复或大规模重构 |
-| `planning-layer-runtime` | 实现前的业务发现、一次性草案装配与依次确认、Planning Context、正式规划文档、UI/UX 执行合同、冻结执行基线、初始/增量 planning handoff，以及经 Change Triage 准入的精确规划重入 | “先做开发规划”“创建这一期规划文档”“梳理需求和验收边界”“生成可执行的 UI/UX 设计合同”“根据测试变更判定增量更新规划” | 仅允许其定义的项目级规划启动上下文、正式规划文档与 planning runtime；不改生产代码 | 是；按需建立最小 `.runtime/planning-layer-runtime/`，并绑定目标项目已有的正式规划目录与当前事实基线路径 | `references/00`–`12`、`.runtime/planning-layer-runtime/`、项目当前基线和正式规划目录 | 直接实现、测试执行、发布或生产操作 |
-| `long-task-orchestrator` | 根据已确认的初始或增量 handoff 执行至少 4 个实现单元的完整功能，按增量队列保护未受影响/已完成工作，并交付到 `ready_for_local_test`；也处理 triage 确认的实现缺陷 patch | “按已确认计划完成这个模块”“继续长任务实现并写自动化测试”“修复 testing 已确认的实现缺陷” | 通过 Source of Truth、revision、增量执行选择与 Runtime Gate 后可修改实现、测试和其 Runtime 资产 | 是；必须确认 handoff、通过 preflight 并创建/恢复 Phase Runtime Directory | Runtime kernel references、planning handoff、Phase Runtime Directory | 小于 4 个实现单元、缺少已确认 SoT、未分流的需求/设计变化、人工验收、云端验证、上线放行 |
-| `testing-layer-runtime` | 继承带 revision 的 long 自动化结果，管理人工、真实设备、服务器、外部能力和最终验收，对发现做 Change Triage，并输出 release handoff | “开始这一期人工测试”“继承 long handoff 做验收”“分类这个测试发现并决定回流位置”“整理服务器验证和上线移交” | 只写绑定到当前期次的 Testing Runtime 输出；不改业务产物或 planning SoT | 是；必须定位测试期次与 writeback target，读取 long handoff 和测试范围 | 项目环境事实源、long testing handoff、测试方案、`references/01`–`05` | 开发实现、重跑已有通过自动化、从测试层定义新需求、直接发布或安全门禁 |
+| `ai-code-inspection` | 路由代码检查与根因诊断；在四 Skill 流程中创建 Bugfix Case | “定位这个报错”“为已确认 Bug 建立修复合同”“检查 PR 合并准备” | Fast Lane 只诊断并形成 Case，由 Long 修改 | 是；首次使用初始化项目级环境档案 | 环境档案、`bugfix-fast-lane.md`、Step references | 上线、生产门禁、无准入猜测修复 |
+| `planning-layer-runtime` | 正式规划与 Change Set；治理 Bugfix Case 的合同边界和最终生产基线更新 | “先做开发规划”“判定这个问题是否需要改规划” | 可写正式规划；Fast Lane 不改原 00–15 | 是；绑定正式规划目录和当前基线 | `references/00`–`14`、当前基线、正式规划目录 | 直接实现、测试执行、发布 |
+| `long-task-orchestrator` | 执行正式 handoff；也消费 `bugfix-case/v1` 完成不限单元数的精确补丁 | “按计划实现”“修复这个 Bugfix Case” | 通过合同和门禁后可修改实现、测试及 Case 结果 | 是；需要 handoff 或已确认 Case | Runtime kernel、planning handoff 或 Bugfix Case | 未分流合同变化、人工/云端测试、上线 |
+| `testing-layer-runtime` | 管理期次验收；也负责 Bugfix 定向测试、生产复验和上线后同类型问题验证 | “开始验收”“验证 Bugfix Case”“继续同类型问题测试” | 只写 Testing Runtime 或 Bugfix Case，不改业务代码/Planning SoT | 是；定位期次或 Case 并读取 Long 证据 | Long 交接/补丁结果、测试合同或 Bugfix Case | 开发实现、无理由重跑 Long 自动化、直接发布 |
 
 发现流程：
 
@@ -93,6 +93,22 @@ Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行�
 - 不让实现 Skill 代替人工验收，也不让测试 Skill 重新承担开发期自动化。
 - 不让发布流程代替日常代码检查。
 - 必要时按 `planning → implementation → testing → 项目发布/安全流程` 顺序切换；每个阶段只保留一个主治理 Skill，完成明确 handoff 后再切换。
+
+### Bugfix Fast Lane
+
+已确认 `implementation_defect` 且当前 Planning 合同仍有效时，不创建新期次，也不修改原 00–15。使用追加式 `bugfix-case/v1`：
+
+```text
+Issue + ai-code-inspection 诊断/合同
+→ fix/<BUG-ID>-short + Long 精确补丁
+→ Testing 定向验证
+→ PR/CI/仅经 PR 合并
+→ 部署与原 Bug 生产复验
+→ Testing 同类型问题扫描与定向验证
+→ 关闭 Case 和 Issue
+```
+
+每次进入项目或收到部署返回时扫描未完成 `bugfix-case.json`。`deployed` 和 `original_bug_production_verified` 都不等于闭环；若状态为 `awaiting_similar_defect_verification`，必须突出提醒用户当前唯一下一步是继续 Testing，不能先宣告完成。新发现的同类型问题必须新建 Bug ID、Issue 和 Case，不得静默扩大原补丁。
 
 ## 7. 项目适配原则
 

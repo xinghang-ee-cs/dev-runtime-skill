@@ -1,4 +1,4 @@
 interface:
   display_name: "Long Task Orchestrator"
-  short_description: "Run contract-bound development through runnable gates."
-  default_prompt: "Use $long-task-orchestrator after a valid execution_ready Planning Handoff. Advance only through its coarse forward state machine, preserve dependency-based parallel work inside each stage, derive a machine-bound repository inventory and required validation matrix, and hand off only after durable evidence proves every applicable build, load, configuration, dependency, startup, and minimum-behavior check."
+  short_description: "Run planned delivery or exact Bugfix Case patches."
+  default_prompt: "Use $long-task-orchestrator after a valid execution_ready Planning Handoff. Advance only through its coarse forward state machine, preserve dependency-based parallel work inside each stage, derive a machine-bound repository inventory and required validation matrix, and hand off only after durable evidence proves every applicable build, load, configuration, dependency, startup, and minimum-behavior check. For a confirmed bugfix-case/v1, use the exact patch mode without reopening Planning or requiring four units, while preserving applicable validation gates."

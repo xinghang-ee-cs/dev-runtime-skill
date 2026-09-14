@@ -5,7 +5,7 @@ description: 从开发前规划推进到测试和发布移交的完整 Runtime S
 
 import { Steps } from '@astrojs/starlight/components';
 
-这条流程适合需要明确规划、完整实现和真实环境验收的功能。小范围的几行修改不必强制启动整套运行时。
+这条流程适合需要明确规划、完整实现和真实环境验收的功能。已确认实现缺陷使用本页后半部分的 Bugfix Fast Lane，不为几行修复重开完整 Planning。
 
 <Steps>
 
@@ -35,6 +35,24 @@ import { Steps } from '@astrojs/starlight/components';
 
 </Steps>
 
+## Bugfix Fast Lane
+
+当前 Planning 合同仍有效的 `implementation_defect` 使用追加式 `bugfix-case/v1`：
+
+```text
+Issue + ai-code-inspection 诊断/合同
+  -> 来源期次 bugfixes/<BUG-ID>/
+  -> Long 精确补丁与自动化
+  -> Testing 原 Bug/影响路径/相邻风险定向验证
+  -> PR/CI/合并/部署与原 Bug 生产复验
+  -> Testing 同类型问题扫描与定向验证
+  -> 关闭 Case 和 Issue
+```
+
+原期次 00–15 保持只读，Bugfix Case 不进入其 baseline hash。若问题实际是 `planning_gap`、`requirement_change` 或合同级 `design_drift`，立即退出 Fast Lane，回到 Planning Change Set。
+
+部署返回后必须把 `post_release_similar_defect_verification` 显示为唯一下一步；`deployed` 和原 Bug 生产复验都不表示流程结束。发现新问题时新建 Bug ID、Issue 和 Case，不扩大原补丁。
+
 ## 交接链
 
 ```text
@@ -55,6 +73,7 @@ planning-layer-runtime
 - 人工测试发现偏差：先执行 Change Triage。实现缺陷交回 Long；测试缺陷留在 Testing；规划缺口、需求变化或合同级设计漂移重入 Planning。
 - Planning 重入：追加 Change Set，只修订受影响合同并生成增量 Handoff；已完成和未受影响工作保持锁定或继续。
 - 发布条件不满足：测试层记录阻塞并移交，不自行批准上线。
+- Bug 已部署但未完成同类型问题验证：保持 Issue open，从 Case 的 `next_required_action` 恢复 Testing。
 
 :::tip[保持单一负责人]
 同一时间只让一个 Skill 负责当前阶段。跨阶段时通过明确交接切换负责人，而不是同时加载所有规则。

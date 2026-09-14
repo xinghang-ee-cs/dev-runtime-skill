@@ -1,6 +1,6 @@
 ---
 name: ai-code-inspection
-description: 通用代码检查、诊断与受控修复 Skill，按 10 种真实工作场景路由当前改动检查、具体问题诊断、已确认 Bug 修复与回归、需求完整性核查、业务规则补全、全项目审计、重构风险评估、合并就绪检查、紧急修复和七步规范治理。适用于 review 当前变更、定位异常、修复证据充分的 Bug、对照需求验收、补齐行为规则、摸清项目现状、评估重构、检查 PR/MR/合并准备、处理阻断故障或按工程规范检查代码。回归验证只作为修复后的内部阶段；只有规范性检查使用交互式 Step 1–7。不要用于上线、发布、生产门禁、严格安全验收或无边界的大规模重构。
+description: 通用代码检查、诊断与受控修复 Skill，按 10 种真实工作场景路由当前改动检查、具体问题诊断、已确认 Bug 修复与回归、需求完整性核查、业务规则补全、全项目审计、重构风险评估、合并就绪检查、紧急修复和七步规范治理。在四 Skill 项目流程中负责为已确认实现缺陷建立持久 `bugfix-case/v1` 合同并交给 Long，而不污染原 Planning 期次。适用于 review 当前变更、定位异常、修复证据充分的 Bug、对照需求验收、补齐行为规则、摸清项目现状、评估重构、检查 PR/MR/合并准备、处理阻断故障或按工程规范检查代码。回归验证只作为修复后的内部阶段；只有规范性检查使用交互式 Step 1–7。不要用于上线、发布、生产门禁、严格安全验收或无边界的大规模重构。
 ---
 
 # AI Code Inspection
@@ -22,9 +22,11 @@ description: 通用代码检查、诊断与受控修复 Skill，按 10 种真实
 
 - `SKILL.md`：唯一 Runtime Governance Source，独占场景、路由、权限、状态切换、gate 和报告规则。
 - `references/README.md`：只提供场景概览、轻量路由和执行路线。
+- `references/bugfix-fast-lane.md`：四 Skill 流程中已确认实现缺陷的准入、持久 Bugfix Case、GitHub/版本规则和跨会话恢复。
 - `references/step1-*.md` 到 `step7-*.md`：只提供检查标准和本 Step 安全边界，不定义场景或 Runtime 生命周期。
 - `references/profiles/`：只补充技术栈特有规则，不重新定义场景、范围、权限、问题分类或生命周期。
 - `assets/runtime-templates/`：只提供未初始化环境档案和空闲 Runtime 模板，用于首次初始化目标项目。
+- `assets/bugfix-case-template/`：只提供 `bugfix-case/v1` 的机器状态与五份记录模板；实例必须创建在目标项目正式规划目录中。
 
 Runtime 目录或文件不存在时，只按当前任务需要从 `assets/runtime-templates/` 初始化目标项目的 `.runtime/ai-code-inspection/`：环境档案必须根据目标仓库的 manifest、workspace 配置、源码入口、测试配置、持久化定义、公共契约、CI/CD workflow 和已有环境文档填写。不得从 Skill 示例或其他项目复制稳定事实；无法可靠确认的字段保持未确认并报告。
 
@@ -162,6 +164,12 @@ routing:
 
 报告故障与影响、紧急程度、回滚/止血/修复判断、根因证据、实际补丁文件、核心验证、未完成验证与风险、回滚方式、部署前人工事项、永久治理任务及固定 `hotfix_readiness`：`ready`、`conditionally_ready`、`not_ready` 或 `blocked`。`conditionally_ready` 必须列出 `conditions`；不得生成其他状态名。
 
+### 四 Skill 项目的 Bugfix Fast Lane 覆盖规则
+
+当目标项目同时采用 Planning、Long、Testing 的正式交付链，且问题属于既有或已发布功能时，场景 3/9 的诊断准入完成后必须读取 `references/bugfix-fast-lane.md`。本 Skill 此时创建或更新 `bugfix-case/v1`、填写 `00-bug-contract.md` 并完成 Change Triage，然后把唯一下一步交给 long-task-orchestrator；不在检查层直接修改实现。
+
+只有目标项目未采用该交付链，或项目规则明确允许本 Skill 独立完成小型修复时，才继续使用本文件原有的单次受控修复。Fast Lane 的紧急程度不允许绕过 Issue、专用分支、PR、CI 或 PR 合并。
+
 ### 场景 10：规范性检查与受控矫正
 
 用户以“规范、规范性检查、按规范检查、代码规范、规范整改/矫正、七步规范检查、是否符合规范”为核心判断依据时固定进入本场景；即使同时出现“修改”“代码”“审计”也不得改路由。
@@ -286,6 +294,8 @@ issue_classification:
 5. `references/step5-documentation.md`：docs/API/schema/README 与行为一致性。
 6. `references/step6-comment-standard.md`：注释和项目本地文件头规范。
 7. `references/step7-code-commit.md`：Git 状态、验证、CI/CD 和提交准备。
+
+场景 3/9 命中四 Skill Bugfix Fast Lane 时，额外加载 `references/bugfix-fast-lane.md`；不得把它当作第 11 个用户场景。
 
 ## 报告格式
 

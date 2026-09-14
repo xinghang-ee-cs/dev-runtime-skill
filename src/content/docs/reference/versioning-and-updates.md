@@ -127,7 +127,7 @@ python .runtime-skills/runtime-skills.py update --project . --release latest --a
 1. 修改受影响的 Skill 或同步工具版本，并同步提升 `release_version`。
 2. 通过清单校验和同步工具测试。
 3. 合并发布变更到 `main`。
-4. Release workflow 重新校验 `main`，自动创建与清单一致的 tag，例如当前清单对应的 `v1.0.0`。
+4. Release workflow 重新校验 `main`，自动创建与清单一致的 tag，例如当前清单对应的 `v1.1.0`。
 5. workflow 自动创建 GitHub Release 和 Release Notes；对应 tag 或 Release 已存在时安全跳过。
 
 不需要维护者在终端手工推送 tag。缺失 Release 时，可以在 GitHub Actions 中手动运行 `Release Runtime Skills` workflow；它仍以最新 `main` 和清单版本为准。

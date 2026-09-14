@@ -1312,7 +1312,7 @@ deferred_improvement
 
 处理：
 
-- `implementation_defect`：当前规划仍正确，`fix_in_execution`；不重新打开 01–13，由后续执行承接方修复并重测，实际事实继续进入 14/15。
+- `implementation_defect`：当前规划仍正确，`fix_in_execution`；不重新打开 01–13。按 `14-bugfix-case-governance.md` 在来源期次 `bugfixes/` 追加 `bugfix-case/v1`，由 Long 修复、Testing 定向验证；实际修复、测试和发布事实只进入 Case，不进入原 14/15。
 - `test_defect`：`fix_in_test`；修复测试脚本、数据、环境或证据，不修改业务规划。
 - `planning_gap`：`reopen_current_planning`；只回到真正拥有该事实的上游 SoT，再调用 08 传播受影响范围。
 - `requirement_change`：先按 `02-planning-change-levels.md` 做范围准入，决定本期吸收、增量、下一期或替换本期范围；不得先改 13。
@@ -1365,7 +1365,8 @@ candidate -> confirmed -> applied_to_planning -> handoff_prepared -> closed
 
 - Planning 只定义 15 的更新条件，不填写真实验收、发布或基线更新结果。
 - 只有实际发布确认后才更新生产当前事实；已验收未发布仍保持交付状态。
-- 本期关闭后 00–15 历史只读。旧期次只允许受控修正事实错误，独立新增需求默认进入下一期。
+- 本期关闭后 00–15 历史只读。旧期次只允许受控修正事实错误，以及按 `14-bugfix-case-governance.md` 在 `bugfixes/` 追加不参与 baseline hash 的 Bugfix Case；独立新增需求默认进入下一期。
+- Bugfix 发布不立即更新基线；必须等待原 Bug 生产复验、同类型问题验证、Case 和 Issue 关闭后，才把已部署事实与 Case 引用写入 `PROJECT-CURRENT-BASELINE.md`。
 - 下一期始终从最新 `PROJECT-CURRENT-BASELINE.md` 开始，并读取 `<requirement_pool_path>` 做 `same / conflict / unrelated` 判断；需求池不得覆盖当前基线。
 
 ## 10. Planning Document Mode

@@ -1,6 +1,6 @@
 ---
 name: long-task-orchestrator
-description: 当 Agent 必须接收已确认且 execution_ready 的初始或增量 planning handoff，按其中的基线 revision、增量执行队列、执行约束、稳定业务命名、实现合同、UI/UX 精确绑定和承接位置执行一个至少包含 4 个实现单元的完整功能或模块时使用。负责从开发开始到经必要验证矩阵证明真实构建/装载/启动及最小行为可用的 ready_for_local_test，或在确认 testing/用户缺陷反馈后 patch 到同等门禁下的 ready_for_local_retest：实现、重构、数据迁移、按指定 Prompt/PAGE/UX/ASSET revision 落实前端、自动化测试代码编写与执行、结果记录及 Long Testing Handoff；不负责补写 Planning 业务合同、自行重设计、人工测试、真实设备测试、云端验证、最终验收或上线放行。
+description: 当 Agent 必须接收已确认且 execution_ready 的初始或增量 planning handoff，按其中的基线 revision、增量执行队列、执行约束、稳定业务命名、实现合同、UI/UX 精确绑定和承接位置执行一个至少包含 4 个实现单元的完整功能或模块时使用；也可接收 `bugfix-case/v1`，在不要求活动 Planning Runtime 或四个实现单元的情况下完成精确补丁。负责从开发开始到经必要验证矩阵证明真实构建/装载/启动及最小行为可用的 ready_for_local_test，或在确认缺陷后 patch 到 ready_for_local_retest / ready_for_bug_verification：实现、重构、数据迁移、前端合同落实、自动化测试代码编写与执行、结果记录及交接；不负责补写 Planning 业务合同、自行重设计、人工测试、真实设备测试、云端验证、最终验收或上线放行。
 ---
 
 # 长任务编排器
@@ -92,6 +92,8 @@ Runtime 存储、路径绑定、首次 Bootstrap、已有 Runtime 恢复与失�
 ## Planning Handoff
 
 Planning Handoff Intake、revision/队列一致性、前置就绪、实现承接、依赖治理和正式记录权限的唯一详细规则在 `references/landing-checklist-preflight.md`、`references/task-state-machine.md` 和 `references/task-execution.md`。UI/UX 适用时还必须完整读取 `references/frontend-experience-execution.md`。
+
+输入为 `bugfix-case/v1` 时改读 `references/bugfix-patch-runtime.md`，以 Case 的精确合同与原 Planning 引用替代活动期次 Handoff Intake；仍复用适用的实现、验证、依赖和 diff 门禁，但不套用“至少 4 个实现单元”或“必须恢复活动 Planning Runtime”的条件。
 
 不可变 Intake 边界：
 
@@ -286,6 +288,12 @@ long-task-orchestrator 不负责执行或等待：
 - UAT
 - Release Gate
 - 上线放行
+
+## Bugfix Fast Lane Patch Runtime
+
+当输入是 ai-code-inspection 已确认并持久化的 `bugfix-case/v1` 时，完整读取 `references/bugfix-patch-runtime.md`。该模式独立于下方的期内 Testing Feedback Patch Runtime：它允许在来源期次已关闭或发布后直接消费 Bug 合同，产出 `01-long-patch-result.md` 与 `ready_for_bug_verification`，然后停止并交给 Testing。
+
+Fast Lane 只豁免活动期次和最少四单元要求，不豁免精确 allowlist、回归、受影响验证矩阵、必要 build/typecheck/load、主 Agent diff 审查、GitHub Issue/分支/PR/CI/PR 合并以及合同变化退出门禁。
 
 ## Testing Feedback Patch Runtime
 
