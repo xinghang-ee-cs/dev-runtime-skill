@@ -4,6 +4,33 @@
 
 A project-neutral set of Agent Skills for planning, implementation, testing, and code inspection. The repository contains reusable governance only; project-specific commands, credentials, paths, and environment facts stay in the target project.
 
+## Quick install
+
+The easiest option is to send this prompt to the Agent working in the target project:
+
+```text
+Install Runtime Skills in the current project from https://github.com/xinghang-ee-cs/dev-runtime-skill.
+Skills: planning-layer-runtime, long-task-orchestrator, testing-layer-runtime, ai-code-inspection
+
+Inspect the current execution platform, project instruction files, and existing Skill directories to determine every Agent platform and installation destination used by this project. Do not ask me to choose a platform: use .agents/skills for Codex; use .claude/skills for Claude Code; for GitHub Copilot, reuse an existing supported project directory and use .agents/skills when sharing with Codex. When evidence shows multiple platforms, install every destination in one operation.
+
+If the source repository is not local, obtain its latest stable Release in a temporary directory. From the source repository run:
+python scripts/runtime-skills.py install --release latest --project "<target-project-root>" --skill planning-layer-runtime --skill long-task-orchestrator --skill testing-layer-runtime --skill ai-code-inspection --destination "<automatically-detected Skill root>"
+Repeat --destination for every detected installation directory. Then merge the applicable AGENTS.md rules and, when Claude Code is detected, maintain the CLAUDE.md import of AGENTS.md. Finish with:
+python "<target-project-root>/.runtime-skills/runtime-skills.py" verify --project "<target-project-root>"
+Report the detected platforms, destinations, Release, Skill versions, and verify result. Do not modify business code, deploy, commit, or push.
+```
+
+The AI must perform platform detection, destination selection, installation, and verification itself. See the [detailed installation guide](#install-in-an-agent-project) for partial installations and existing-project migration.
+
+## Start in one sentence
+
+After installation, send this in the target project:
+
+```text
+Use the Skills to start the first development phase for me.
+```
+
 Only the selected directories under `skills/` are installable Skill packages. `AGENTS.md` is the reusable project-entry template. `src/`, `public/`, `package*.json`, `astro.config.mjs`, `tsconfig.json`, and the documentation deployment workflow belong to this repository's Astro/Starlight documentation site and must not be copied into a target project. The version in `package.json` belongs to the documentation site and is not a Skill version.
 
 ## The four skills
@@ -52,7 +79,7 @@ The current bundle declared by the manifest is:
 
 | Component | Version |
 | --- | --- |
-| Repository Release | `v1.1.0` (prerelease) |
+| Repository Release | `v1.1.1` (prerelease) |
 | `planning-layer-runtime` | `1.1.0` |
 | `long-task-orchestrator` | `1.1.0` |
 | `testing-layer-runtime` | `1.1.0` |
@@ -82,11 +109,11 @@ See [Versioning and updates](src/content/docs/reference/versioning-and-updates.m
 
 ### Release tags and a copy-ready Skill + Runtime migration prompt
 
-GitHub Release tags use `vMAJOR.MINOR.PATCH`; the current manifest declares the `v1.1.0` prerelease. The versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release; it deliberately does not select `v1.1.0`. Use the exact `v1.1.0` tag only when explicitly opting into this prerelease for evaluation. After installation, `runtime-skills.lock.json` records what that project actually uses.
+GitHub Release tags use `vMAJOR.MINOR.PATCH`; the current manifest declares the `v1.1.1` prerelease. The versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release; it deliberately does not select `v1.1.1`. Use the exact `v1.1.1` tag only when explicitly opting into this prerelease for evaluation. After installation, `runtime-skills.lock.json` records what that project actually uses.
 
 Updating Skill files does not upgrade Runtime state already created inside a project. The `v1.0.0` forward ledgers and validation receipts remain the compatibility boundary for unfinished pre-1.0 phases. v1.1 adds Bugfix Cases without rewriting closed historical phases: new confirmed defects create `bugfix-case/v1` alongside the originating phase, while existing 00–15 files remain untouched.
 
-Paste the following prompt directly into the Agent that is working in the target project. It handles the managed/unversioned Skill copies and the current project's unfinished legacy Runtime state. It uses the latest stable Release as-is; append `Target Release: v1.1.0 prerelease` only when intentionally evaluating this prerelease.
+Paste the following prompt directly into the Agent that is working in the target project. It handles the managed/unversioned Skill copies and the current project's unfinished legacy Runtime state. It uses the latest stable Release as-is; append `Target Release: v1.1.1 prerelease` only when intentionally evaluating this prerelease.
 
 ```text
 Adopt or update Runtime Skills in the current project.
@@ -99,7 +126,7 @@ Take responsibility for the workflow from inspection through verification. Treat
 1. Inspect runtime-skills.lock.json, .runtime-skills/runtime-skills.py, AGENTS.md, CLAUDE.md, and supported project-level Skill roots such as .agents/skills/, .claude/skills/, and .github/skills/. Identify the currently installed Runtime Skills, every destination copy, the Agent platforms in use, local Git changes, and any active phase pin. Do not scan unrelated projects.
 2. If the lock file exists, treat this as a managed installation even when the project-local synchronization entry point or a managed copy is missing. When the entry point is healthy, first run verify and remote status, then run diff against the requested Release. When it is missing or verify reports drift, use a temporary trusted copy of the tool from the locked/requested Release to diagnose it; do not reclassify the project as an unmanaged installation or repair it without approval. Apply a compatible patch through sync. For a minor or major change, summarize the affected Release, Skill versions, added/modified/removed files, and compatibility impact, then wait for my explicit confirmation before running update with the required --allow level. Never silently bypass an active phase pin: normally defer the update; when the requested major update is specifically needed to migrate an unfinished legacy Runtime, offer one controlled transition for explicit confirmation—record the old lock/pin and Runtime sources, unpin with the tool, perform the approved update and steps 7–10, then pin the active phase to the new bundle again. If I do not approve that transition, leave everything pinned and unchanged.
 3. If Runtime Skill directories exist without a lock file, treat them as unmanaged legacy copies. Obtain the requested stable Release from the source repository in a temporary location. Infer the exact existing Skill names and destination roots without adding or removing Skills. Run the install command once without --overwrite-local-changes so the tool reports the incoming additions, modifications, and removals. Show that comparison and wait for my explicit approval before rerunning with --overwrite-local-changes to adopt the Release, create runtime-skills.lock.json, and install .runtime-skills/runtime-skills.py.
-4. If neither a managed installation nor legacy Runtime Skill copies exist, stop and tell me this is a first installation; ask only for any Agent platform or Skill selection that cannot be determined from the current project, then use the repository's installation flow.
+4. If neither a managed installation nor legacy Runtime Skill copies exist, treat it as a first installation. Determine the Agent platform from the current execution platform, project instruction files, and existing platform directories; do not ask me to choose a platform. Ask only for a Skill selection that cannot be determined from the request or current project, then proceed directly with the repository's installation flow.
 5. Preserve all project-specific instructions. Merge only applicable routing and safety rules into AGENTS.md, and maintain the CLAUDE.md import when Claude Code is used. Never replace either file wholesale. Never silently overwrite local Skill changes, mix copies from different Releases, downgrade a Skill, expose credentials, modify business code, run database migrations, deploy, commit, or push.
 6. After an approved Skill migration or update, run verify. Report the previous Release and Skill versions -> installed Release and Skill versions, the exact destinations, lock-file state, phase-pin state, merged instruction files, and any unresolved drift or decisions. If remote access is unavailable, say so and distinguish local verification from a successful latest-version check.
 7. After Skill verification, inspect only the current project's Planning, Long, and Testing state locations referenced by the project instructions, handoffs, and active phase. Classify each phase as: no Runtime state, closed historical state, unfinished legacy state, or already-current state. Never rewrite a closed historical phase merely to make it match the new schema.
@@ -108,13 +135,13 @@ Take responsibility for the workflow from inspection through verification. Treat
 10. Run every applicable validator from the newly installed Skill directories; if step 2 temporarily removed an active phase pin, restore that pin to the new bundle before stopping. Then report: migrated and untouched phase paths, the new Runtime epoch/cycle, preserved legacy sources, regenerated contracts/receipts, rerun checks and outcomes, final pin state, unresolved blockers, and the exact next permitted action. Do not start feature implementation, manual acceptance, deployment, database migration, commit, or push unless I separately requested it.
 ```
 
-For an exact managed update, the synchronization commands accept a published Release tag directly. The current `v1.1.0` is prerelease-only and must be selected explicitly; `latest` will not adopt it. Moving from a pre-1.0 Release requires explicit `update --allow major`; `sync` will report it but will not silently cross that boundary. Do not use a tag that has not been published as a GitHub Release.
+For an exact managed update, the synchronization commands accept a published Release tag directly. The current `v1.1.1` is prerelease-only and must be selected explicitly; `latest` will not adopt it. Moving from a pre-1.0 Release requires explicit `update --allow major`; `sync` will report it but will not silently cross that boundary. Do not use a tag that has not been published as a GitHub Release.
 
 ## Install in an Agent project
 
 No manual file copying is required. Give the Agent read access to this repository and write access to the target project, then run the initialization prompt below. The Agent should invoke the synchronization tool instead of maintaining an unversioned copy workflow.
 
-The user only needs to provide a target project name, local path, or repository URL, plus the Agent platform and Skills to install. With sufficient permissions, the Agent locates the project, copies each selected Skill as a complete directory, and adapts it without requiring the user to move or edit files manually.
+The user only needs to provide a target project name, local path, or repository URL plus the Skills to install. The Agent determines the platform and destinations from the current execution platform, project instruction files, and existing Skill directories. With sufficient permissions, it locates the project, copies each selected Skill as a complete directory, and adapts it without requiring the user to choose a platform or move or edit files manually.
 
 | Agent | Project skill location | Project instructions | Official documentation |
 | --- | --- | --- | --- |
@@ -143,7 +170,7 @@ your-project/
     └── testing-layer-runtime/
 ```
 
-The Agent installs only the directories required by the selected platforms. If the target project already has `AGENTS.md` or `CLAUDE.md`, it merges the instructions instead of overwriting them. When only some Skills are installed, it removes unavailable Skills from the installed `AGENTS.md` inventory.
+The Agent installs only the directories required by the automatically detected platforms; when evidence shows multiple platforms, it writes every corresponding destination in the same installation. If the target project already has `AGENTS.md` or `CLAUDE.md`, it merges the instructions instead of overwriting them. When only some Skills are installed, it removes unavailable Skills from the installed `AGENTS.md` inventory.
 
 Claude Code does not read `AGENTS.md` directly. The Agent therefore creates or merges this minimal project file:
 
@@ -160,19 +187,19 @@ Run this prompt from this Skill repository. The AI performs the complete install
 ```text
 Install and initialize Runtime Skills for the following target project:
 - Target project: <required project name, local path, or repository URL>
-- Agent platform: <Codex / Claude Code / GitHub Copilot>
 - Skills to install: <one or more exact Skill names>
 
 Take responsibility for the complete initialization. Do not ask me to copy, paste, or edit installation files manually.
 Use the supplied project name or address to search the workspaces and repositories you can access. If exactly one matching local project is found, continue automatically. Ask me only when the target is missing, ambiguous, or outside your permissions.
 Confirm internally that the source is this Skill repository and that the destination is the matched target project before writing.
-Run scripts/runtime-skills.py install --release latest to place the complete selected Skill directories from the latest stable Release in the project-level Skill directory supported by the selected Agent platform. Also create runtime-skills.lock.json and the project-local synchronization entry point. Pass every target directory in the same installation when multiple Agent platforms are used.
+Inspect the current execution platform, the target project's AGENTS.md and CLAUDE.md, and existing .agents/skills/, .claude/skills/, and .github/skills/ directories. Determine the actual Agent platforms and installation destinations without asking me to choose a platform. Use .agents/skills for Codex; use .claude/skills for Claude Code; for GitHub Copilot, reuse an existing supported project directory and use .agents/skills when sharing with Codex. Use every corresponding destination when evidence shows multiple platforms.
+If the source repository is not local, obtain its latest stable Release in a temporary directory. From the source repository run `python scripts/runtime-skills.py install --release latest --project "<target-project-root>"`, repeating `--skill <name>` for every selected Skill and `--destination <directory>` for every automatically detected destination. This operation must also create runtime-skills.lock.json and the project-local synchronization entry point.
 Merge the applicable routing and safety rules from this repository's AGENTS.md into the target project's AGENTS.md; never overwrite existing project instructions. For Claude Code, also create or merge CLAUDE.md so it imports AGENTS.md.
 Do not copy this repository's README files, src/, public/, package.json, package-lock.json, astro.config.mjs, tsconfig.json, .github/workflows/, or any other documentation-site files.
 Scan only the target project, list the installed Skills, and adapt their stable environment profiles or bootstrap files using facts from that project.
 Do not create task/phase Runtime state before its skill entry gate is satisfied.
 Do not modify business code, run database migrations, deploy, commit, or push.
-Run the synchronization tool's verify command. Report the installed Release, commit, every Skill version and destination; copied, merged, and initialized files; detected components, languages, frameworks, persistence, test tools, CI workflows, and validation commands; and any unresolved facts.
+Run `python "<target-project-root>/.runtime-skills/runtime-skills.py" verify --project "<target-project-root>"`. Report the automatically detected platforms, installed Release, commit, every Skill version and destination; copied, merged, and initialized files; detected components, languages, frameworks, persistence, test tools, CI workflows, and validation commands; and any unresolved facts.
 ```
 
 AI initialization means locating the named target, installing the selected Skill packages, merging the Agent entry instructions, and adapting Skill-owned profiles or bootstrap files. It does not migrate this repository or its documentation site into that project.

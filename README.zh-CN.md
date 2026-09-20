@@ -4,6 +4,33 @@
 
 这是一套与具体项目无关的 Agent Skills，负责开发规划、实现、测试和代码检查。仓库只保存可复用治理；目标项目的命令、账号、路径和环境事实必须留在目标项目中。
 
+## 快速安装
+
+最简单的方式是把下面这段发给正在目标项目中工作的 Agent：
+
+```text
+请从 https://github.com/xinghang-ee-cs/dev-runtime-skill 为当前项目安装 Runtime Skills。
+需要安装：planning-layer-runtime、long-task-orchestrator、testing-layer-runtime、ai-code-inspection
+
+先检查当前运行平台、项目指令文件和已有 Skill 目录，自行识别本项目使用的 Agent 平台与全部安装目录，不要让我选择平台：Codex 使用 .agents/skills；Claude Code 使用 .claude/skills；GitHub Copilot 优先复用项目已有的受支持目录，与 Codex 共用时使用 .agents/skills；存在多个平台证据时一次安装到全部目录。
+
+如果来源仓库尚未在本地，先把最新稳定 Release 取得到临时目录。然后从来源仓库运行：
+python scripts/runtime-skills.py install --release latest --project "<目标项目根目录>" --skill planning-layer-runtime --skill long-task-orchestrator --skill testing-layer-runtime --skill ai-code-inspection --destination "<自动识别的 Skill 根目录>"
+多个安装目录就重复传入 --destination。安装后合并适用的 AGENTS.md 规则；识别到 Claude Code 时维护 CLAUDE.md 对 AGENTS.md 的导入。最后运行：
+python "<目标项目根目录>/.runtime-skills/runtime-skills.py" verify --project "<目标项目根目录>"
+报告实际识别的平台、安装目录、Release、Skill 版本和 verify 结果。不要修改业务代码、部署、提交或推送。
+```
+
+AI 必须自行完成平台识别、目录选择、安装和校验。需要部分 Skill 安装或已有项目迁移时，继续阅读[详细安装说明](#部署到-agent-项目)。
+
+## 一句话启动
+
+安装完成后，在目标项目中直接发送：
+
+```text
+根据 Skill，帮我开启第一期的开发。
+```
+
 只有 `skills/` 下被选中的目录属于可安装 Skill 包；`AGENTS.md` 是可复用的项目入口模板。`src/`、`public/`、`package*.json`、`astro.config.mjs`、`tsconfig.json` 和文档部署 workflow 只用于构建本仓库的 Astro/Starlight 文档站，不能复制到目标项目。`package.json` 的版本属于文档站，不代表任何 Skill 版本。
 
 ## 四个 Skill
@@ -52,7 +79,7 @@ Issue + ai-code-inspection Bug Contract
 
 | 组件 | 版本 |
 | --- | --- |
-| 仓库 Release | `v1.1.0`（预发布） |
+| 仓库 Release | `v1.1.1`（预发布） |
 | `planning-layer-runtime` | `1.1.0` |
 | `long-task-orchestrator` | `1.1.0` |
 | `testing-layer-runtime` | `1.1.0` |
@@ -82,11 +109,11 @@ python .runtime-skills/runtime-skills.py sync --project .
 
 ### Release Tag 与可直接使用的 Skill + Runtime 迁移 Prompt
 
-GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是预发布版 `v1.1.0`。快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 只会跟随最新稳定 Release，不会选中 `v1.1.0`；只有明确参与本次预发布验证时，才使用 `v1.1.0` 这个精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
+GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是预发布版 `v1.1.1`。快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 只会跟随最新稳定 Release，不会选中 `v1.1.1`；只有明确参与本次预发布验证时，才使用 `v1.1.1` 这个精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
 
 只更新 Skill 文件，并不会自动升级目标项目中已经生成的 Runtime 状态。`v1.0.0` 的前向账本与验证 receipt 仍是未完成 pre-1.0 期次的兼容边界。v1.1 通过在来源期次旁追加 `bugfix-case/v1` 来管理新缺陷，不重写已关闭历史期次，也不改变原 00–15。
 
-把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release；只有明确参与本次预发布验证时，才在消息末尾补充 `目标 Release：v1.1.0 预发布版`。
+把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release；只有明确参与本次预发布验证时，才在消息末尾补充 `目标 Release：v1.1.1 预发布版`。
 
 ```text
 请在当前项目中接管或更新 Runtime Skills。
@@ -99,7 +126,7 @@ GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `v
 1. 检查 runtime-skills.lock.json、.runtime-skills/runtime-skills.py、AGENTS.md、CLAUDE.md，以及 .agents/skills/、.claude/skills/、.github/skills/ 等受支持的项目级 Skill 目录。识别当前已有的 Runtime Skill、所有副本位置、正在使用的 Agent 平台、本地 Git 改动和活动期次锁定；不要扫描无关项目。
 2. 只要锁文件存在，就按“受管安装”处理，即使项目内同步入口或某个受管副本已经缺失。同步入口正常时，先执行 verify 和远端 status，再对目标 Release 执行 diff；入口缺失或 verify 报告漂移时，从锁定或目标 Release 临时取得可信同步工具做诊断，不得把项目误判为无版本安装，也不得未经同意修复。兼容的修订版本更新通过 sync 执行；遇到次版本或主版本变化时，先汇总目标 Release、各 Skill 版本、增加/修改/删除的文件以及兼容性影响，得到我的明确确认后，才使用所需的 --allow 级别执行 update。绝不静默绕过活动期次锁定：通常应延后更新；如果这次主版本更新正是为了迁移尚未结束的旧 Runtime，可以提出一次“受控切换”并等待我明确确认——先记录旧 lock/pin 和 Runtime 来源，再用工具解除 pin，执行获批更新和第 7–10 步，最后把活动期次重新 pin 到新 bundle。如果我不批准，就保持原 pin 和全部文件不变。
 3. 如果已有 Runtime Skill 目录但没有锁文件，按“无版本旧副本”处理。从来源仓库把目标稳定 Release 临时取到本机；根据现有目录准确识别 Skill 名称和目标根目录，不自行增删 Skill。先不带 --overwrite-local-changes 执行一次 install，让工具列出将增加、修改和删除的内容；把差异展示给我，并等待我明确同意。得到同意后，才能带 --overwrite-local-changes 重新执行，以采用该 Release、生成 runtime-skills.lock.json 并安装 .runtime-skills/runtime-skills.py。
-4. 如果既没有受管安装，也没有旧版 Runtime Skill 副本，停止更新并说明这是首次安装；只询问当前项目无法判断的 Agent 平台或 Skill 选择，然后按来源仓库的首次安装流程执行。
+4. 如果既没有受管安装，也没有旧版 Runtime Skill 副本，则按首次安装处理。根据当前运行平台、项目指令文件和已有平台目录自行确定 Agent 平台，不要让我选择平台；只询问无法从请求或当前项目判断的 Skill 选择，然后直接按来源仓库的首次安装流程执行。
 5. 保留项目自己的全部指令。只把适用的路由和安全规则合并进 AGENTS.md；使用 Claude Code 时继续维护 CLAUDE.md 的导入，绝不整体覆盖这两个文件。不得静默覆盖 Skill 本地修改，不得混用不同 Release 的副本，不得降级 Skill，不得暴露凭证，也不要修改业务代码、执行数据库迁移、部署、commit 或 push。
 6. 经我确认并完成 Skill 迁移或更新后，执行 verify。报告原 Release 和 Skill 版本 -> 当前 Release 和 Skill 版本、全部实际安装位置、锁文件状态、期次锁定状态、合并过的指令文件，以及仍未解决的漂移或待决事项。如果远端不可用，明确区分“本地校验通过”和“已成功检查最新版本”。
 7. Skill 校验通过后，只检查当前项目说明、Handoff 和活动期次实际引用的 Planning、Long、Testing 状态位置。把各期次分成：没有 Runtime、已关闭的历史 Runtime、未结束的旧版 Runtime、已是当前版本 Runtime。不要为了套用新 schema 而重写已经关闭的历史期次。
@@ -108,13 +135,13 @@ GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `v
 10. 从新安装的 Skill 目录运行全部适用 validator；如果第 2 步曾临时解除活动期次 pin，在停止前把它恢复到新 bundle。然后报告：已迁移与保持不动的期次路径、新 Runtime epoch/cycle、保留的旧来源、重建的合同/receipt、重跑项及结果、最终 pin 状态、未解决 blocker 和下一项唯一允许动作。除非我另行明确要求，不要开始功能实现、人工验收、部署、数据库迁移、commit 或 push。
 ```
 
-对已受管项目执行精确版本更新时，同步命令可以直接接收已发布的 Release Tag。当前 `v1.1.0` 仅用于预发布验证，必须显式指定，`latest` 不会采用它。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为更新来源。
+对已受管项目执行精确版本更新时，同步命令可以直接接收已发布的 Release Tag。当前 `v1.1.1` 仅用于预发布验证，必须显式指定，`latest` 不会采用它。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为更新来源。
 
 ## 部署到 Agent 项目
 
 不需要用户手动复制文件。只需让 Agent 同时拥有本仓库的读取权限和目标项目的写入权限，然后运行下方初始化 Prompt。Agent 应调用同步工具，不再自行维护一套无版本复制逻辑。
 
-用户只需提供目标项目名称、本地路径或仓库地址，以及 Agent 平台和需要安装的 Skill。有足够权限时，Agent 会自行定位项目、完整复制所选 Skill 并完成适配，不要求用户手动搬运或编辑文件。
+用户只需提供目标项目名称、本地路径或仓库地址，以及需要安装的 Skill。Agent 必须根据当前运行平台、项目指令文件和已有 Skill 目录自行判断平台与安装位置；有足够权限时，Agent 会自行定位项目、完整复制所选 Skill 并完成适配，不要求用户选择平台、手动搬运或编辑文件。
 
 | Agent | 项目级 Skill 目录 | 项目指令文件 | 官方文档 |
 | --- | --- | --- | --- |
@@ -143,7 +170,7 @@ your-project/
     └── testing-layer-runtime/
 ```
 
-Agent 只安装所选平台需要的目录。目标项目已有 `AGENTS.md` 或 `CLAUDE.md` 时，由 Agent 合并指令而不是覆盖；只安装部分 Skill 时，由 Agent 从安装后的 `AGENTS.md` 清单中移除未安装项。
+Agent 只安装自动识别出的平台需要的目录；发现多个平台证据时，在同一次安装中写入全部对应目录。目标项目已有 `AGENTS.md` 或 `CLAUDE.md` 时，由 Agent 合并指令而不是覆盖；只安装部分 Skill 时，由 Agent 从安装后的 `AGENTS.md` 清单中移除未安装项。
 
 Claude Code 不会直接读取 `AGENTS.md`，因此 Agent 会创建或合并这个最小项目文件：
 
@@ -160,19 +187,19 @@ Claude Code 不会直接读取 `AGENTS.md`，因此 Agent 会创建或合并这�
 ```text
 请为以下目标项目安装并初始化 Runtime Skills：
 - 目标项目：<必填，项目名称、本地路径或仓库地址>
-- Agent 平台：<Codex / Claude Code / GitHub Copilot>
 - 需要安装的 Skill：<一个或多个准确的 Skill 名称>
 
 请完整负责本次初始化，不要要求我手动复制、粘贴或编辑安装文件。
 根据我提供的项目名称或地址，在你有权限访问的工作区和仓库中搜索目标项目。只找到一个匹配的本地项目时直接继续；仅在找不到目标、存在多个匹配或权限不足时再询问我。
 写入前自行确认来源是当前 Skill 仓库，目标是搜索到的目标项目。
-运行 scripts/runtime-skills.py install --release latest，从最新稳定 Release 将已选择 Skill 的完整目录放入该 Agent 平台支持的项目级 Skill 目录；同时生成 runtime-skills.lock.json 和项目内同步入口。多个 Agent 平台必须在同一次安装中传入全部目标目录。
+检查当前运行平台、目标项目的 AGENTS.md、CLAUDE.md 和已有的 .agents/skills/、.claude/skills/、.github/skills/，自行识别项目实际使用的 Agent 平台和安装目录，不要让我选择平台。Codex 使用 .agents/skills；Claude Code 使用 .claude/skills；GitHub Copilot 优先复用项目已有的受支持目录，与 Codex 共用时使用 .agents/skills；存在多个平台证据时使用全部对应目录。
+如果来源仓库尚未在本地，先把最新稳定 Release 取得到临时目录。从来源仓库运行 `python scripts/runtime-skills.py install --release latest --project "<目标项目根目录>"`，每个 Skill 重复传入 `--skill <名称>`，每个自动识别的安装目录重复传入 `--destination <目录>`。这一步必须同时生成 runtime-skills.lock.json 和项目内同步入口。
 将本仓库 AGENTS.md 中适用的路由与安全规则合并到目标项目的 AGENTS.md，绝不覆盖目标项目已有指令。使用 Claude Code 时，还要创建或合并 CLAUDE.md，使其导入 AGENTS.md。
 不要复制本仓库的 README、src/、public/、package.json、package-lock.json、astro.config.mjs、tsconfig.json、.github/workflows/ 或任何其他文档站文件。
 只扫描目标项目，列出已安装 Skill，并根据该项目的真实事实适配 Skill 自有的稳定环境档案或启动文件。
 在对应 Skill 的进入条件满足前，不要创建任务或期次 Runtime 状态。
 不要修改业务代码，不执行数据库迁移、部署、commit 或 push。
-运行同步工具的 verify，报告安装的 Release、commit、每个 Skill 版本、全部安装位置；本次复制、合并和初始化的文件；识别出的组件、语言、框架、持久化方案、测试工具、CI workflow 和验证命令；以及仍未确认的事实。
+运行 `python "<目标项目根目录>/.runtime-skills/runtime-skills.py" verify --project "<目标项目根目录>"`，报告自动识别的平台、安装的 Release、commit、每个 Skill 版本、全部安装位置；本次复制、合并和初始化的文件；识别出的组件、语言、框架、持久化方案、测试工具、CI workflow 和验证命令；以及仍未确认的事实。
 ```
 
 AI 初始化只包括：定位指定目标、安装选中的 Skill 包、合并 Agent 入口指令，以及适配 Skill 自有的环境档案或启动文件。它不代表迁移本仓库，更不会把本仓库的文档站搬进目标项目。

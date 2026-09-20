@@ -31,7 +31,7 @@ python scripts/runtime-skills.py install \
 
 需要同时支持 Claude Code 时，再传入 `--destination .claude/skills`。所有副本写入同一个锁文件；后续更新始终把已安装 Skill 作为一个 Release 快照共同处理，不允许只更新其中一个平台副本。
 
-`--release latest` 是普通用户的稳定入口，只解析 GitHub 标记为稳定的最新 Release，不会选中预发布版本。当前 `v1.1.0` 是预发布版，只有明确参与验证时才通过 `--release v1.1.0` 精确选择。维护者需要验证尚未发布的本地内容时，才使用 `--source /path/to/dev-runtime-skill`，此时锁文件会记录实际分支和 commit，而不会伪装成 Release。
+`--release latest` 是普通用户的稳定入口，只解析 GitHub 标记为稳定的最新 Release，不会选中预发布版本。当前 `v1.1.1` 是预发布版，只有明确参与验证时才通过 `--release v1.1.1` 精确选择。维护者需要验证尚未发布的本地内容时，才使用 `--source /path/to/dev-runtime-skill`，此时锁文件会记录实际分支和 commit，而不会伪装成 Release。
 
 ### 迁移已有的无版本副本
 
@@ -127,7 +127,7 @@ python .runtime-skills/runtime-skills.py update --project . --release latest --a
 1. 修改受影响的 Skill 或同步工具版本，并同步提升 `release_version`。
 2. 通过清单校验和同步工具测试。
 3. 合并发布变更到 `main`。
-4. Release workflow 重新校验 `main`，自动创建与清单一致的 tag，例如当前清单对应的 `v1.1.0`。
+4. Release workflow 重新校验 `main`，自动创建与清单一致的 tag，例如当前清单对应的 `v1.1.1`。
 5. workflow 根据清单中的 `repository.channel` 创建稳定版或预发布版 GitHub Release，并生成 Release Notes；Release 已存在时，工作流仍会校正其预发布标记。
 
 不需要维护者在终端手工推送 tag。缺失 Release 时，可以在 GitHub Actions 中手动运行 `Release Runtime Skills` workflow；它仍以最新 `main` 和清单版本为准。
