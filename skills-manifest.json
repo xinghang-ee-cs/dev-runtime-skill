@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "release_version": "1.1.1",
+  "release_version": "1.1.2",
   "repository": {
     "url": "https://github.com/xinghang-ee-cs/dev-runtime-skill",
-    "channel": "prerelease"
+    "channel": "stable"
   },
   "tool": {
     "version": "0.1.1",

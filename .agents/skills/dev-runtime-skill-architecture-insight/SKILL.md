@@ -41,6 +41,7 @@ Use this repository-local Skill to minimize discovery before edits. It is not on
 ## Search shortcuts
 
 - `rg -n "release_version|repository.*channel|version" skills-manifest.json scripts README* src`
+- `rg -n "Archive superseded|obsolete_patch_tags|--draft" .github scripts tests README* src`
 - `rg -n "add_parser|command_install|command_sync|command_update" scripts/runtime-skills.py`
 - `rg -n "planning_baseline_revision|ready_for_local_test|bugfix-case" skills tests`
 - `rg -n "^## |^### " skills -g SKILL.md; rg -n "^## |^### " README.md README.zh-CN.md`

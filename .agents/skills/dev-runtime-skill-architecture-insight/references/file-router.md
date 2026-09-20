@@ -13,11 +13,13 @@ Reason: the synchronization CLI owns parsing and behavior; tests and reference d
 ## 2. Install, download, or version-resolution flow
 
 - `scripts/runtime-skills.py`
+- `scripts/select-obsolete-patch-tags.py` when changing public PATCH retention
 - `skills-manifest.json`
 - `tests/test_runtime_skills.py`
+- `tests/test_release_retention.py` when changing public PATCH retention
 - `.github/workflows/release-skills.yml`
 
-Reason: these files own source resolution, managed deployment, lock generation, and Release publication.
+Reason: these files own source resolution, managed deployment, lock generation, Release publication, and archival of superseded PATCH records.
 
 ## 3. Version switching, paths, or environment setup
 
