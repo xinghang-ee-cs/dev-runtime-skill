@@ -46,13 +46,13 @@ Issue + ai-code-inspection Bug Contract
 
 ## 版本与自动同步
 
-仓库采用两个版本层级：GitHub Release 表示一组经过共同验证的 Skill 快照，每个 Skill 在 [`skills-manifest.json`](skills-manifest.json) 中拥有独立 SemVer。README 和 `SKILL.md` 都不是版本事实源。
+仓库采用两个版本层级：GitHub Release 表示一组 Skill 快照，每个 Skill 在 [`skills-manifest.json`](skills-manifest.json) 中拥有独立 SemVer。清单中的发布渠道用于区分“供验证的预发布包”和“经过共同验证的稳定包”。README 和 `SKILL.md` 都不是版本事实源。
 
 当前清单声明的版本如下：
 
 | 组件 | 版本 |
 | --- | --- |
-| 仓库 Release | `v1.1.0` |
+| 仓库 Release | `v1.1.0`（预发布） |
 | `planning-layer-runtime` | `1.1.0` |
 | `long-task-orchestrator` | `1.1.0` |
 | `testing-layer-runtime` | `1.1.0` |
@@ -82,11 +82,11 @@ python .runtime-skills/runtime-skills.py sync --project .
 
 ### Release Tag 与可直接使用的 Skill + Runtime 迁移 Prompt
 
-稳定 GitHub Release 的 Tag 统一采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是 `v1.1.0`。这个 Tag 标识一组经过共同验证的仓库快照；快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 可跟随最新稳定 Release；目标项目需要复现当前版本时，使用 `v1.1.0` 这个精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
+GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是预发布版 `v1.1.0`。快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 只会跟随最新稳定 Release，不会选中 `v1.1.0`；只有明确参与本次预发布验证时，才使用 `v1.1.0` 这个精确 Tag。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
 
 只更新 Skill 文件，并不会自动升级目标项目中已经生成的 Runtime 状态。`v1.0.0` 的前向账本与验证 receipt 仍是未完成 pre-1.0 期次的兼容边界。v1.1 通过在来源期次旁追加 `bugfix-case/v1` 来管理新缺陷，不重写已关闭历史期次，也不改变原 00–15。
 
-把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release；需要固定版本时，在消息末尾补充类似 `目标 Release：v1.1.0` 即可。
+把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release；只有明确参与本次预发布验证时，才在消息末尾补充 `目标 Release：v1.1.0 预发布版`。
 
 ```text
 请在当前项目中接管或更新 Runtime Skills。
@@ -108,7 +108,7 @@ python .runtime-skills/runtime-skills.py sync --project .
 10. 从新安装的 Skill 目录运行全部适用 validator；如果第 2 步曾临时解除活动期次 pin，在停止前把它恢复到新 bundle。然后报告：已迁移与保持不动的期次路径、新 Runtime epoch/cycle、保留的旧来源、重建的合同/receipt、重跑项及结果、最终 pin 状态、未解决 blocker 和下一项唯一允许动作。除非我另行明确要求，不要开始功能实现、人工验收、部署、数据库迁移、commit 或 push。
 ```
 
-对已受管项目执行精确版本更新时，同步命令可以直接接收 Release Tag，例如 `--release v1.1.0`。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为稳定更新来源。
+对已受管项目执行精确版本更新时，同步命令可以直接接收已发布的 Release Tag。当前 `v1.1.0` 仅用于预发布验证，必须显式指定，`latest` 不会采用它。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为更新来源。
 
 ## 部署到 Agent 项目
 
