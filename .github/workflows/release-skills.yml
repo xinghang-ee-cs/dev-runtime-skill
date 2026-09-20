@@ -82,3 +82,20 @@ jobs:
           else
             gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"
           fi
+      - name: Archive superseded patch releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          mapfile -t obsolete_tags < <(
+            git tag --list |
+              python scripts/select-obsolete-patch-tags.py --current-tag "$TAG"
+          )
+          for obsolete_tag in "${obsolete_tags[@]}"; do
+            if gh release view "$obsolete_tag" >/dev/null 2>&1; then
+              gh release edit "$obsolete_tag" --draft --latest=false
+              echo "Archived superseded patch release ${obsolete_tag} as a draft."
+            fi
+            git push origin ":refs/tags/${obsolete_tag}"
+            echo "Removed superseded public tag ${obsolete_tag}."
+          done

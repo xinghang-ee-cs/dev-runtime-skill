@@ -31,7 +31,7 @@ python scripts/runtime-skills.py install \
 
 需要同时支持 Claude Code 时，再传入 `--destination .claude/skills`。所有副本写入同一个锁文件；后续更新始终把已安装 Skill 作为一个 Release 快照共同处理，不允许只更新其中一个平台副本。
 
-`--release latest` 是普通用户的稳定入口，只解析 GitHub 标记为稳定的最新 Release，不会选中预发布版本。当前 `v1.1.1` 是预发布版，只有明确参与验证时才通过 `--release v1.1.1` 精确选择。维护者需要验证尚未发布的本地内容时，才使用 `--source /path/to/dev-runtime-skill`，此时锁文件会记录实际分支和 commit，而不会伪装成 Release。
+`--release latest` 是普通用户的稳定入口，只解析 GitHub 标记为稳定的最新 Release，不会选中预发布或 Draft 版本。当前 `v1.1.2` 是稳定版，可通过 `latest` 获取。维护者需要验证尚未发布的本地内容时，才使用 `--source /path/to/dev-runtime-skill`，此时锁文件会记录实际分支和 commit，而不会伪装成 Release。
 
 ### 迁移已有的无版本副本
 
@@ -122,14 +122,17 @@ python .runtime-skills/runtime-skills.py update --project . --release latest --a
 
 每次修改 `skills/<name>/`，必须同时提升清单中该 Skill 的版本和仓库 `release_version`。修改同步工具时必须提升工具版本和 `release_version`。CI 会阻止内容已变化但对应版本未提升的 PR。
 
+修订版本是同一 `主版本.次版本` 系列中的直接替代版本：用户侧 `sync` 检测到兼容的 PATCH 变化后自动更新。GitHub 只向用户公开每个系列最新的 PATCH Release 和 Tag；新的修订版本成功发布后，工作流把同系列旧 Release 转为 Draft 以保留记录，并删除其公开 Tag。主版本或次版本变化时保留旧系列，使不同系列可以并存并用于梯度灰度。
+
 ## 发布
 
 1. 修改受影响的 Skill 或同步工具版本，并同步提升 `release_version`。
 2. 通过清单校验和同步工具测试。
 3. 合并发布变更到 `main`。
-4. Release workflow 重新校验 `main`，自动创建与清单一致的 tag，例如当前清单对应的 `v1.1.1`。
+4. Release workflow 重新校验 `main`，自动创建与清单一致的 tag，例如当前清单对应的 `v1.1.2`。
 5. workflow 根据清单中的 `repository.channel` 创建稳定版或预发布版 GitHub Release，并生成 Release Notes；Release 已存在时，工作流仍会校正其预发布标记。
+6. 新 Release 成功发布后，workflow 把同一 `主版本.次版本` 系列中更旧的 Release 转为 Draft，并删除其公开 Tag；不同系列不受影响。
 
 不需要维护者在终端手工推送 tag。缺失 Release 时，可以在 GitHub Actions 中手动运行 `Release Runtime Skills` workflow；它仍以最新 `main` 和清单版本为准。
 
-稳定 Release 是普通用户的使用入口。预发布 Release 只供显式指定版本的验证者使用，不会被 `latest` 自动选中。`main` 可以包含尚未发布的下一版内容，但目标项目的自动同步只消费 GitHub Release，不直接追随移动的 `main`。
+稳定 Release 是普通用户的使用入口。预发布 Release 只供显式指定版本的验证者使用，不会被 `latest` 自动选中。Draft 仅保留维护记录，不提供给普通用户，同系列旧 PATCH 的公开 Tag 被删除后也不能再用于安装或回退；需要灰度保留时应提升 MINOR 或 MAJOR。`main` 可以包含尚未发布的下一版内容，但目标项目的自动同步只消费公开的 GitHub Release，不直接追随移动的 `main`。
