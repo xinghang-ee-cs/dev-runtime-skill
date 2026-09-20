@@ -1,0 +1,7 @@
+interface:
+  display_name: "Dev Runtime Skill Architecture"
+  short_description: "Route repository maintenance to the smallest owning file set"
+  default_prompt: "Use $dev-runtime-skill-architecture-insight to identify the minimal files and validations for this repository change before editing."
+
+policy:
+  allow_implicit_invocation: true
