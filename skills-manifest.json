@@ -3,7 +3,7 @@
   "release_version": "1.1.0",
   "repository": {
     "url": "https://github.com/xinghang-ee-cs/dev-runtime-skill",
-    "channel": "stable"
+    "channel": "prerelease"
   },
   "tool": {
     "version": "0.1.1",

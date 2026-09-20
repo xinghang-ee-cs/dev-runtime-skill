@@ -46,13 +46,13 @@ The originating 00–15 documents stay read-only. `deployed` and `original_bug_p
 
 ## Versions and automatic synchronization
 
-The repository has two version levels: a GitHub Release identifies one jointly validated bundle, while each Skill has its own SemVer in [`skills-manifest.json`](skills-manifest.json). Neither the README nor `SKILL.md` is a version source.
+The repository has two version levels: a GitHub Release identifies one bundle snapshot, while each Skill has its own SemVer in [`skills-manifest.json`](skills-manifest.json). The manifest's release channel distinguishes prerelease evaluation bundles from jointly validated stable bundles. Neither the README nor `SKILL.md` is a version source.
 
 The current bundle declared by the manifest is:
 
 | Component | Version |
 | --- | --- |
-| Repository Release | `v1.1.0` |
+| Repository Release | `v1.1.0` (prerelease) |
 | `planning-layer-runtime` | `1.1.0` |
 | `long-task-orchestrator` | `1.1.0` |
 | `testing-layer-runtime` | `1.1.0` |
@@ -82,11 +82,11 @@ See [Versioning and updates](src/content/docs/reference/versioning-and-updates.m
 
 ### Release tags and a copy-ready Skill + Runtime migration prompt
 
-Stable GitHub Release tags use `vMAJOR.MINOR.PATCH`; the current manifest declares `v1.1.0`. The tag identifies the jointly validated repository bundle; the versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release or an exact tag such as `v1.1.0` when the target project must reproduce this bundle. After installation, `runtime-skills.lock.json` records what that project actually uses.
+GitHub Release tags use `vMAJOR.MINOR.PATCH`; the current manifest declares the `v1.1.0` prerelease. The versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release; it deliberately does not select `v1.1.0`. Use the exact `v1.1.0` tag only when explicitly opting into this prerelease for evaluation. After installation, `runtime-skills.lock.json` records what that project actually uses.
 
 Updating Skill files does not upgrade Runtime state already created inside a project. The `v1.0.0` forward ledgers and validation receipts remain the compatibility boundary for unfinished pre-1.0 phases. v1.1 adds Bugfix Cases without rewriting closed historical phases: new confirmed defects create `bugfix-case/v1` alongside the originating phase, while existing 00–15 files remain untouched.
 
-Paste the following prompt directly into the Agent that is working in the target project. It handles the managed/unversioned Skill copies and the current project's unfinished legacy Runtime state. It uses the latest stable Release as-is; append an exact target such as `Target Release: v1.1.0` when required.
+Paste the following prompt directly into the Agent that is working in the target project. It handles the managed/unversioned Skill copies and the current project's unfinished legacy Runtime state. It uses the latest stable Release as-is; append `Target Release: v1.1.0 prerelease` only when intentionally evaluating this prerelease.
 
 ```text
 Adopt or update Runtime Skills in the current project.
@@ -108,7 +108,7 @@ Take responsibility for the workflow from inspection through verification. Treat
 10. Run every applicable validator from the newly installed Skill directories; if step 2 temporarily removed an active phase pin, restore that pin to the new bundle before stopping. Then report: migrated and untouched phase paths, the new Runtime epoch/cycle, preserved legacy sources, regenerated contracts/receipts, rerun checks and outcomes, final pin state, unresolved blockers, and the exact next permitted action. Do not start feature implementation, manual acceptance, deployment, database migration, commit, or push unless I separately requested it.
 ```
 
-For an exact managed update, the synchronization commands accept the Release tag directly, for example `--release v1.1.0`. Moving from a pre-1.0 Release requires explicit `update --allow major`; `sync` will report it but will not silently cross that boundary. Do not use a tag that has not been published as a GitHub Release.
+For an exact managed update, the synchronization commands accept a published Release tag directly. The current `v1.1.0` is prerelease-only and must be selected explicitly; `latest` will not adopt it. Moving from a pre-1.0 Release requires explicit `update --allow major`; `sync` will report it but will not silently cross that boundary. Do not use a tag that has not been published as a GitHub Release.
 
 ## Install in an Agent project
 
