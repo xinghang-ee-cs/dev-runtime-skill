@@ -377,7 +377,7 @@ Discovery 检查点建立与 Requirement Pool 核对
 
 #### 3.2.1 Discovery Round Transaction
 
-本节是 Planning Conversation Mode 中逐轮发现事务的唯一行为规则，字段格式以 `04-planning-format-spec.md` 为准。
+本节是 Planning Conversation Mode 中逐轮发现事务的完整行为规则，字段格式以 `04-planning-format-spec.md` 为准。首次首问阶段按 `discovery-entry.md` 的最小必要投影启动，不预读本文件其他阶段；适用边界和后续反馈事务不变。
 
 首次启动：
 

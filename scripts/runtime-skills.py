@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Iterator, Sequence
 
 
-TOOL_VERSION = "0.1.1"
+TOOL_VERSION = "0.2.0"
 SUPPORTED_SCHEMA_VERSION = 1
 MANIFEST_NAME = "skills-manifest.json"
 LOCK_NAME = "runtime-skills.lock.json"
@@ -473,7 +473,7 @@ def copy_to_stage(source: Path, destination: Path) -> None:
         raise RuntimeSkillsError(f"Deployment source is missing: {source}")
 
 
-def deploy_transaction(project: Path, operations: list[tuple[Path, Path]]) -> None:
+def deploy_transaction(project: Path, operations: list[tuple[Path | None, Path]]) -> None:
     if not operations:
         return
     transaction_root = Path(
@@ -483,13 +483,14 @@ def deploy_transaction(project: Path, operations: list[tuple[Path, Path]]) -> No
     backup_root = transaction_root / "backup"
     staged_root.mkdir()
     backup_root.mkdir()
-    staged: list[tuple[Path, Path, Path]] = []
+    staged: list[tuple[Path | None, Path, Path]] = []
     installed: list[tuple[Path, Path | None]] = []
     try:
         for index, (source, destination) in enumerate(operations):
             staged_path = staged_root / str(index)
-            copy_to_stage(source, staged_path)
-            staged.append((staged_path, destination, backup_root / str(index)))
+            if source is not None:
+                copy_to_stage(source, staged_path)
+            staged.append((staged_path if source is not None else None, destination, backup_root / str(index)))
 
         for staged_path, destination, backup in staged:
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -498,7 +499,8 @@ def deploy_transaction(project: Path, operations: list[tuple[Path, Path]]) -> No
                 os.replace(destination, backup)
                 previous = backup
             try:
-                os.replace(staged_path, destination)
+                if staged_path is not None:
+                    os.replace(staged_path, destination)
             except Exception:
                 if previous and previous.exists():
                     os.replace(previous, destination)
@@ -569,8 +571,8 @@ def prepare_deployment(
     bundle: SourceBundle,
     destinations: dict[str, list[str]],
     lock: dict[str, Any],
-) -> tuple[list[tuple[Path, Path]], Path]:
-    operations: list[tuple[Path, Path]] = []
+) -> tuple[list[tuple[Path | None, Path]], Path]:
+    operations: list[tuple[Path | None, Path]] = []
     for name, relative_destinations in sorted(destinations.items()):
         source_directory = bundle.root / bundle.manifest["skills"][name]["path"]
         for relative in relative_destinations:
@@ -611,8 +613,269 @@ def normalize_destination(skill_root: str, skill_name: str) -> str:
     return (root / skill_name).as_posix()
 
 
+# Only inspect known discovery roots and explicit managed roots. Never recurse through
+# application code, archives, other projects, or arbitrary user directories.
+DISCOVERY_ROOTS = (".agents/skills", ".claude/skills", ".github/skills", ".codex/skills", ".skills")
+DISCOVERY_LIMIT = 256
+REPORT_LIMIT = 20
+CONTEXT_LIMIT = 6000
+
+
+def user_skill_roots() -> list[Path]:
+    home = Path.home()
+    codex = Path(os.environ.get("CODEX_HOME", str(home / ".codex")))
+    return list(dict.fromkeys([
+        *(home / root for root in DISCOVERY_ROOTS),
+        codex / "skills", codex / "skills/remote-skills",
+    ]))
+
+
+def discovery_roots(project: Path, managed: Sequence[Path]) -> list[tuple[str, Path]]:
+    roots = [("project", project / root) for root in DISCOVERY_ROOTS]
+    roots.extend(("project", root) for root in managed)
+    # Ancestor skills and instructions are relevant up to the containing Git root.
+    boundary = git_value(project, "rev-parse", "--show-toplevel")
+    stop = Path(boundary).resolve() if boundary else project
+    if stop != project and stop in project.parents:
+        for parent in project.parents:
+            roots.extend(("ancestor", parent / root) for root in DISCOVERY_ROOTS)
+            if parent == stop:
+                break
+    roots.extend(("user", root) for root in user_skill_roots())
+    unique: dict[Path, tuple[str, Path]] = {}
+    for scope, root in roots:
+        unique.setdefault(root.absolute(), (scope, root))
+    return list(unique.values())
+
+
+def declared_skill_name(path: Path) -> str:
+    with path.open("rb") as stream:
+        text = stream.read(4096).decode("utf-8", errors="replace")
+    if text.startswith("---\n"):
+        frontmatter = text.split("---", 2)[1]
+        match = re.search(r"^name:\s*([^\n]+)", frontmatter, re.MULTILINE)
+        if match:
+            return match.group(1).strip().strip("\"'")
+    return path.parent.name
+
+
+def installation_findings(
+    project: Path, names: Sequence[str], expected: Sequence[Path], *, instructions: bool = True,
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    expected_resolved = {path.resolve() for path in expected}
+    managed_roots = [path.parent for path in expected]
+    for scope, root in discovery_roots(project, managed_roots):
+        if not root.is_dir():
+            continue
+        try:
+            # Read at most the bounded discovery inventory, not reference content.
+            entries = []
+            with os.scandir(root) as scan:
+                for entry in scan:
+                    entries.append(Path(entry.path))
+                    if len(entries) > DISCOVERY_LIMIT:
+                        findings.append({"code": "inventory_limit", "path": str(root),
+                                         "message": "Discovery inventory exceeds 256 entries; inspect this root explicitly."})
+                        break
+            for directory in sorted(entries[:DISCOVERY_LIMIT]):
+                skill = directory / "SKILL.md"
+                if not skill.is_file():
+                    continue
+                name = declared_skill_name(skill)
+                if name in names and directory.resolve() not in expected_resolved:
+                    findings.append({"code": "duplicate_skill", "path": str(directory),
+                                     "message": f"{name}: unregistered {scope} copy; resolve platform discovery before proceeding."})
+        except OSError as exc:
+            findings.append({"code": "inventory_unreadable", "path": str(root),
+                             "message": f"Cannot inspect discovery root ({type(exc).__name__})."})
+    if instructions:
+        instruction_roots = [project]
+        boundary = git_value(project, "rev-parse", "--show-toplevel")
+        if boundary:
+            for parent in project.parents:
+                if Path(boundary).resolve() not in (parent, *parent.parents):
+                    break
+                instruction_roots.append(parent)
+                if parent == Path(boundary).resolve():
+                    break
+        instruction_roots.extend([
+            Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))),
+            Path.home() / ".claude",
+        ])
+        for directory in dict.fromkeys(instruction_roots):
+            for filename in ("AGENTS.md", "AGENTS.override.md", "CLAUDE.md", "CLAUDE.local.md"):
+                path = directory / filename
+                if not path.is_file():
+                    continue
+                try:
+                    size = path.stat().st_size
+                    # Bound inspection itself; do not echo potentially private instructions.
+                    with path.open("rb") as stream:
+                        excerpt = stream.read(32768).decode("utf-8", errors="replace")
+                    begin = excerpt.count("<!-- runtime-skills:begin -->")
+                    if size > 12000 or begin > 1:
+                        findings.append({"code": "instruction_review", "path": str(path),
+                                         "message": f"{size} bytes, {begin} routing blocks; review legacy instructions without automatic rewriting."})
+                except OSError:
+                    findings.append({"code": "instruction_review", "path": str(path),
+                                     "message": "Instruction file cannot be inspected; review manually."})
+    return findings
+
+
+def lock_expected_paths(project: Path, lock: dict[str, Any]) -> list[Path]:
+    return [safe_project_path(project, relative) for record in lock["skills"].values()
+            for relative in record["destinations"]]
+
+
+def print_findings(findings: Sequence[dict[str, str]]) -> None:
+    for finding in findings[:REPORT_LIMIT]:
+        print(f"- {finding['code']}: {finding['path']}: {finding['message']}")
+    if len(findings) > REPORT_LIMIT:
+        print(f"- {len(findings) - REPORT_LIMIT} additional findings; use doctor --json for the complete bounded inventory.")
+
+
+def scope_conflicts(project: Path, lock: dict[str, Any]) -> list[str]:
+    return [f"{item['code']}: {item['path']}: {item['message']}"
+            for item in installation_findings(project, list(lock["skills"]), lock_expected_paths(project, lock), instructions=False)]
+
+
+def command_doctor(args: argparse.Namespace) -> int:
+    project = Path(args.project).resolve()
+    lock = load_lock(project) if (project / LOCK_NAME).is_file() else None
+    names = list(lock["skills"]) if lock else list(args.skill or [])
+    if not names:
+        raise RuntimeSkillsError("doctor requires an installed lock or at least one --skill")
+    findings = installation_findings(project, names, lock_expected_paths(project, lock) if lock else [])
+    if lock:
+        findings.extend({"code": "managed_drift", "path": str(project), "message": problem}
+                        for problem in lock_drift(project, lock))
+    if args.json:
+        print(json.dumps({"findings": findings, "scope": "known project, Git ancestors and user discovery roots only"}, ensure_ascii=False))
+    else:
+        print_findings(findings)
+        print(f"Doctor: {len(findings)} finding(s); no files changed. Nested/additional platform directories require explicit inspection.")
+    return 2 if findings else 0
+
+
+def markdown_sections(text: str) -> list[tuple[str, str]]:
+    # Fenced examples can contain headings. They are not document sections.
+    lines = text.splitlines(keepends=True)
+    sections: list[tuple[str, str]] = []
+    title = "preamble"
+    current: list[str] = []
+    fence: str | None = None
+    for line in lines:
+        stripped = line.lstrip()
+        match = re.match(r"(`{3,}|~{3,})", stripped)
+        if match:
+            marker = match.group(1)
+            if fence is None:
+                fence = marker
+            elif marker[0] == fence[0] and len(marker) >= len(fence) and not stripped[len(marker):].strip():
+                fence = None
+        if fence is None and re.match(r"^#{1,6} +", line):
+            if current:
+                sections.append((title, "".join(current)))
+            title, current = line.strip(), []
+        current.append(line)
+    if current:
+        sections.append((title, "".join(current)))
+    return sections
+
+
+def command_context(args: argparse.Namespace) -> int:
+    project = Path(args.project).resolve()
+    lock = load_lock(project)
+    if args.skill not in lock["skills"]:
+        raise RuntimeSkillsError("Skill is not installed in this project")
+    problems = lock_drift(project, lock) + scope_conflicts(project, lock)
+    if problems:
+        raise RuntimeSkillsError("Resolve installation findings before reading rules: " + "; ".join(problems[:REPORT_LIMIT]))
+    root = safe_project_path(project, lock["skills"][args.skill]["destinations"][0])
+    if not 1 <= args.limit <= CONTEXT_LIMIT or args.offset < 0:
+        raise RuntimeSkillsError("Context limit must be 1..6000 characters and offset must be nonnegative")
+    if args.file:
+        path = safe_project_path(root, args.file)
+        if path.suffix != ".md" or not path.is_file():
+            raise RuntimeSkillsError("Choose an existing Markdown rule file")
+        sections = markdown_sections(path.read_text(encoding="utf-8"))
+        if args.outline:
+            payload = "\n".join(f"{i}: {title} ({len(body)} chars)" for i, (title, body) in enumerate(sections))
+        elif args.section is not None:
+            if not 0 <= args.section < len(sections):
+                raise RuntimeSkillsError("Section index is outside the outline")
+            payload = sections[args.section][1]
+        else:
+            payload = path.read_text(encoding="utf-8")
+    else:
+        if args.section is not None or args.outline:
+            raise RuntimeSkillsError("--section and --outline require --file")
+        payload = "\n".join(f"{path.relative_to(root).as_posix()} ({path.stat().st_size} bytes)"
+                            for path in iter_content_files(root) if path.suffix == ".md")
+    end = min(args.offset + args.limit, len(payload))
+    if args.offset > len(payload):
+        raise RuntimeSkillsError("Offset is past the selected content")
+    print(f"[context chars={end - args.offset} total={len(payload)} next_offset={end if end < len(payload) else 'done'}]")
+    print(payload[args.offset:end])
+    return 0
+
+
+def validate_operation_paths(project: Path, destinations: dict[str, list[str]]) -> None:
+    paths = [safe_project_path(project, item) for values in destinations.values() for item in values]
+    protected = safe_project_path(project, ".runtime-skills")
+    for path in paths:
+        if path == protected or protected in path.parents or path in protected.parents:
+            raise RuntimeSkillsError("Skill destinations may not overlap .runtime-skills")
+    for index, path in enumerate(paths):
+        if any(path == other or path in other.parents or other in path.parents for other in paths[index + 1:]):
+            raise RuntimeSkillsError("Managed Skill destinations may not overlap")
+
+
+def command_relocate(args: argparse.Namespace) -> int:
+    project = Path(args.project).resolve()
+    lock = load_lock(project)
+    if lock.get("phase_pin", {}).get("active"):
+        raise RuntimeSkillsError("Cannot relocate Skills while an active phase is pinned")
+    problems = lock_drift(project, lock) + scope_conflicts(project, lock)
+    if problems:
+        raise RuntimeSkillsError("Resolve drift/discovery findings before relocation: " + "; ".join(problems[:REPORT_LIMIT]))
+    updated = json.loads(json.dumps(lock))
+    archive = f".runtime-skills/retired/{uuid.uuid4().hex}"
+    operations: list[tuple[Path | None, Path]] = []
+    source_paths: dict[str, list[str]] = {}
+    for name in dict.fromkeys(args.skill):
+        if name not in updated["skills"]:
+            raise RuntimeSkillsError(f"Skill is not installed: {name}")
+        old = normalize_destination(args.from_root, name)
+        new = normalize_destination(args.to_root, name)
+        if old == new:
+            raise RuntimeSkillsError("Relocation source and destination must differ")
+        record = updated["skills"][name]
+        if old not in record["destinations"]:
+            raise RuntimeSkillsError(f"Source is not a managed destination: {old}")
+        old_path, new_path = safe_project_path(project, old), safe_project_path(project, new)
+        if new_path.exists():
+            raise RuntimeSkillsError(f"Relocation destination already exists; inspect/adopt it explicitly first: {new}")
+        source_paths[name] = [old, new]
+        record["destinations"] = sorted((set(record["destinations"]) - {old}) | {new})
+        operations.extend([(old_path, safe_project_path(project, f"{archive}/{old}")),
+                           (old_path, new_path), (None, old_path)])
+    validate_operation_paths(project, {**{name: record["destinations"] for name, record in lock["skills"].items() if name not in source_paths}, **source_paths})
+    updated["updated_at"] = utc_now()
+    with tempfile.TemporaryDirectory(prefix="runtime-relocate-lock-") as temp:
+        staged_lock = Path(temp) / LOCK_NAME
+        write_json_atomic(staged_lock, updated)
+        operations.append((staged_lock, project / LOCK_NAME))
+        deploy_transaction(project, operations)
+    print(f"Relocated {len(source_paths)} skill(s); old copies archived at {archive}; no project Runtime or instructions changed.")
+    return 0
+
+
 def command_install(args: argparse.Namespace, script_path: Path) -> int:
     project = Path(args.project).resolve()
+    if project == Path(project.anchor) or project in {Path.home().resolve(), Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))).resolve()}:
+        raise RuntimeSkillsError("This installer manages project-local Skills; do not use a user/home root as --project")
     project.mkdir(parents=True, exist_ok=True)
     previous = load_lock(project) if (project / LOCK_NAME).is_file() else None
     if previous:
@@ -662,17 +925,27 @@ def command_install(args: argparse.Namespace, script_path: Path) -> int:
             new_destinations = [
                 normalize_destination(root, name) for root in args.destination
             ]
-            destinations[name] = sorted(
-                set(destinations.get(name, [])) | set(new_destinations)
-            )
+            old_destinations = set(destinations.get(name, []))
+            if old_destinations and set(new_destinations) - old_destinations and not args.add_destination:
+                raise RuntimeSkillsError("New destination for an installed Skill: use --add-destination for an intentional additional platform, or relocate for a move")
+            destinations[name] = sorted(old_destinations | set(new_destinations))
 
+        validate_operation_paths(project, destinations)
+        expected = [safe_project_path(project, item) for values in destinations.values() for item in values]
+        findings = installation_findings(project, list(destinations), expected)
+        conflicts = [item for item in findings if item["code"] != "instruction_review"]
+        if conflicts:
+            print_findings(conflicts)
+            raise RuntimeSkillsError("Resolve duplicate/incomplete discovery inventory before installation; no old copies were removed")
+        print_findings([item for item in findings if item["code"] == "instruction_review"])
         unmanaged_conflicts: list[str] = []
         for name, relative_destinations in destinations.items():
             if name not in bundle.manifest["skills"]:
                 raise RuntimeSkillsError(f"Installed skill is missing from source: {name}")
             for relative in relative_destinations:
                 destination = safe_project_path(project, relative)
-                if destination.exists() and not previous and not args.overwrite_local_changes:
+                registered = previous and relative in previous["skills"].get(name, {}).get("destinations", [])
+                if destination.exists() and not registered and not args.overwrite_local_changes:
                     if not destination.is_dir():
                         unmanaged_conflicts.append(f"{relative}: existing path is not a directory")
                         continue
@@ -696,6 +969,9 @@ def command_install(args: argparse.Namespace, script_path: Path) -> int:
                 + "\n- ".join(unmanaged_conflicts)
             )
 
+        if previous and destinations == {name: record["destinations"] for name, record in previous["skills"].items()} and highest_change(changes_against_source(previous, bundle)) == "none" and not lock_drift(project, previous):
+            print("Already installed; no files changed.")
+            return 0
         lock = deploy_bundle(
             project,
             bundle,
@@ -713,7 +989,7 @@ def command_install(args: argparse.Namespace, script_path: Path) -> int:
 def command_verify(args: argparse.Namespace) -> int:
     project = Path(args.project).resolve()
     lock = load_lock(project)
-    drift = lock_drift(project, lock)
+    drift = lock_drift(project, lock) + scope_conflicts(project, lock)
     if drift:
         print("Verification failed:")
         for problem in drift:
@@ -743,7 +1019,7 @@ def print_version_status(lock: dict[str, Any], bundle: SourceBundle) -> dict[str
 def command_status(args: argparse.Namespace, script_path: Path) -> int:
     project = Path(args.project).resolve()
     lock = load_lock(project)
-    drift = lock_drift(project, lock)
+    drift = lock_drift(project, lock) + scope_conflicts(project, lock)
     if drift:
         print("Local status: attention required")
         for problem in drift:
@@ -836,7 +1112,7 @@ def update_from_bundle(
         reason = pin.get("reason") or "no reason recorded"
         raise RuntimeSkillsError(f"Update deferred because the active phase is pinned: {reason}")
 
-    drift = lock_drift(project, lock)
+    drift = lock_drift(project, lock) + scope_conflicts(project, lock)
     if drift and not getattr(args, "overwrite_local_changes", False):
         raise RuntimeSkillsError(
             "Refusing to overwrite local changes:\n- " + "\n- ".join(drift)
@@ -887,7 +1163,7 @@ def update_from_bundle(
 def command_sync(args: argparse.Namespace, script_path: Path) -> int:
     project = Path(args.project).resolve()
     lock = load_lock(project)
-    drift = lock_drift(project, lock)
+    drift = lock_drift(project, lock) + scope_conflicts(project, lock)
     if drift:
         print("Automatic synchronization stopped because local drift was detected:")
         for problem in drift:
@@ -974,7 +1250,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--auto-update", choices=["none", "patch"], default="patch"
     )
     install.add_argument("--overwrite-local-changes", action="store_true")
+    install.add_argument("--add-destination", action="store_true", help="Explicitly add an additional platform copy; use relocate to move")
     add_source_arguments(install)
+
+    doctor = subparsers.add_parser("doctor", help="Read-only diagnosis of duplicate scopes and oversized instructions")
+    doctor.add_argument("--project", default=".")
+    doctor.add_argument("--skill", action="append")
+    doctor.add_argument("--json", action="store_true")
+
+    context = subparsers.add_parser("context", help="Read a bounded rule section or outline")
+    context.add_argument("--project", default=".")
+    context.add_argument("--skill", required=True)
+    context.add_argument("--file")
+    context.add_argument("--outline", action="store_true")
+    context.add_argument("--section", type=int)
+    context.add_argument("--offset", type=int, default=0)
+    context.add_argument("--limit", type=int, default=CONTEXT_LIMIT)
+
+    relocate = subparsers.add_parser("relocate", help="Move managed copies and archive old paths outside discovery")
+    relocate.add_argument("--project", default=".")
+    relocate.add_argument("--from", dest="from_root", required=True)
+    relocate.add_argument("--to", dest="to_root", required=True)
+    relocate.add_argument("--skill", action="append", required=True)
 
     verify = subparsers.add_parser("verify", help="Verify installed copies against the lock")
     verify.add_argument("--project", default=".")
@@ -1018,6 +1315,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "install":
             return command_install(args, script_path)
+        if args.command == "doctor":
+            return command_doctor(args)
+        if args.command == "context":
+            return command_context(args)
+        if args.command == "relocate":
+            return command_relocate(args)
         if args.command == "verify":
             return command_verify(args)
         if args.command == "status":

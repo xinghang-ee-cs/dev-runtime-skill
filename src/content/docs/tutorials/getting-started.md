@@ -9,9 +9,9 @@ sidebar:
 
 目标项目应当能被所选 Agent 打开，并允许在项目根目录维护 Skill 目录和 `runtime-skills.lock.json`。已有 Agent 指令文件时可以更新；没有时不需要为了安装 Runtime Skills 创建 `AGENTS.md`。执行安装的 Agent 还需要读取本仓库并运行 Python 3 标准库脚本。
 
-## 1. 运行受管安装
+## 1. 先诊断，再运行项目级安装
 
-不要手工复制整个 `skills/`。从本仓库运行同步工具，明确选择 Skill 和每个 Agent 平台的目标根目录：
+不要手工复制整个 `skills/`，不要同时部署到用户全局和项目。默认只选择当前实际使用的平台；只有明确需要多平台时才提供多个目录。把来源仓库放在发现范围外的临时目录，先执行 `python scripts/runtime-skills.py doctor --project /path/to/your-project --skill planning-layer-runtime`；同名副本/漂移/无法完整检查时先报告并解决，不自动删除。然后从本仓库运行：
 
 ```bash
 python scripts/runtime-skills.py install \
@@ -19,23 +19,17 @@ python scripts/runtime-skills.py install \
   --project /path/to/your-project \
   --skill planning-layer-runtime \
   --skill long-task-orchestrator \
-  --destination .agents/skills \
-  --destination .claude/skills
+  --destination .agents/skills
 ```
 
-同步工具复制完整 Skill 包，不会漏掉 references、模板和 agent 元数据。多次提供 `--skill` 和 `--destination` 即可安装多个 Skill 和平台。
+同步工具复制所选完整包、项目内同步工具和锁文件，不初始化业务。相同版本和位置重复安装不写文件。已有安装新增平台位置必须用 `--add-destination`；移动位置使用 `relocate --from <旧根目录> --to <新根目录> --skill <名称>`，旧副本归档到发现范围外并更新锁。每个新目标的未受管内容始终需要明确审阅，不能因为已有锁而覆盖。
 
 ```text
 your-project/
   runtime-skills.lock.json
   .runtime-skills/
     runtime-skills.py
-  .runtime/
-    ai-code-inspection/        # 首次使用时按需初始化，不从其他项目复制
   .agents/skills/
-    planning-layer-runtime/
-    long-task-orchestrator/
-  .claude/skills/
     planning-layer-runtime/
     long-task-orchestrator/
 ```
@@ -53,11 +47,11 @@ your-project/
 
 项目自己的命令、账号边界、环境事实和发布流程应继续写在项目文档中，不要回填进通用 Skill。
 
-## 3. 让首次运行发现项目事实
+## 3. 安装后停止，真实任务按需初始化
 
-第一次运行 `ai-code-inspection` 时，Agent 从已安装的 `ai-code-inspection/assets/runtime-templates/` 初始化项目根目录 `.runtime/ai-code-inspection/`，再检查目标仓库的真实组件、语言、框架、包管理器、脚本、持久化、契约和 CI 配置，填写稳定环境事实。
+安装阶段不扫描业务源码、不访谈、不创建四套 Runtime。另行发出实际业务任务后，只加载一个选中的 SKILL.md，按当前范围补齐缺失的项目事实；已知事实复用，未涉及组件不调研。初始化 ai-code-inspection 时只从未填写模板创建当前职责必要的项目文件，不复制其他项目事实。
 
-只有无法从仓库可靠判断的信息才需要询问。不要从另一个项目复制环境结论。
+规则通过 `context --skill <名称> --file <规则路径> --outline` 定位，使用 `--section <编号>` 分段读取；每次正文最多 6000 字符，`next_offset` 未到 done 则必须续读该节。子标题独立编号，适用 gate 的全部章节必须补齐；禁止预读其他阶段、完整治理大文件或所有 references。各入口独立包含同步与 pin 生命周期，不依赖项目指令文件。
 
 ## 4. 验证部署与版本
 
@@ -77,7 +71,7 @@ runtime-skills.lock.json
 
 然后给 Codex 一个示例任务，让它只回答“应该使用哪个 Skill，以及为什么”。如果路由和边界正确，再进入真实任务。
 
-每个新会话第一次使用 Runtime Skill 前运行 `sync`。新期次开始前同步并执行 `pin --reason <期次标识>`；期次关闭后执行 `unpin`。详细规则见[版本与更新机制](../../reference/versioning-and-updates/)。
+每个新会话首次使用前运行 doctor；新期次先 sync 后 pin，再建立状态。已有活动期次先 verify，缺 pin 时先 pin 原期次，再 sync（仅校验），不能先升级；期次关闭或明确批准受控迁移后才 unpin。详细规则见[版本与更新机制](../../reference/versioning-and-updates/)。
 
 ## 下一步
 

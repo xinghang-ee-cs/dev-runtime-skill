@@ -40,7 +40,7 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 - `sync` 只在无本地漂移、无期次锁定且更新为兼容补丁版本时自动更新。次版本或主版本变化必须先展示版本差异并取得用户确认。
 - 同一 `主版本.次版本` 系列发布新修订版本后，只向用户公开最新的 Release 和 Tag；旧修订版 Release 转为 Draft 保留维护记录，公开 Tag 删除。不同 `主版本.次版本` 系列继续公开保留，用于梯度灰度。
 - 任何受管 Skill 或同步工具与锁文件摘要不一致时，停止自动覆盖，先运行 `diff` 并让用户决定保留本地修改还是采用发布版本。
-- 新期次开始前先完成同步，再运行 `pin --reason <期次或任务标识>`。从 Planning 建立期次开始，到 Long、Testing 和期次关闭之间保持同一版本；不得在活动期次中途自动换版。
+- 恢复已有活动期次时，先 verify；原 pin 缺失时先 pin 已有期次，再 sync（仅校验）。新期次开始前先完成同步，再运行 `pin --reason <期次或任务标识>`。从 Planning 建立期次开始，到 Long、Testing 和期次关闭之间保持同一版本；不得在活动期次中途自动换版。
 - 只有期次已经关闭，或用户明确批准迁移并接受重新校验现有 Runtime/合同后，才运行 `unpin` 并更新。
 - 网络或 GitHub 不可用时，至少运行 `verify`。本地副本全部匹配锁文件时可以继续使用已锁版本，但必须报告没有完成远端更新检查。
 
@@ -48,7 +48,7 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 
 1. 优先运行 `scripts/runtime-skills.py install --release latest`，由同步工具从最新稳定 Release 复制完整 Skill 目录、安装目标项目级同步入口并生成锁文件；不要以手工复制作为正常安装流程。只有维护者明确验证未发布内容时才使用 `--source`。
 2. 安装时同时复制 `SKILL.md`、`agents/` 元数据、references、Profiles、模板和必要 Runtime bootstrap 资产；不要只复制单个 `SKILL.md`。
-3. 多平台共用时，在同一次安装中传入全部目标 Skill 根目录。工具必须把所有副本绑定到同一锁文件和同一 Release。
+3. 默认只安装当前实际使用的平台；不能因历史平台目录存在就扩为多平台。明确需要多平台时在同次安装中传入目标目录，绑定同一锁和 Release。先用 doctor 检查已知全局/祖先/项目同名副本；不向全局再安装一份。新增平台目录用 --add-destination；迁移用 relocate 并归档旧发现路径。
 4. 不复制其他项目已经填写的环境事实或运行状态。`ai-code-inspection` 安装包中的 `assets/runtime-templates/` 只作为初始化源；首次使用时在目标项目根目录创建 `.runtime/ai-code-inspection/`，环境档案从 `uninitialized` 模板开始，运行状态从空闲模板开始。
 5. 安装、更新和首次使用 Skill 都不自动创建 `AGENTS.md`、`CLAUDE.md` 或其子目录副本，也不复制本文件。已有指令文件且确需补充路由时，只选择当前平台实际读取的一个文件，保留项目原文，复用已有等价说明；仅由用户明确要求创建项目入口文件时才新建指令文件。
 6. 根据目标 Agent 平台和项目约定选择项目级 Skill 目录。可能的目录例如但不限于 `.skills/`、`.agents/skills/`、`.claude/skills/`、`.codex/skills/`。
@@ -64,20 +64,9 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 
 ## 5. 首次项目初始化
 
-Agent 第一次在目标项目使用需要环境事实的 Skill 时，先执行：
+安装与业务初始化分开。安装只部署所选静态包、同步工具和锁文件，doctor/verify 后停止，不扫描业务源码或预建四套 Runtime。首次实际任务只读取一个 Skill 入口，按当前范围补齐缺失的项目事实和必要状态；未涉及的组件、数据库、前端、CI/CD 不提前调研。后续复用已有事实，状态变化时精确更新。
 
-```text
-扫描仓库
-→ 识别语言、框架、构建工具和包管理器
-→ 识别前端、后端、服务、共享包、worker、CLI 和其他组件
-→ 识别测试框架与测试层
-→ 识别持久化方案、schema 和 migration 路径
-→ 识别公共契约与生成工具
-→ 识别 CI/CD 平台和全部相关 workflow
-→ 识别真实 build/test/lint/typecheck/verify 命令
-→ 初始化该 Skill 的项目环境档案或项目运行目录
-→ 再运行 Skill
-```
+大规则使用项目工具 context 的 outline/section/offset 分段读取，单次最多 6000 字符；首轮静态规则目标不超过 12000 字符，后续按当前 gate 有理由扩展，不省略适用门禁。不要整读全部 references、历史日志或其他阶段。原入口完整规则保留在各 Skill 的 references/runtime-governance.md。
 
 初始化只使用当前仓库证据和用户明确提供的约束。不得从 Skill 示例或其他项目推断技术栈；不得默认使用 Vue、React、NestJS、Prisma、TypeScript、某个 package manager、测试命令或数据库迁移命令。无法可靠确认的事实保持未确认并报告。
 
@@ -187,7 +176,7 @@ Issue + ai-code-inspection 诊断/合同
 1. 使用同步工具安装所需 Skill，并把 `runtime-skills.lock.json` 提交到目标项目。
 2. 如果项目已有入口指令文件，只合并一次精简的适用路由；不要把本 `AGENTS.md` 整体复制到目标项目，也不要为安装单独创建 `AGENTS.md`。
 3. 运行 `verify`，确认所有 Agent 平台副本与锁文件一致。
-4. 让 Agent 扫描项目并初始化各已选 Skill 需要的环境档案或 Runtime 目录。
+4. 安装结束。另行提出真实任务后，只初始化当前选中 Skill 在当前范围必需的项目事实和状态。
 5. 先运行只读检查验证适配结果。
 6. 确认识别出的技术栈、命令、范围和权限正确。
 7. 再执行明确允许修改的任务。
@@ -195,7 +184,7 @@ Issue + ai-code-inspection 诊断/合同
 通用示例指令：
 
 ```text
-扫描当前项目，并初始化所有已安装 Skill 需要的项目环境档案，不修改业务代码。
+为当前项目安装所需 Skill，doctor/verify 后停止，不开展业务初始化。
 
 列出当前项目可用的 Skill，以及每个 Skill 适合处理的任务。
 

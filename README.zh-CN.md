@@ -2,242 +2,102 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-这是一套与具体项目无关的 Agent Skills，负责开发规划、实现、测试和代码检查。仓库只保存可复用治理；目标项目的命令、账号、路径和环境事实必须留在目标项目中。
+用于项目规划、实现、验收和代码诊断的四项独立 Skill。版本事实只来自 `skills-manifest.json`，目标项目的实际安装事实只来自 `runtime-skills.lock.json`。文档站的 `package.json` 不代表 Skill 版本。
 
 ## 快速安装
 
-最简单的方式是把下面这段发给正在目标项目中工作的 Agent：
+把下列请求发给正在目标项目中工作的 Agent：
 
 ```text
 请从 https://github.com/xinghang-ee-cs/dev-runtime-skill 为当前项目安装 Runtime Skills。
-需要安装：planning-layer-runtime、long-task-orchestrator、testing-layer-runtime、ai-code-inspection
+需要安装：planning-layer-runtime、long-task-orchestrator、testing-layer-runtime、ai-code-inspection。
+只完成安装，不开始开发规划、业务访谈或全项目环境初始化。
 
-先检查当前运行平台、项目指令文件和已有 Skill 目录，自行识别本项目使用的 Agent 平台与全部安装目录，不要让我选择平台：Codex 使用 .agents/skills；Claude Code 使用 .claude/skills；GitHub Copilot 优先复用项目已有的受支持目录，与 Codex 共用时使用 .agents/skills；存在多个平台证据时一次安装到全部目录。
-
-如果来源仓库尚未在本地，先把最新稳定 Release 取得到临时目录。然后从来源仓库运行：
-python scripts/runtime-skills.py install --release latest --project "<目标项目根目录>" --skill planning-layer-runtime --skill long-task-orchestrator --skill testing-layer-runtime --skill ai-code-inspection --destination "<自动识别的 Skill 根目录>"
-多个安装目录就重复传入 --destination。不要为了安装创建 AGENTS.md 或 CLAUDE.md。复用已有等价说明；确实缺少路由时，只在当前平台实际读取的一个已有指令文件中更新下文规定的带标记短块，不复制本仓库 AGENTS.md，不重复追加。最后运行：
-python "<目标项目根目录>/.runtime-skills/runtime-skills.py" verify --project "<目标项目根目录>"
-报告实际识别的平台、安装目录、Release、Skill 版本和 verify 结果。不要修改业务代码、部署、提交或推送。
+确认目标项目根目录和当前实际使用的平台。默认只安装当前平台：Codex 使用 .agents/skills；Claude Code 使用 .claude/skills；Copilot 复用项目实际支持的目录。只有我明确要求多平台，或当前任务明确需要这些平台时，才提供多个 --destination；旧平台目录存在本身不代表还在使用。不要安装到用户全局目录。
+把来源 Release 下载到平台不会发现 Skill 的临时目录，不把来源仓库放进目标项目的 Skill 搜索范围，不复制来源 AGENTS.md、README、文档站或 CI。
+使用可信来源工具运行 doctor --project "<项目根目录>"，新项目用重复的 --skill 指定上述名称。检查已知项目、Git 祖先和用户级同名副本；嵌套或额外发现目录需按当前平台配置单独确认。存在同名冲突、漂移或无法完整检查时停止并报告路径；不自动删除旧副本。历史过大的入口文件只报告，不改写。
+没有冲突时运行：
+python scripts/runtime-skills.py install --release latest --project "<项目根目录>" --skill planning-layer-runtime --skill long-task-orchestrator --skill testing-layer-runtime --skill ai-code-inspection --destination "<当前平台目录>"
+已有锁文件时先 verify/status/diff。新增平台目录必须明确使用 --add-destination；变更位置使用 relocate，不通过重装累加。遇到次/主版本更新或本地修改时展示差异并等待确认，不绕过活动期次 pin。
+安装不创建 AGENTS.md/CLAUDE.md，不预建 Runtime，不扫描业务源码。运行项目内工具 verify，报告 Release、版本、安装位置、诊断与校验结果，然后停止。不要修改业务代码、部署、提交或推送。
 ```
 
-AI 必须自行完成平台识别、目录选择、安装和校验。需要部分 Skill 安装或已有项目迁移时，继续阅读[详细安装说明](#部署到-agent-项目)。
+只需要部分 Skill 时删去不需要的名称。工具只管理项目级安装，拒绝把 Home 或 Codex 用户根目录当作目标项目。已有个人/全局 Skill 由对应平台管理；不能把全局和项目两份同名正文同时作为事实源。
 
-## 一句话启动
+## 四个入口与首次使用
 
-安装完成后，在目标项目中直接发送：
-
-```text
-根据 Skill，帮我开启第一期的开发。
-```
-
-只有 `skills/` 下被选中的目录属于可安装 Skill 包。本仓库的 `AGENTS.md` 是本仓库自己的治理源，不是要复制到目标项目的文件。目标项目可以保留已有指令文件；安装不要求创建新的 AGENTS.md。`src/`、`public/`、`package*.json`、`astro.config.mjs`、`tsconfig.json` 和文档部署 workflow 只用于构建本仓库的 Astro/Starlight 文档站，不能复制到目标项目。`package.json` 的版本属于文档站，不代表任何 Skill 版本。
-
-## 四个 Skill
-
-| Skill | 适用任务 | 边界 |
+| Skill | 任务 | 边界 |
 | --- | --- | --- |
-| [`planning-layer-runtime`](skills/planning-layer-runtime/SKILL.md) | 梳理需求、冻结执行基线、产出交接，并判断缺陷能否绕过 Planning。 | 不写生产代码；Fast Lane 不修改原 00–15。 |
-| [`long-task-orchestrator`](skills/long-task-orchestrator/SKILL.md) | 实现至少 4 个单元的正式功能，或消费 Bugfix Case 完成更小的精确补丁。 | 不负责人工验收，也不吸收合同变化。 |
-| [`testing-layer-runtime`](skills/testing-layer-runtime/SKILL.md) | 管理期次验收，以及 Bugfix 定向验证、生产复验和上线后同类型问题检查。 | 不修改业务代码，不批准生产上线。 |
-| [`ai-code-inspection`](skills/ai-code-inspection/SKILL.md) | 路由 10 种检查/诊断场景，并为受管 Fast Lane 创建持久 Bug Contract。 | 四 Skill 流程中由 Long 修改，而不是检查层；它不是发布或安全门禁。 |
+| [planning-layer-runtime](skills/planning-layer-runtime/SKILL.md) | 需求发现、规划、合同及 Handoff | 不写业务实现或测试执行事实 |
+| [long-task-orchestrator](skills/long-task-orchestrator/SKILL.md) | 执行已确认 Handoff 或 Bugfix Case，整期自动化验证 | 不代替人工/真机/云端验收或发布 |
+| [testing-layer-runtime](skills/testing-layer-runtime/SKILL.md) | 期次验收、Bugfix 和发布后复验 | 不修改业务代码，不直接发布 |
+| [ai-code-inspection](skills/ai-code-inspection/SKILL.md) | 代码检查、诊断及持久 Bug Contract | 只读范围不等于修改授权 |
 
-正常开发链路：
-
-```text
-planning-layer-runtime
-  -> 已确认规划交接
-  -> long-task-orchestrator
-  -> ready_for_local_test
-  -> testing-layer-runtime
-  -> 目标项目自己的发布/安全流程
-```
-
-`ai-code-inspection` 是独立流程，可单独用于代码检查、根因诊断、确认修复、需求完整性核查、审计、重构评估、合并准备、hotfix 或规范治理。
-
-Planning Execution Baseline 冻结后，已接受的需求或合同变化通过追加式 Change Set 和增量 Handoff 流转。Long 只消费被选中的执行队列，Testing 先分类再回流；默认不会重开或重跑整个期次。
-
-当前 Planning 合同仍有效的已确认实现缺陷，从 v1.1 起不再新建一期，而是进入 Bugfix Fast Lane：
+安装完成后再单独发出业务请求，例如：
 
 ```text
-Issue + ai-code-inspection Bug Contract
-  -> 在来源期次追加 bugfix-case/v1
-  -> long-task-orchestrator 精确补丁
-  -> testing-layer-runtime 定向验证
-  -> PR/CI/合并/部署 + 原 Bug 生产复验
-  -> 上线后同类型问题验证
-  -> 关闭 Case 与 Issue
+使用 planning-layer-runtime 开始本期需求访谈，只处理当前阶段。
 ```
 
-来源期次的 00–15 始终只读。`deployed` 和 `original_bug_production_verified` 都不是闭环状态：Testing 必须恢复持久化的 `post_release_similar_defect_verification` 下一步；如果发现另一个同类型问题，为它单独建立 Bug ID、Issue 和 Case。
+Agent 只加载选中的一个入口，按任务补齐最少项目事实。完整治理条款保存在各 Skill 的 `references/runtime-governance.md` 和原有专题文件中，按章节与阶段消费；不在首轮读取完整治理文件、全部 references、四个 Skill 或历史日志。普通链路为 Planning → 已确认 Handoff → Long → Testing → 项目发布流程。合同仍有效的已确认实现缺陷使用 Bugfix Case，不重开原 00–15；原 Bug 生产复验与同类型问题验证完成前不关闭 Case。
 
-## 版本与自动同步
+## 安装、重复运行与迁移
 
-仓库采用两个版本层级：GitHub Release 表示一组 Skill 快照，每个 Skill 在 [`skills-manifest.json`](skills-manifest.json) 中拥有独立 SemVer。清单中的发布渠道用于区分“供验证的预发布包”和“经过共同验证的稳定包”。README 和 `SKILL.md` 都不是版本事实源。
-
-当前清单声明的版本如下：
-
-| 组件 | 版本 |
-| --- | --- |
-| 仓库 Release | `v1.1.2`（稳定版） |
-| `planning-layer-runtime` | `1.1.0` |
-| `long-task-orchestrator` | `1.1.0` |
-| `testing-layer-runtime` | `1.1.0` |
-| `ai-code-inspection` | `0.2.0` |
-| 同步工具 | `0.1.1` |
-
-本表仅用于方便阅读，[`skills-manifest.json`](skills-manifest.json) 仍是唯一版本事实源。
-
-安装后，目标项目会得到：
-
-```text
-runtime-skills.lock.json               # 已安装 Release、commit、Skill 版本、目标位置和内容摘要
-.runtime-skills/runtime-skills.py      # 项目内同步入口
+```bash
+python scripts/runtime-skills.py doctor --project /path/to/project --skill planning-layer-runtime
+python scripts/runtime-skills.py install --release latest --project /path/to/project --skill planning-layer-runtime --destination .agents/skills
+python /path/to/project/.runtime-skills/runtime-skills.py verify --project /path/to/project
 ```
 
-把锁文件提交到目标项目 Git。它会把 `.agents/skills/`、`.claude/skills/` 等多个副本绑定到同一 Release，避免不同 Agent 使用新旧混合规则。
+相同版本和目标重复安装不重写 Skill 或锁文件。安装只复制所选 Skill 完整包、项目内同步工具和锁文件，不初始化业务环境。若需要增加第二个实际使用的平台：
 
-每个 Agent 会话第一次使用 Runtime Skill 前运行：
+```bash
+python scripts/runtime-skills.py install --release latest --project /path/to/project --skill planning-layer-runtime --destination .claude/skills --add-destination
+```
+
+每个新目标都检查未受管内容，即使已有锁文件也不能静默覆盖。确认采用发布内容后才使用 `--overwrite-local-changes`；该选项不能绕过全局/项目同名冲突。
+
+将现有受管副本移动到另一个位置：
+
+```bash
+python .runtime-skills/runtime-skills.py relocate --project . --skill planning-layer-runtime --from .agents/skills --to .claude/skills
+```
+
+`relocate` 在无漂移、无活动 pin、目标不存在时更新同一锁文件，将旧副本归档到 `.runtime-skills/retired/`，并移除旧发现路径；事务失败会恢复原位置。它不升级版本、不移动项目 Runtime，也不自动处理未受管或全局副本。只有明确要求移动时才调用；不能以归档代替用户对本地修改的决定。
+
+## 历史安装诊断
+
+`doctor` 只读取有限的已知发现目录、Skill 元数据和入口文件大小，不递归扫描业务源码或输出指令全文。它报告：未登记同名副本、受管摘要漂移、无法完整检查的目录、超过 12 KB 的入口文件和重复路由标记。后两项是人工审阅提示，不证明文件一定有错，也不自动删除。平台额外配置的目录、嵌套 monorepo Skill 需额外检查；诊断通过不等于整台电脑不存在其他副本。
+
+已有入口文件只在确需时复用最多一个不超过 10 个非空行、1200 字符的标记块；内容相同不写入。没有入口文件时不要新建。同步与 pin/unpin 已包含在每个分发 Skill 的入口，不依赖 AGENTS.md。
+
+## 同步与活动期次
+
+每个会话首次使用前运行 doctor。新期次：sync → pin → 建立期次。恢复已有活动期次：verify → 缺失时先 pin 原期次 → sync（仅验证，不升级）。同一会话锁未变化不重复同步。期次已关闭，或用户明确批准受控迁移后才 unpin。
 
 ```bash
 python .runtime-skills/runtime-skills.py sync --project .
+python .runtime-skills/runtime-skills.py pin --project . --reason phase-01
+# 期次关闭后：
+python .runtime-skills/runtime-skills.py unpin --project .
 ```
 
-默认自动安装兼容的补丁更新；次版本和主版本更新只报告差异，等待用户确认。GitHub 对每个 `主版本.次版本` 系列只向用户公开最新的修订版本 Release 和 Tag；被取代的 Release 记录转为 Draft 保留，不同 `主版本.次版本` 系列继续公开保留，用于梯度灰度。存在本地修改或多平台副本漂移时停止覆盖。活动期次应先 `pin`，保持 Planning、Long 和 Testing 使用同一套规则，期次关闭后再 `unpin`。
+sync 只自动应用兼容 PATCH；MINOR/MAJOR 需要明确确认。稳定来源使用 `--release latest`，维护者验证未发布代码才用 `--source`。更新前查看 `status --check-remote` 和 `diff`；文件包更新不意味着要扫描全部历史期次、迁移 Runtime 或重跑全部验证。只有明确的 Runtime/schema 迁移任务才进入相应 recovery 与 validator，已关闭历史保持只读。
 
-完整命令、退出行为和版本升级规则见[版本与更新机制](src/content/docs/reference/versioning-and-updates.md)。
-
-### Release Tag 与可直接使用的 Skill + Runtime 迁移 Prompt
-
-GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是稳定版 `v1.1.2`。快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 跟随最新稳定 Release。新的修订版本发布后，工作流会把同一 `主版本.次版本` 系列中更旧的 Release 转为 Draft 并删除其公开 Tag，因此用户只会拿到修复后的 `v1.1.2`，不会再拿到 `v1.1.0` 或 `v1.1.1`；不同 `主版本.次版本` 系列的 Release 会继续公开保留，用于梯度灰度。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
-
-只更新 Skill 文件，并不会自动升级目标项目中已经生成的 Runtime 状态。`v1.0.0` 的前向账本与验证 receipt 仍是未完成 pre-1.0 期次的兼容边界。v1.1 通过在来源期次旁追加 `bugfix-case/v1` 来管理新缺陷，不重写已关闭历史期次，也不改变原 00–15。
-
-把下面整段直接发给正在目标项目中工作的 Agent，即可同时处理“已有版本化安装的更新”“旧版无锁副本的迁移”和“当前项目未结束的旧 Runtime 升级”。原样使用时更新到最新稳定 Release。
-
-```text
-请在当前项目中接管或更新 Runtime Skills。
-
-来源仓库：https://github.com/xinghang-ee-cs/dev-runtime-skill
-目标 Release：最新稳定版；如果我另外给出 vMAJOR.MINOR.PATCH 格式的 Tag，则以该精确 Tag 为准。
-
-请从检查到验证完整负责本次操作。只把当前项目根目录视为目标，不要要求我手动搬运或编辑文件。
-
-1. 检查 runtime-skills.lock.json、.runtime-skills/runtime-skills.py、AGENTS.md、CLAUDE.md，以及 .agents/skills/、.claude/skills/、.github/skills/ 等受支持的项目级 Skill 目录。识别当前已有的 Runtime Skill、所有副本位置、正在使用的 Agent 平台、本地 Git 改动和活动期次锁定；不要扫描无关项目。
-2. 只要锁文件存在，就按“受管安装”处理，即使项目内同步入口或某个受管副本已经缺失。同步入口正常时，先执行 verify 和远端 status，再对目标 Release 执行 diff；入口缺失或 verify 报告漂移时，从锁定或目标 Release 临时取得可信同步工具做诊断，不得把项目误判为无版本安装，也不得未经同意修复。兼容的修订版本更新通过 sync 执行；遇到次版本或主版本变化时，先汇总目标 Release、各 Skill 版本、增加/修改/删除的文件以及兼容性影响，得到我的明确确认后，才使用所需的 --allow 级别执行 update。绝不静默绕过活动期次锁定：通常应延后更新；如果这次主版本更新正是为了迁移尚未结束的旧 Runtime，可以提出一次“受控切换”并等待我明确确认——先记录旧 lock/pin 和 Runtime 来源，再用工具解除 pin，执行获批更新和第 7–10 步，最后把活动期次重新 pin 到新 bundle。如果我不批准，就保持原 pin 和全部文件不变。
-3. 如果已有 Runtime Skill 目录但没有锁文件，按“无版本旧副本”处理。从来源仓库把目标稳定 Release 临时取到本机；根据现有目录准确识别 Skill 名称和目标根目录，不自行增删 Skill。先不带 --overwrite-local-changes 执行一次 install，让工具列出将增加、修改和删除的内容；把差异展示给我，并等待我明确同意。得到同意后，才能带 --overwrite-local-changes 重新执行，以采用该 Release、生成 runtime-skills.lock.json 并安装 .runtime-skills/runtime-skills.py。
-4. 如果既没有受管安装，也没有旧版 Runtime Skill 副本，则按首次安装处理。根据当前运行平台、项目指令文件和已有平台目录自行确定 Agent 平台，不要让我选择平台；只询问无法从请求或当前项目判断的 Skill 选择，然后直接按来源仓库的首次安装流程执行。
-5. 保留项目自己的全部指令。不要仅因 Runtime Skills 创建指令文件。复用已有等价说明；确实缺少路由时，只在当前平台实际读取的一个已有文件中更新下文规定的带标记短块，绝不复制本仓库完整 AGENTS.md、替换项目指令或重复追加。不得静默覆盖 Skill 本地修改，不得混用不同 Release 的副本，不得降级 Skill，不得暴露凭证，也不要修改业务代码、执行数据库迁移、部署、commit 或 push。
-6. 经我确认并完成 Skill 迁移或更新后，执行 verify。报告原 Release 和 Skill 版本 -> 当前 Release 和 Skill 版本、全部实际安装位置、锁文件状态、期次锁定状态、合并过的指令文件，以及仍未解决的漂移或待决事项。如果远端不可用，明确区分“本地校验通过”和“已成功检查最新版本”。
-7. Skill 校验通过后，只检查当前项目说明、Handoff 和活动期次实际引用的 Planning、Long、Testing 状态位置。把各期次分成：没有 Runtime、已关闭的历史 Runtime、未结束的旧版 Runtime、已是当前版本 Runtime。不要为了套用新 schema 而重写已经关闭的历史期次。
-8. 对每个未结束的 1.0 之前旧版期次，把已确认的正式文档、需求池、用户画像、交互/事件历史、任务事实、finding 和 evidence 保留为只读迁移来源。不得伪造前向状态历史，也不得把旧的 failed/blocked 证据修改成 passed。使用刚安装的新 Skill 的 recovery/entry 流程，从这些来源创建全新的当前版本 Runtime epoch；只有已经采用当前 schema 的 Runtime 才能恢复原流程或开启新的前向 cycle。保留到旧位置的可追踪引用；只询问真正未知的事实，不得让用户重复回答已有记录。
-9. 只重建当前 Skill 明确要求的合同。Planning 需要恢复持久化 discovery、需求池、用户画像和环境档案；部署身份已有可靠记录且用户未声明迁移时直接复用，历史运行数据只迁移脱敏后的项目进程极值/异常摘要，不复制原始日志。校验适用的数据库合同：复用未变结构必须引用真实 Schema，新增或修改结构必须确认全部物理存储单元、字段、键、约束、索引和关系并禁止额外造表；同时校验 UI/UX 合同并证明全部 before-Long 前置条件。Long 需要声明 project_root_ref、完整 source_roots、当前 Required Validation Matrix，并为每条 success postcondition 配置一个 machine_execution 探针；以整期为正式验证闭环，按顺序进入前向流程并通过 run-long-validation.sh 或 run-long-validation.ps1 重跑每个当前 required 项，让每个 passed 都引用新生成的机器执行 receipt。Testing 只能继承当前有效的 Long readiness receipt，复用验证必须绑定源 receipt/证据摘要，并通过前向迁移重建适用的本地、云端、发布状态和 deployment identity。旧的 pass/ready/accepted 只作为历史声明，在当前 validator 证明前均不生效；禁止直接跳到 ready 或 final。
-10. 从新安装的 Skill 目录运行全部适用 validator；如果第 2 步曾临时解除活动期次 pin，在停止前把它恢复到新 bundle。然后报告：已迁移与保持不动的期次路径、新 Runtime epoch/cycle、保留的旧来源、重建的合同/receipt、重跑项及结果、最终 pin 状态、未解决 blocker 和下一项唯一允许动作。除非我另行明确要求，不要开始功能实现、人工验收、部署、数据库迁移、commit 或 push。
-```
-
-对已受管项目执行精确版本更新时，同步命令可以直接接收公开的 Release Tag。同系列中已被新修订版本取代的 Release 记录会转为 Draft，公开 Tag 会删除，不能再选择；应选择该 `主版本.次版本` 系列的最新修订版本。从 1.0 之前升级必须显式执行 `update --allow major`；`sync` 只会报告，不会静默跨越主版本边界。尚未发布为 GitHub Release 的 Tag 不能作为更新来源。
-
-## 部署到 Agent 项目
-
-不需要用户手动复制文件。只需让 Agent 同时拥有本仓库的读取权限和目标项目的写入权限，然后运行下方初始化 Prompt。Agent 应调用同步工具，不再自行维护一套无版本复制逻辑。
-
-用户只需提供目标项目名称、本地路径或仓库地址，以及需要安装的 Skill。Agent 必须根据当前运行平台、项目指令文件和已有 Skill 目录自行判断平台与安装位置；有足够权限时，Agent 会自行定位项目、完整复制所选 Skill 并完成适配，不要求用户选择平台、手动搬运或编辑文件。
-
-| Agent | 项目级 Skill 目录 | 项目指令文件 | 官方文档 |
-| --- | --- | --- | --- |
-| OpenAI Codex | `.agents/skills/<skill-name>/` | 按需复用已有项目指令文件，安装不创建新文件 | [Codex Skills](https://developers.openai.com/codex/skills)、[AGENTS.md](https://developers.openai.com/codex/guides/agents-md) |
-| Claude Code | `.claude/skills/<skill-name>/` | 按需复用已有 `CLAUDE.md`，不新增对本仓库 `AGENTS.md` 的导入 | [Claude Code Skills](https://code.claude.com/docs/en/skills)、[CLAUDE.md 与 AGENTS.md](https://code.claude.com/docs/en/memory#agents-md) |
-| GitHub Copilot | 与 Codex 共用时推荐 `.agents/skills/<skill-name>/`；也支持 `.github/skills/` 和 `.claude/skills/` | 按需复用已有项目指令文件，安装不创建新文件 | [Copilot Agent Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills)、[仓库指令](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions) |
-
-同时使用三种 Agent 时，Agent 自动生成的目标结构可以是：
-
-```text
-your-project/
-├── runtime-skills.lock.json
-├── .runtime-skills/
-│   └── runtime-skills.py
-├── .agents/skills/             # Codex + GitHub Copilot
-│   ├── ai-code-inspection/
-│   ├── planning-layer-runtime/
-│   ├── long-task-orchestrator/
-│   └── testing-layer-runtime/
-└── .claude/skills/             # Claude Code
-    ├── ai-code-inspection/
-    ├── planning-layer-runtime/
-    ├── long-task-orchestrator/
-    └── testing-layer-runtime/
-```
-
-Agent 只安装自动识别出的平台需要的目录；发现多个平台证据时，在同一次安装中写入全部对应目录。保留项目原有指令，复用已有等价路由；确实缺失时只更新当前平台实际读取的一个已有文件。安装、更新、首次使用和 Runtime 初始化都不自动创建指令文件，除非用户明确要求。多个 Skill 安装目录不需要分别生成指令文件。
-
-最多使用一个 `<!-- runtime-skills:begin -->` 与 `<!-- runtime-skills:end -->` 标记块，不超过 10 个非空行、1200 字符。已有块只在原位置更新，内容相同则不写入。示例中的未安装 Skill 必须删去：
-
-```markdown
-<!-- runtime-skills:begin -->
-已安装 Skill 的路径与版本以 runtime-skills.lock.json 为准。
-本会话首次使用前运行：python .runtime-skills/runtime-skills.py sync --project .
-规划：planning-layer-runtime；实现：long-task-orchestrator。
-验收：testing-layer-runtime；检查与诊断：ai-code-inspection。
-读取选中 Skill 的 SKILL.md，再按其路由加载必要 references。
-<!-- runtime-skills:end -->
-```
-
-不要向入口文件复制 Skill 正文、完整生命周期、扫描结果或本仓库的 GitHub 交付规则；不要按 Skill、平台目录或子目录分别创建副本。发现历史重复文件时先报告，不自动删除或覆盖项目原文。
-
-Claude Code 的安装也不要求新建 `AGENTS.md` 或 `CLAUDE.md`。目标项目已有任一文件时保留原文，只在确有需要时加入上述短路由说明。
-
-## 安装并初始化目标项目
-
-在本 Skill 仓库中运行下面的 Prompt。整个安装与适配过程由 AI 完成，用户无需手动复制文件：
-
-```text
-请为以下目标项目安装并初始化 Runtime Skills：
-- 目标项目：<必填，项目名称、本地路径或仓库地址>
-- 需要安装的 Skill：<一个或多个准确的 Skill 名称>
-
-请完整负责本次初始化，不要要求我手动复制、粘贴或编辑安装文件。
-根据我提供的项目名称或地址，在你有权限访问的工作区和仓库中搜索目标项目。只找到一个匹配的本地项目时直接继续；仅在找不到目标、存在多个匹配或权限不足时再询问我。
-写入前自行确认来源是当前 Skill 仓库，目标是搜索到的目标项目。
-检查当前运行平台、目标项目的 AGENTS.md、CLAUDE.md 和已有的 .agents/skills/、.claude/skills/、.github/skills/，自行识别项目实际使用的 Agent 平台和安装目录，不要让我选择平台。Codex 使用 .agents/skills；Claude Code 使用 .claude/skills；GitHub Copilot 优先复用项目已有的受支持目录，与 Codex 共用时使用 .agents/skills；存在多个平台证据时使用全部对应目录。
-如果来源仓库尚未在本地，先把最新稳定 Release 取得到临时目录。从来源仓库运行 `python scripts/runtime-skills.py install --release latest --project "<目标项目根目录>"`，每个 Skill 重复传入 `--skill <名称>`，每个自动识别的安装目录重复传入 `--destination <目录>`。这一步必须同时生成 runtime-skills.lock.json 和项目内同步入口。
-不要仅因本次安装创建 `AGENTS.md` 或 `CLAUDE.md`。复用已有等价说明；确实缺少路由时，只在当前平台实际读取的一个已有文件中更新 `<!-- runtime-skills:begin -->` 与 `<!-- runtime-skills:end -->` 短块（最多 10 个非空行、1200 字符）。原位置更新，内容相同则不写入；绝不复制本仓库完整 `AGENTS.md`、覆盖项目指令或创建重复、嵌套的入口文件。
-不要复制本仓库的 README、src/、public/、package.json、package-lock.json、astro.config.mjs、tsconfig.json、.github/workflows/ 或任何其他文档站文件。
-只扫描目标项目，列出已安装 Skill，并根据该项目的真实事实适配 Skill 自有的稳定环境档案或启动文件。
-在对应 Skill 的进入条件满足前，不要创建任务或期次 Runtime 状态。
-不要修改业务代码，不执行数据库迁移、部署、commit 或 push。
-运行 `python "<目标项目根目录>/.runtime-skills/runtime-skills.py" verify --project "<目标项目根目录>"`，报告自动识别的平台、安装的 Release、commit、每个 Skill 版本、全部安装位置；本次复制、合并和初始化的文件；识别出的组件、语言、框架、持久化方案、测试工具、CI workflow 和验证命令；以及仍未确认的事实。
-```
-
-AI 初始化只包括：定位指定目标、安装选中的 Skill 包、合并 Agent 入口指令，以及适配 Skill 自有的环境档案或启动文件。它不代表迁移本仓库，更不会把本仓库的文档站搬进目标项目。
-
-也可以直接从本仓库运行同步工具。例如同时安装给 Codex 和 Claude Code：
+## 有界规则读取
 
 ```bash
-python scripts/runtime-skills.py install \
-  --release latest \
-  --project /path/to/your-project \
-  --skill planning-layer-runtime \
-  --skill long-task-orchestrator \
-  --destination .agents/skills \
-  --destination .claude/skills
+python .runtime-skills/runtime-skills.py context --project . --skill planning-layer-runtime --file references/07-planning-conversation-runtime.md --outline
+python .runtime-skills/runtime-skills.py context --project . --skill planning-layer-runtime --file references/07-planning-conversation-runtime.md --section 1
 ```
 
-## 开始使用
+每次正文最多 6000 字符；`next_offset` 表示还有内容，必须用同样参数加 `--offset` 续读到 `done` 才算读完该节。子标题是独立节，按当前 gate 选择必要子节，不因分页跳过门禁。入口与首轮必要节的静态规则目标为 12000 字符，后续按当前阶段补齐并说明扩展原因。此限制不是整个会话 token 保证；项目资料、工具输出和客户端自动注入仍需控制。相同且已读的规则不重复读，恢复以紧凑 checkpoint 和当前状态为先。
 
-可以直接使用自然语言；支持显式调用的平台也可以直接点名 Skill。Codex 可通过 `/skills` 或 `$skill-name` 调用，Claude Code 使用 `/skill-name`，Copilot 根据请求和 Skill 描述自动选择。
+## 验证与文档
 
-```text
-使用 planning-layer-runtime 规划这个功能，暂时不要实现。
-
-使用 long-task-orchestrator 执行已经确认的规划交接。
-
-使用 testing-layer-runtime 接管当前测试交接。
-
-使用 ai-code-inspection 只读检查当前 Git 改动，并一次性反馈。
-
-使用 ai-code-inspection 对当前项目做全量只读审计。
+```bash
+python scripts/validate-skill-manifest.py
+python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-部署完成后，先让 Agent 列出当前加载的项目指令和已发现的 Skill。发现缺失时，检查目录名和完整 `SKILL.md` 路径；平台需要重新发现时，重启或新开一个 Agent 会话。
-
-本仓库不提供生产发布批准或企业级安全验收，这些仍由目标项目自己的流程负责。
+完整教程在 `src/content/docs/`。`package*.json`、`src/`、`public/` 和文档站配置仅供构建文档，不属于安装包。所有 GitHub 变更遵循本仓库 AGENTS.md 的 Issue → 专用分支 → PR → CI → PR 合并流程；这些维护规则不复制到用户项目。

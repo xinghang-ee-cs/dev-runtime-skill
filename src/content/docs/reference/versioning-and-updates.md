@@ -29,13 +29,13 @@ python scripts/runtime-skills.py install \
   --destination .agents/skills
 ```
 
-需要同时支持 Claude Code 时，再传入 `--destination .claude/skills`。所有副本写入同一个锁文件；后续更新始终把已安装 Skill 作为一个 Release 快照共同处理，不允许只更新其中一个平台副本。
+默认只为当前实际使用的平台安装。明确需要同时支持 Claude Code 时，新安装再传入 `--destination .claude/skills`；已有安装必须加 `--add-destination`。位置移动使用 `relocate`，旧副本归档而非继续暴露在发现目录中。所有副本写入同一个锁文件；后续更新始终把已安装 Skill 作为一个 Release 快照共同处理，不允许只更新其中一个平台副本。
 
 `--release latest` 是普通用户的稳定入口，只解析 GitHub 标记为稳定的最新 Release，不会选中预发布或 Draft 版本。当前稳定版本以 GitHub 最新公开稳定 Release 为准，可通过 `latest` 获取。维护者需要验证尚未发布的本地内容时，才使用 `--source /path/to/dev-runtime-skill`，此时锁文件会记录实际分支和 commit，而不会伪装成 Release。
 
 ### 迁移已有的无版本副本
 
-目标目录已经存在但没有 `runtime-skills.lock.json` 时，首次 `install` 不会直接覆盖。工具会列出发布版相对旧副本将新增、修改和删除的文件。用户确认愿意采用发布版后，再运行同一安装命令并增加：
+任何目标目录已存在且未登记到锁文件时，`install` 都不会直接覆盖，包括已有锁文件后新增的目标位置。工具会列出发布版相对旧副本将新增、修改和删除的文件。用户确认愿意采用发布版后，再运行同一安装命令并增加：
 
 ```bash
 --overwrite-local-changes
@@ -51,11 +51,11 @@ python scripts/runtime-skills.py install \
 python .runtime-skills/runtime-skills.py sync --project .
 ```
 
-每个 Agent 会话第一次使用任一 Runtime Skill 前执行一次。同一会话中，锁文件没有变化时不重复执行。
+每个 Agent 会话首次使用前先运行 doctor 检查已知同名副本及历史指令；同步工具只读取有限元数据，不扫描业务代码。新期次首次使用时执行一次 sync。恢复已有活动期次时先 verify，缺失 pin 时先 pin 原期次，再执行 sync（仅校验），避免先升级后发现期次仍活动。同一会话中，锁文件没有变化时不重复执行。
 
 `sync` 的判断顺序：
 
-1. 校验所有安装目录和同步工具是否匹配锁文件摘要。
+1. 校验登记目录和工具摘要，并检查已知项目、Git 祖先及用户发现根中的未登记同名副本；额外或嵌套目录按平台配置单独确认。
 2. 如果存在本地修改或平台间漂移，停止覆盖。
 3. 如果存在活动期次锁定，只验证当前版本，不远端更新。
 4. 查询最新稳定 GitHub Release。
@@ -136,3 +136,11 @@ python .runtime-skills/runtime-skills.py update --project . --release latest --a
 不需要维护者在终端手工推送 tag。缺失 Release 时，可以在 GitHub Actions 中手动运行 `Release Runtime Skills` workflow；它仍以最新 `main` 和清单版本为准。
 
 稳定 Release 是普通用户的使用入口。预发布 Release 只供显式指定版本的验证者使用，不会被 `latest` 自动选中。Draft 仅保留维护记录，不提供给普通用户，同系列旧 PATCH 的公开 Tag 被删除后也不能再用于安装或回退；需要灰度保留时应提升 MINOR 或 MAJOR。`main` 可以包含尚未发布的下一版内容，但目标项目的自动同步只消费公开的 GitHub Release，不直接追随移动的 `main`。
+
+## 安装与上下文诊断
+
+`doctor --project . --json` 只报告路径、问题和大小，不输出指令全文、不删除或改写用户文件。超过 12 KB 或含重复路由块的指令是人工审阅提示，不等于文件损坏；副本冲突/无法完整检查会阻断安装与同步。`verify` 证明登记内容一致并未发现已知范围冲突，不证明整台电脑不存在额外副本。
+
+安装不启动业务初始化，文件包升级也不自动迁移 Runtime、扫描全部期次或重跑验证。真正的 schema 迁移需明确任务范围并遵循受控恢复，历史关闭期次保持不变。
+
+四个 SKILL.md 是精简启动路由，完整原治理在各自 references/runtime-governance.md。`context --skill <名称> --file <路径> --outline` 返回章节索引；按 --section/--offset 加载最多 6000 字符正文。子标题是独立节；当前 gate 所需父节、子节和分页读完后才能动作。首轮静态规则目标 12000 字符，其余阶段有理由扩展；不是整个会话的 token 保证。
