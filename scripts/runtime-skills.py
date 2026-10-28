@@ -832,8 +832,21 @@ def validate_operation_paths(project: Path, destinations: dict[str, list[str]]) 
             raise RuntimeSkillsError("Managed Skill destinations may not overlap")
 
 
+def validate_project_root(project: Path) -> None:
+    home = Path.home().resolve()
+    user_directories = [(home / name).resolve() for name in (".agents", ".claude", ".github", ".codex", ".skills")]
+    user_directories.append(Path(os.environ.get("CODEX_HOME", str(home / ".codex"))).resolve())
+    if project in {home, Path(project.anchor)} or any(
+        project == root or root in project.parents for root in user_directories
+    ):
+        raise RuntimeSkillsError(
+            "This installer manages project-local Skills; do not use a user/home/platform directory as --project"
+        )
+
+
 def command_relocate(args: argparse.Namespace) -> int:
     project = Path(args.project).resolve()
+    validate_project_root(project)
     lock = load_lock(project)
     if lock.get("phase_pin", {}).get("active"):
         raise RuntimeSkillsError("Cannot relocate Skills while an active phase is pinned")
@@ -874,8 +887,7 @@ def command_relocate(args: argparse.Namespace) -> int:
 
 def command_install(args: argparse.Namespace, script_path: Path) -> int:
     project = Path(args.project).resolve()
-    if project == Path(project.anchor) or project in {Path.home().resolve(), Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))).resolve()}:
-        raise RuntimeSkillsError("This installer manages project-local Skills; do not use a user/home root as --project")
+    validate_project_root(project)
     project.mkdir(parents=True, exist_ok=True)
     previous = load_lock(project) if (project / LOCK_NAME).is_file() else None
     if previous:
@@ -1106,6 +1118,7 @@ def update_from_bundle(
     automatic: bool,
 ) -> int:
     project = Path(args.project).resolve()
+    validate_project_root(project)
     lock = load_lock(project)
     pin = lock.get("phase_pin", {})
     if pin.get("active") and not getattr(args, "ignore_pin", False):
@@ -1199,6 +1212,7 @@ def command_sync(args: argparse.Namespace, script_path: Path) -> int:
 
 def command_pin(args: argparse.Namespace) -> int:
     project = Path(args.project).resolve()
+    validate_project_root(project)
     lock = load_lock(project)
     lock["phase_pin"] = {
         "active": True,
@@ -1213,6 +1227,7 @@ def command_pin(args: argparse.Namespace) -> int:
 
 def command_unpin(args: argparse.Namespace) -> int:
     project = Path(args.project).resolve()
+    validate_project_root(project)
     lock = load_lock(project)
     lock["phase_pin"] = {"active": False, "reason": None, "set_at": None}
     lock["updated_at"] = utc_now()

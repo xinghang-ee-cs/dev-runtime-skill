@@ -197,6 +197,14 @@ class InstallationContextTests(unittest.TestCase):
             self.assertEqual(self.install()[0], 1)
         self.assertFalse((self.project / runtime.LOCK_NAME).exists())
 
+    def test_user_platform_subdirectory_cannot_be_used_as_a_project(self):
+        home = self.root / 'simulated-home'
+        with mock.patch.object(runtime.Path, 'home', return_value=home):
+            for suffix in ('.claude', '.claude/skills', '.agents/skills', '.codex/skills/remote-skills'):
+                self.project = home / suffix
+                self.assertEqual(self.install('skills')[0], 1, suffix)
+                self.assertFalse((self.project / runtime.LOCK_NAME).exists())
+
     def test_git_ancestor_copy_is_not_missed(self):
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         self.project.mkdir()
