@@ -41,7 +41,7 @@ python scripts/runtime-skills.py install \
 --overwrite-local-changes
 ```
 
-工具随后统一替换所有目标副本、安装项目内同步入口并生成锁文件。目标项目原有 `AGENTS.md` 或 `CLAUDE.md` 仍由 Agent 合并适用规则，不能整体覆盖。
+工具随后统一替换所有目标副本、安装项目内同步入口并生成锁文件，不创建或改写 `AGENTS.md`、`CLAUDE.md`。Agent 复用已有等价路由；确实缺失时只在当前平台实际读取的一个已有指令文件中维护最多 10 个非空行、1200 字符的 `<!-- runtime-skills:begin -->` / `<!-- runtime-skills:end -->` 短块，原位置更新且相同内容不写入。不复制本仓库的完整入口规则，不重复创建、追加或覆盖项目原文；没有指令文件时，不为安装或更新自动创建。
 
 ## 使用前同步
 

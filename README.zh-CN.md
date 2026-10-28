@@ -16,7 +16,7 @@
 
 如果来源仓库尚未在本地，先把最新稳定 Release 取得到临时目录。然后从来源仓库运行：
 python scripts/runtime-skills.py install --release latest --project "<目标项目根目录>" --skill planning-layer-runtime --skill long-task-orchestrator --skill testing-layer-runtime --skill ai-code-inspection --destination "<自动识别的 Skill 根目录>"
-多个安装目录就重复传入 --destination。安装后合并适用的 AGENTS.md 规则；识别到 Claude Code 时维护 CLAUDE.md 对 AGENTS.md 的导入。最后运行：
+多个安装目录就重复传入 --destination。不要为了安装创建 AGENTS.md 或 CLAUDE.md。复用已有等价说明；确实缺少路由时，只在当前平台实际读取的一个已有指令文件中更新下文规定的带标记短块，不复制本仓库 AGENTS.md，不重复追加。最后运行：
 python "<目标项目根目录>/.runtime-skills/runtime-skills.py" verify --project "<目标项目根目录>"
 报告实际识别的平台、安装目录、Release、Skill 版本和 verify 结果。不要修改业务代码、部署、提交或推送。
 ```
@@ -31,7 +31,7 @@ AI 必须自行完成平台识别、目录选择、安装和校验。需要部�
 根据 Skill，帮我开启第一期的开发。
 ```
 
-只有 `skills/` 下被选中的目录属于可安装 Skill 包；`AGENTS.md` 是可复用的项目入口模板。`src/`、`public/`、`package*.json`、`astro.config.mjs`、`tsconfig.json` 和文档部署 workflow 只用于构建本仓库的 Astro/Starlight 文档站，不能复制到目标项目。`package.json` 的版本属于文档站，不代表任何 Skill 版本。
+只有 `skills/` 下被选中的目录属于可安装 Skill 包。本仓库的 `AGENTS.md` 是本仓库自己的治理源，不是要复制到目标项目的文件。目标项目可以保留已有指令文件；安装不要求创建新的 AGENTS.md。`src/`、`public/`、`package*.json`、`astro.config.mjs`、`tsconfig.json` 和文档部署 workflow 只用于构建本仓库的 Astro/Starlight 文档站，不能复制到目标项目。`package.json` 的版本属于文档站，不代表任何 Skill 版本。
 
 ## 四个 Skill
 
@@ -127,7 +127,7 @@ GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `v
 2. 只要锁文件存在，就按“受管安装”处理，即使项目内同步入口或某个受管副本已经缺失。同步入口正常时，先执行 verify 和远端 status，再对目标 Release 执行 diff；入口缺失或 verify 报告漂移时，从锁定或目标 Release 临时取得可信同步工具做诊断，不得把项目误判为无版本安装，也不得未经同意修复。兼容的修订版本更新通过 sync 执行；遇到次版本或主版本变化时，先汇总目标 Release、各 Skill 版本、增加/修改/删除的文件以及兼容性影响，得到我的明确确认后，才使用所需的 --allow 级别执行 update。绝不静默绕过活动期次锁定：通常应延后更新；如果这次主版本更新正是为了迁移尚未结束的旧 Runtime，可以提出一次“受控切换”并等待我明确确认——先记录旧 lock/pin 和 Runtime 来源，再用工具解除 pin，执行获批更新和第 7–10 步，最后把活动期次重新 pin 到新 bundle。如果我不批准，就保持原 pin 和全部文件不变。
 3. 如果已有 Runtime Skill 目录但没有锁文件，按“无版本旧副本”处理。从来源仓库把目标稳定 Release 临时取到本机；根据现有目录准确识别 Skill 名称和目标根目录，不自行增删 Skill。先不带 --overwrite-local-changes 执行一次 install，让工具列出将增加、修改和删除的内容；把差异展示给我，并等待我明确同意。得到同意后，才能带 --overwrite-local-changes 重新执行，以采用该 Release、生成 runtime-skills.lock.json 并安装 .runtime-skills/runtime-skills.py。
 4. 如果既没有受管安装，也没有旧版 Runtime Skill 副本，则按首次安装处理。根据当前运行平台、项目指令文件和已有平台目录自行确定 Agent 平台，不要让我选择平台；只询问无法从请求或当前项目判断的 Skill 选择，然后直接按来源仓库的首次安装流程执行。
-5. 保留项目自己的全部指令。只把适用的路由和安全规则合并进 AGENTS.md；使用 Claude Code 时继续维护 CLAUDE.md 的导入，绝不整体覆盖这两个文件。不得静默覆盖 Skill 本地修改，不得混用不同 Release 的副本，不得降级 Skill，不得暴露凭证，也不要修改业务代码、执行数据库迁移、部署、commit 或 push。
+5. 保留项目自己的全部指令。不要仅因 Runtime Skills 创建指令文件。复用已有等价说明；确实缺少路由时，只在当前平台实际读取的一个已有文件中更新下文规定的带标记短块，绝不复制本仓库完整 AGENTS.md、替换项目指令或重复追加。不得静默覆盖 Skill 本地修改，不得混用不同 Release 的副本，不得降级 Skill，不得暴露凭证，也不要修改业务代码、执行数据库迁移、部署、commit 或 push。
 6. 经我确认并完成 Skill 迁移或更新后，执行 verify。报告原 Release 和 Skill 版本 -> 当前 Release 和 Skill 版本、全部实际安装位置、锁文件状态、期次锁定状态、合并过的指令文件，以及仍未解决的漂移或待决事项。如果远端不可用，明确区分“本地校验通过”和“已成功检查最新版本”。
 7. Skill 校验通过后，只检查当前项目说明、Handoff 和活动期次实际引用的 Planning、Long、Testing 状态位置。把各期次分成：没有 Runtime、已关闭的历史 Runtime、未结束的旧版 Runtime、已是当前版本 Runtime。不要为了套用新 schema 而重写已经关闭的历史期次。
 8. 对每个未结束的 1.0 之前旧版期次，把已确认的正式文档、需求池、用户画像、交互/事件历史、任务事实、finding 和 evidence 保留为只读迁移来源。不得伪造前向状态历史，也不得把旧的 failed/blocked 证据修改成 passed。使用刚安装的新 Skill 的 recovery/entry 流程，从这些来源创建全新的当前版本 Runtime epoch；只有已经采用当前 schema 的 Runtime 才能恢复原流程或开启新的前向 cycle。保留到旧位置的可追踪引用；只询问真正未知的事实，不得让用户重复回答已有记录。
@@ -145,16 +145,14 @@ GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `v
 
 | Agent | 项目级 Skill 目录 | 项目指令文件 | 官方文档 |
 | --- | --- | --- | --- |
-| OpenAI Codex | `.agents/skills/<skill-name>/` | 根目录 `AGENTS.md` | [Codex Skills](https://developers.openai.com/codex/skills)、[AGENTS.md](https://developers.openai.com/codex/guides/agents-md) |
-| Claude Code | `.claude/skills/<skill-name>/` | `CLAUDE.md`；用 `@AGENTS.md` 导入本仓库规则 | [Claude Code Skills](https://code.claude.com/docs/en/skills)、[CLAUDE.md 与 AGENTS.md](https://code.claude.com/docs/en/memory#agents-md) |
-| GitHub Copilot | 与 Codex 共用时推荐 `.agents/skills/<skill-name>/`；也支持 `.github/skills/` 和 `.claude/skills/` | 根目录或就近的 `AGENTS.md` | [Copilot Agent Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills)、[仓库指令](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions) |
+| OpenAI Codex | `.agents/skills/<skill-name>/` | 按需复用已有项目指令文件，安装不创建新文件 | [Codex Skills](https://developers.openai.com/codex/skills)、[AGENTS.md](https://developers.openai.com/codex/guides/agents-md) |
+| Claude Code | `.claude/skills/<skill-name>/` | 按需复用已有 `CLAUDE.md`，不新增对本仓库 `AGENTS.md` 的导入 | [Claude Code Skills](https://code.claude.com/docs/en/skills)、[CLAUDE.md 与 AGENTS.md](https://code.claude.com/docs/en/memory#agents-md) |
+| GitHub Copilot | 与 Codex 共用时推荐 `.agents/skills/<skill-name>/`；也支持 `.github/skills/` 和 `.claude/skills/` | 按需复用已有项目指令文件，安装不创建新文件 | [Copilot Agent Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills)、[仓库指令](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions) |
 
 同时使用三种 Agent 时，Agent 自动生成的目标结构可以是：
 
 ```text
 your-project/
-├── AGENTS.md
-├── CLAUDE.md                   # 仅 Claude Code 需要
 ├── runtime-skills.lock.json
 ├── .runtime-skills/
 │   └── runtime-skills.py
@@ -170,15 +168,23 @@ your-project/
     └── testing-layer-runtime/
 ```
 
-Agent 只安装自动识别出的平台需要的目录；发现多个平台证据时，在同一次安装中写入全部对应目录。目标项目已有 `AGENTS.md` 或 `CLAUDE.md` 时，由 Agent 合并指令而不是覆盖；只安装部分 Skill 时，由 Agent 从安装后的 `AGENTS.md` 清单中移除未安装项。
+Agent 只安装自动识别出的平台需要的目录；发现多个平台证据时，在同一次安装中写入全部对应目录。保留项目原有指令，复用已有等价路由；确实缺失时只更新当前平台实际读取的一个已有文件。安装、更新、首次使用和 Runtime 初始化都不自动创建指令文件，除非用户明确要求。多个 Skill 安装目录不需要分别生成指令文件。
 
-Claude Code 不会直接读取 `AGENTS.md`，因此 Agent 会创建或合并这个最小项目文件：
+最多使用一个 `<!-- runtime-skills:begin -->` 与 `<!-- runtime-skills:end -->` 标记块，不超过 10 个非空行、1200 字符。已有块只在原位置更新，内容相同则不写入。示例中的未安装 Skill 必须删去：
 
 ```markdown
-# CLAUDE.md
-
-@AGENTS.md
+<!-- runtime-skills:begin -->
+已安装 Skill 的路径与版本以 runtime-skills.lock.json 为准。
+本会话首次使用前运行：python .runtime-skills/runtime-skills.py sync --project .
+规划：planning-layer-runtime；实现：long-task-orchestrator。
+验收：testing-layer-runtime；检查与诊断：ai-code-inspection。
+读取选中 Skill 的 SKILL.md，再按其路由加载必要 references。
+<!-- runtime-skills:end -->
 ```
+
+不要向入口文件复制 Skill 正文、完整生命周期、扫描结果或本仓库的 GitHub 交付规则；不要按 Skill、平台目录或子目录分别创建副本。发现历史重复文件时先报告，不自动删除或覆盖项目原文。
+
+Claude Code 的安装也不要求新建 `AGENTS.md` 或 `CLAUDE.md`。目标项目已有任一文件时保留原文，只在确有需要时加入上述短路由说明。
 
 ## 安装并初始化目标项目
 
@@ -194,7 +200,7 @@ Claude Code 不会直接读取 `AGENTS.md`，因此 Agent 会创建或合并这�
 写入前自行确认来源是当前 Skill 仓库，目标是搜索到的目标项目。
 检查当前运行平台、目标项目的 AGENTS.md、CLAUDE.md 和已有的 .agents/skills/、.claude/skills/、.github/skills/，自行识别项目实际使用的 Agent 平台和安装目录，不要让我选择平台。Codex 使用 .agents/skills；Claude Code 使用 .claude/skills；GitHub Copilot 优先复用项目已有的受支持目录，与 Codex 共用时使用 .agents/skills；存在多个平台证据时使用全部对应目录。
 如果来源仓库尚未在本地，先把最新稳定 Release 取得到临时目录。从来源仓库运行 `python scripts/runtime-skills.py install --release latest --project "<目标项目根目录>"`，每个 Skill 重复传入 `--skill <名称>`，每个自动识别的安装目录重复传入 `--destination <目录>`。这一步必须同时生成 runtime-skills.lock.json 和项目内同步入口。
-将本仓库 AGENTS.md 中适用的路由与安全规则合并到目标项目的 AGENTS.md，绝不覆盖目标项目已有指令。使用 Claude Code 时，还要创建或合并 CLAUDE.md，使其导入 AGENTS.md。
+不要仅因本次安装创建 `AGENTS.md` 或 `CLAUDE.md`。复用已有等价说明；确实缺少路由时，只在当前平台实际读取的一个已有文件中更新 `<!-- runtime-skills:begin -->` 与 `<!-- runtime-skills:end -->` 短块（最多 10 个非空行、1200 字符）。原位置更新，内容相同则不写入；绝不复制本仓库完整 `AGENTS.md`、覆盖项目指令或创建重复、嵌套的入口文件。
 不要复制本仓库的 README、src/、public/、package.json、package-lock.json、astro.config.mjs、tsconfig.json、.github/workflows/ 或任何其他文档站文件。
 只扫描目标项目，列出已安装 Skill，并根据该项目的真实事实适配 Skill 自有的稳定环境档案或启动文件。
 在对应 Skill 的进入条件满足前，不要创建任务或期次 Runtime 状态。

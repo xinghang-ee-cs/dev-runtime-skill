@@ -1,6 +1,6 @@
 ---
 name: testing-layer-runtime
-description: 通用测试治理 Skill，用于在 long-task-orchestrator 通过 Required Validation Gate 并完成 ready_for_local_test 后管理期次测试生命周期；也消费 `bugfix-case/v1` 的 ready_for_bug_verification，执行原 Bug、受影响路径、相邻风险、生产复验和上线后同类型问题验证。期次模式读取 Planning FLOW、环境前置、UI/UX 合同与带 revision 的 Long 自动化交接；Bugfix 模式不建立完整 Test Plan，也不默认重跑全部 FLOW，并在部署后把“继续同类型问题验证”持久化为唯一下一步。Use when Codex needs to manage phase testing or close a durable Bugfix Case. Do not use it to re-run long-owned automation unless an allowed reuse exception or changed environment requires it.
+description: 通用测试治理 Skill。用于在 Long 交接后管理期次验收，或验证 `bugfix-case/v1` 的原 Bug、受影响路径、相邻风险、生产复验和上线后同类型问题。负责测试证据与 Case 收尾，不负责业务实现、规划合同或直接发布。
 ---
 
 # Testing Layer Runtime
