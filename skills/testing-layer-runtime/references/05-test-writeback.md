@@ -19,6 +19,12 @@
 
 Testing Runtime 只写本期 Runtime 输出目录；不得修改 planning SoT 或业务产物。本期测试状态、事件、证据、队列、依赖、Change Triage 与恢复数据不得写入项目根目录 `.runtime/`；根 `.runtime/` 只允许该 Skill 明确定义的跨期项目级环境索引或稳定配置。
 
+### 机器可读格式
+
+机器字段使用本文件示例中的块式 YAML，可放在 `yaml` 代码块内或直接写入文件。测试结果与 finding 支持单条根级记录、记录列表以及以 ID 为键的字典；每条记录仍必须显式填写 `item_id` 或 `finding_id`。字典外层 ID 不能代替该字段。非空结构化记录无法识别时必须报错，不得当作没有测试项或没有 finding。
+
+校验器不支持 YAML 锚点、别名或 merge key；生成文档时必须展开重复值，关闭序列化器的 alias 输出。发现这些语法时校验必须明确失败，不得将无法解析的引用默认为空列表。Planning 字段仍须遵循 Planning 模板的独立字段行及完整名称，不使用行内简称。
+
 ## 必须维护的文件
 
 - `test-runtime-state.md`：当前阶段、当前环境、总状态、阻塞项、最后更新时间。
@@ -503,7 +509,7 @@ EVIDENCE-001:
   item_id: TEST-001
   evidence_type: long_automation
   source: long_readiness_receipt
-  path: long-readiness-receipt.json
+  path: <已核验 Long Handoff 所引用的原始 long-readiness-receipt.json 路径>
   content_sha256: <该文件实际内容的 sha256:...>
   target_environment: local
   revision_kind: git_commit
@@ -556,7 +562,7 @@ EVIDENCE-003:
 - 每项必须填写 `content_sha256`、`target_environment`、`revision_kind`、`revision`、`deployment_identity_ref`、`component_revision_refs`、`flow_refs`、`valid` 和 `invalidated_by`；不适用字段显式写 `not_applicable` 或空数组。校验器重算持久文件摘要，不匹配即证据失效。
 - 本地证据必须绑定可重建的代码与公开配置状态。Git 工作区干净时可用 `git_commit`；存在未提交改动时必须使用覆盖相关文件的 `git_worktree_snapshot`，不得只写 HEAD；非 Git 项目使用项目 build ID 或 `workspace_snapshot`。快照不得读取、包含或散列秘密值，优先复用 Long Handoff 已记录的代码/配置证据标识。
 - Testing 未修改业务代码时，本地 required FLOW 证据的 `revision` 必须精确等于 Long readiness receipt 的 `repository_revision`；存在业务代码变化时先回 Long/Planning 形成新 receipt，不在 Testing 自造 revision。
-- `path` 必须解析到 Testing Runtime 内真实、非空的持久化证据文件。外部平台链接、用户反馈或 CI 记录先写入脱敏本地证据记录，再引用该文件；仅填路径字符串不构成闭环。
+- 一般证据的 `path` 必须解析到 Testing Runtime 内真实、非空的持久化证据文件。唯一例外是 `source: long_readiness_receipt`：允许引用相邻 Long Runtime 中已由 Intake 核验的原始 receipt，解析后的路径必须与 Long Handoff 冻结的 receipt 完全一致，且仍须重算 `content_sha256`；不接受复制件、其他 Long 文件或任意外部路径。相对路径可从 Testing Runtime 或项目根目录解析，必须唯一且不得经过符号链接。外部平台链接、用户反馈或 CI 记录先写入脱敏本地证据记录，再引用该文件；仅填路径字符串不构成闭环。
 - cloud-required 证据必须通过 `deployment_identity_ref` 引用 `test-runtime-state.md#current_deployment_revision`，其目标环境、revision kind、revision 和 `runtime_configuration_identity` 与当前完整部署身份一致；`component_set` 还必须列出该 FLOW 实际经过的组件 revision refs。CI/CD 证据只有针对同一完整部署身份时才可继承。
 - 当前部署身份改变时，必须执行下文唯一的 Deployment Revision Reconciliation Gate；不得在其他文件另写切换顺序，或只改当前 revision 而保留旧 cloud-required 关闭关系。
 - 本地证据和云端 `not_applicable` 项不会仅因部署身份改变而失效；Planning/Long 合同变化仍按实际影响精确失效。

@@ -92,10 +92,31 @@ def read(path: Path, result: Result) -> str:
         result.errors.append(f"missing file: {path}")
         return ""
     try:
-        return path.read_text(encoding="utf-8")
+        body = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         result.errors.append(f"file is not UTF-8: {path}")
         return ""
+    validate_yaml_subset(body, result, str(path))
+    return body
+
+
+def validate_yaml_subset(text: str, result: Result, label: str) -> None:
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        mapping = LIST_MAPPING_KEY.match(line) or MAPPING_KEY.match(line)
+        scalar = LIST_SCALAR.match(line) if not mapping else None
+        if mapping:
+            value = (mapping.group(3) or "").strip()
+        elif scalar:
+            value = scalar.group(2).strip()
+        else:
+            value = line.strip()
+        values = value[1:-1].split(",") if value.startswith("[") and value.endswith("]") else [value]
+        if re.match(r"^\s*(?:-\s+)?<<\s*:", line) or any(
+            re.match(r"^[&*][^\s\[\]{},]+(?:\s|$)", item.strip()) for item in values
+        ):
+            result.errors.append(
+                f"{label}:{line_number}: unsupported YAML anchor, alias or merge key; expand values explicitly"
+            )
 
 
 def entries(text: str) -> list[Entry]:
@@ -229,16 +250,43 @@ def anchored_records(text: str, anchor: str) -> list[tuple[list[Entry], tuple[st
     records: list[tuple[list[Entry], tuple[str, ...]]] = []
     for block in text_blocks(text):
         parsed = entries(block)
-        if value_at(parsed, (anchor,)):
-            records.append((parsed, ()))
         prefixes = {
             entry.path[:-1]
             for entry in parsed
             if entry.path[-1:] == (anchor,)
-            and entry.path[:-1]
-            and entry.path[-2].startswith("[")
         }
         records.extend((parsed, prefix) for prefix in sorted(prefixes))
+    return records
+
+
+def checked_records(
+    text: str, anchor: str, result: Result, label: str
+) -> list[tuple[list[Entry], tuple[str, ...]]]:
+    """Reject structured records that would otherwise disappear during parsing."""
+    validate_yaml_subset(text, result, label)
+    records = anchored_records(text, anchor)
+    outside = FENCE.sub("", text)
+    status_field = "finding_status" if anchor == "finding_id" else "status"
+    if FENCE.search(text) and any(
+        entry.path[-1] in {anchor, status_field} for entry in entries(outside)
+    ):
+        result.errors.append(f"unrecognized {label} record outside YAML blocks; use one document format")
+    for block in text_blocks(text):
+        parsed = entries(block)
+        for path, lines in duplicate_paths(parsed):
+            result.errors.append(f"duplicate {label} key {'.'.join(path)} at lines {lines}")
+        prefixes = {entry.path[:-1] for entry in parsed if entry.path[-1:] == (anchor,)}
+        unrecognized = not parsed and re.search(rf"\b{re.escape(anchor)}\b", block)
+        for entry in parsed:
+            if entry.path[-1] == status_field and entry.path[:-1] not in prefixes:
+                unrecognized = True
+            if any(entry.path[: len(prefix)] == prefix for prefix in prefixes):
+                continue
+            if not entry.value and any(prefix[: len(entry.path)] == entry.path for prefix in prefixes):
+                continue
+            unrecognized = True
+        if unrecognized:
+            result.errors.append(f"unrecognized {label} record; every record requires {anchor}")
     return records
 
 
@@ -950,12 +998,7 @@ def validate_long_intake(
 
 def testing_result_records(text: str, result: Result) -> dict[str, tuple[list[Entry], tuple[str, ...]]]:
     records: dict[str, tuple[list[Entry], tuple[str, ...]]] = {}
-    for block in text_blocks(text):
-        for path, lines in duplicate_paths(entries(block)):
-            result.errors.append(
-                f"duplicate test result key {'.'.join(path)} at lines {lines}"
-            )
-    for parsed, prefix in anchored_records(text, "item_id"):
+    for parsed, prefix in checked_records(text, "item_id", result, "test result"):
         item_id = value_at(parsed, prefix + ("item_id",))
         if not has_concrete(item_id):
             result.errors.append("test result item_id must be concrete")
@@ -996,18 +1039,29 @@ def validate_evidence_content(
     parsed: list[Entry],
     prefix: tuple[str, ...],
     result: Result,
+    *,
+    long_receipt_path: Path | None = None,
 ) -> Path | None:
     declared_digest = value_at(parsed, prefix + ("content_sha256",))
     result.require(
         DIGEST.fullmatch(declared_digest) is not None,
         f"{evidence_id}: content_sha256 must be a sha256 digest",
     )
-    durable_path = resolve_runtime_ref(
-        runtime_directory,
-        value_at(parsed, prefix + ("path",)),
-        result,
-        f"{evidence_id}.path",
-    )
+    evidence_path = value_at(parsed, prefix + ("path",))
+    if value_at(parsed, prefix + ("source",)) == "long_readiness_receipt":
+        if not isinstance(long_receipt_path, Path):
+            result.errors.append(f"{evidence_id}: Long evidence requires the frozen Long readiness receipt")
+            return None
+        durable_path = resolve_source_ref(
+            runtime_directory, evidence_path, f"{evidence_id}.path", result
+        )
+        if durable_path is not None and durable_path != long_receipt_path.resolve():
+            result.errors.append(f"{evidence_id}: Long evidence must bind the frozen Long readiness receipt")
+            return None
+    else:
+        durable_path = resolve_runtime_ref(
+            runtime_directory, evidence_path, result, f"{evidence_id}.path"
+        )
     if durable_path is None:
         return None
     result.require(
@@ -1306,6 +1360,7 @@ def validate_final_closure(
                     evidence_parsed,
                     evidence_prefix,
                     result,
+                    long_receipt_path=planning.get("long_receipt_path"),
                 )
                 result.require(path_present(evidence_parsed, evidence_prefix + ("component_revision_refs",)), f"{evidence_ref}: component_revision_refs is missing")
                 evidence_flows = set(list_at(evidence_parsed, evidence_prefix + ("flow_refs",)))
@@ -1367,13 +1422,9 @@ def validate_final_closure(
 
     triage_text = read(runtime_directory / "change-triage.md", result)
     if triage_text:
-        for block in text_blocks(triage_text):
-            for path, lines in duplicate_paths(entries(block)):
-                result.errors.append(
-                    f"duplicate finding key {'.'.join(path)} at lines {lines}"
-                )
-        for parsed, prefix in anchored_records(triage_text, "finding_id"):
+        for parsed, prefix in checked_records(triage_text, "finding_id", result, "finding"):
             finding_id = value_at(parsed, prefix + ("finding_id",))
+            result.require(has_concrete(finding_id), "finding_id must be concrete")
             result.require(
                 value_at(parsed, prefix + ("finding_status",)) == "closed",
                 f"{finding_id}: finding is not closed",
@@ -1422,6 +1473,7 @@ def validate_final_closure(
                     closure_parsed,
                     closure_prefix,
                     result,
+                    long_receipt_path=planning.get("long_receipt_path"),
                 )
 
     if value_at(state_entries, ("active_release_handoff", "status")) == "current":
@@ -1669,6 +1721,7 @@ def validate_release_handoff(
                     evidence_parsed,
                     evidence_prefix,
                     result,
+                    long_receipt_path=planning.get("long_receipt_path"),
                 )
                 valid_evidence = valid_evidence and durable_path is not None
             if not resolved or not valid_evidence:

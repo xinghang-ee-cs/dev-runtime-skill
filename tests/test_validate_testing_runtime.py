@@ -19,10 +19,15 @@ VALIDATOR = (
 sys.path.insert(0, str(VALIDATOR.parent))
 from forward_state import advance_ledger, canonical_digest  # noqa: E402
 from validate_testing_runtime import (  # noqa: E402
+    Result,
     TESTING_WORKFLOW,
+    anchored_records,
     canonical_release_snapshot_digest,
     entries,
+    testing_result_records,
     testing_transition_allowed,
+    validate_evidence_content,
+    validate_yaml_subset,
 )
 
 
@@ -265,7 +270,9 @@ def long_testing_handoff() -> str:
     ).strip() + "\n"
 
 
-def write_long_readiness_receipt(runtime: Path) -> None:
+def write_long_readiness_receipt(
+    runtime: Path, planning_handoff_path: Path | None = None
+) -> None:
     validation_text = (runtime / "validation-results.md").read_text(encoding="utf-8")
     validation_matrix_match = re.search(
         r"(?m)^matrix_revision:\s*(\S+)", validation_text
@@ -353,7 +360,7 @@ def write_long_readiness_receipt(runtime: Path) -> None:
             "kind": "source",
             "ref": "planning-handoff.yaml",
             "sha256": hashlib.sha256(
-                (runtime / "planning-handoff.yaml").read_bytes()
+                (planning_handoff_path or runtime / "planning-handoff.yaml").read_bytes()
             ).hexdigest(),
         }
     )
@@ -389,15 +396,36 @@ class TestingRuntimeValidatorTests(unittest.TestCase):
         workflow_deployment_digest: str | None = None,
         tamper_release_after_seal: bool = False,
         advance_stage: str | None = None,
+        sibling_long_runtime: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as temporary:
-            runtime = Path(temporary)
+            workspace = Path(temporary)
+            runtime = workspace / "testing-runtime" if sibling_long_runtime else workspace
+            runtime.mkdir(exist_ok=True)
+            long_runtime = workspace / "long-runtime" if sibling_long_runtime else runtime
+            long_runtime.mkdir(exist_ok=True)
+            planning_handoff_path = (
+                workspace / "planning-handoff.yaml"
+                if sibling_long_runtime else runtime / "planning-handoff.yaml"
+            )
+            if sibling_long_runtime:
+                state_body = state_body.replace(
+                    "long_testing_handoff_ref: testing-handoff.md",
+                    "long_testing_handoff_ref: ../long-runtime/testing-handoff.md",
+                ).replace(
+                    "required_validation_matrix_ref: project-execution-baseline.md",
+                    "required_validation_matrix_ref: ../long-runtime/project-execution-baseline.md",
+                )
             (runtime / "test-runtime-state.md").write_text(
                 state_body, encoding="utf-8"
             )
-            (runtime / "testing-handoff.md").write_text(
-                long_testing_handoff(), encoding="utf-8"
-            )
+            long_handoff = long_testing_handoff()
+            if sibling_long_runtime:
+                long_handoff = long_handoff.replace(
+                    "matrix_ref: project-execution-baseline.md",
+                    "matrix_ref: ../long-runtime/project-execution-baseline.md",
+                )
+            (long_runtime / "testing-handoff.md").write_text(long_handoff, encoding="utf-8")
             base_files = {
                 "planning-handoff.yaml": """```yaml
 handoff_type: execution_ready
@@ -458,8 +486,15 @@ evidence: [machine-execution-receipts/VALIDATION-1.json]
 ```
 """,
             }
+            def fixture_path(name: str) -> Path:
+                if name == "planning-handoff.yaml":
+                    return planning_handoff_path
+                if name in {"project-execution-baseline.md", "validation-results.md"}:
+                    return long_runtime / name
+                return runtime / name
+
             for name, body in base_files.items():
-                (runtime / name).write_text(body, encoding="utf-8")
+                fixture_path(name).write_text(body, encoding="utf-8")
             if release_body is not None:
                 release_body = re.sub(
                     r"(?m)^snapshot_digest:\s*\S+",
@@ -495,10 +530,12 @@ evidence: [machine-execution-receipts/VALIDATION-1.json]
                         encoding="utf-8",
                     )
             for name, body in (extra_files or {}).items():
-                (runtime / name).write_text(body, encoding="utf-8")
-            write_long_readiness_receipt(runtime)
+                if sibling_long_runtime and name == "business-journey-test-matrix.md":
+                    body = body.replace("testing-handoff.md", "../long-runtime/testing-handoff.md")
+                fixture_path(name).write_text(body, encoding="utf-8")
+            write_long_readiness_receipt(long_runtime, planning_handoff_path)
             if long_receipt_schema is not None:
-                long_receipt_path = runtime / "long-readiness-receipt.json"
+                long_receipt_path = long_runtime / "long-readiness-receipt.json"
                 long_receipt = json.loads(
                     long_receipt_path.read_text(encoding="utf-8")
                 )
@@ -510,7 +547,7 @@ evidence: [machine-execution-receipts/VALIDATION-1.json]
                     encoding="utf-8",
                 )
             if omit_long_receipt:
-                (runtime / "long-readiness-receipt.json").unlink()
+                (long_runtime / "long-readiness-receipt.json").unlink()
             for name, body in (post_receipt_files or {}).items():
                 (runtime / name).write_text(body, encoding="utf-8")
             if materialize_evidence:
@@ -863,6 +900,98 @@ closure_evidence_refs: []
         result = self.run_validator(state(), extra_files=files, expect_final=True)
         self.assertEqual(result.returncode, 1)
         self.assertIn("finding is not closed", result.stderr)
+
+    def test_documented_dictionary_results_pass_final_closure(self) -> None:
+        files = self.final_files()
+        body = files["test-validation-results.md"].replace("```yaml\n", "").replace("```\n", "")
+        files["test-validation-results.md"] = "TEST-LOCAL-1:\n" + textwrap.indent(body, "  ")
+        result = self.run_validator(state(), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_dictionary_open_finding_cannot_be_ignored(self) -> None:
+        files = self.final_files()
+        files["change-triage.md"] = """FINDING-1:
+  finding_id: FINDING-1
+  finding_status: open
+  retest_result_refs: []
+  closure_evidence_refs: []
+"""
+        result = self.run_validator(state(), extra_files=files, expect_final=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("finding is not closed", result.stderr)
+
+    def test_dictionary_closed_finding_requires_resolved_closure(self) -> None:
+        for valid_refs in (True, False):
+            with self.subTest(valid_refs=valid_refs):
+                files = self.final_files()
+                files["change-triage.md"] = """FINDING-1:
+  finding_id: FINDING-1
+  finding_status: closed
+  retest_result_refs: [TEST-LOCAL-1]
+  closure_evidence_refs: [EVIDENCE-LOCAL-1]
+"""
+                if not valid_refs:
+                    files["change-triage.md"] = files["change-triage.md"].replace(
+                        "EVIDENCE-LOCAL-1", "EVIDENCE-MISSING"
+                    )
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertEqual(result.returncode, 0 if valid_refs else 1, result.stderr)
+                if not valid_refs:
+                    self.assertIn("closure evidence ref does not resolve", result.stderr)
+
+    def test_unrecognized_findings_cannot_be_ignored(self) -> None:
+        for body in (
+            "FINDING-1:\n  finding_status: open\n",
+            "FINDING-1:\n  finding_id = FINDING-1\n  finding_status: open\n",
+            "finding_id = FINDING-1\nfinding_status = open\n",
+            "VALID:\n  finding_id: VALID\n  finding_status: closed\n"
+            "  retest_result_refs: [TEST-LOCAL-1]\n"
+            "  closure_evidence_refs: [EVIDENCE-LOCAL-1]\n"
+            "FINDING-1:\n  finding_status: open\n",
+            "finding_id: VALID\nfinding_status: closed\n"
+            "retest_result_refs: [TEST-LOCAL-1]\n"
+            "closure_evidence_refs: [EVIDENCE-LOCAL-1]\n"
+            "FINDING-1:\n  finding_status: open\n",
+            "```yaml\nfinding_id: VALID\nfinding_status: closed\n"
+            "retest_result_refs: [TEST-LOCAL-1]\n"
+            "closure_evidence_refs: [EVIDENCE-LOCAL-1]\n```\n"
+            "FINDING-1:\n  finding_id: FINDING-1\n  finding_status: open\n",
+        ):
+            with self.subTest(body=body):
+                files = self.final_files()
+                files["change-triage.md"] = body
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("unrecognized finding record", result.stderr)
+
+    def test_runtime_rejects_yaml_anchors_aliases_and_merge_keys(self) -> None:
+        for declaration in (
+            "success_journey_test_refs: &tests\n      - TEST-PLAN-1",
+            "success_journey_test_refs: *tests",
+            "success_journey_test_refs: [*tests]",
+            "success_journey_test_refs: [TEST-PLAN-1]\n    <<: *defaults",
+        ):
+            with self.subTest(declaration=declaration):
+                files = self.final_files()
+                files["business-journey-test-matrix.md"] = files[
+                    "business-journey-test-matrix.md"
+                ].replace("success_journey_test_refs: [TEST-PLAN-1]", declaration)
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("unsupported YAML anchor, alias or merge key", result.stderr)
+
+    def test_sibling_long_receipt_passes_final_closure(self) -> None:
+        files = self.final_files()
+        files["test-validation-results.md"] = files["test-validation-results.md"].replace(
+            "status: verified", "status: reused_from_long"
+        ).replace("evidence_reuse: false", "source_validation_id: VALIDATION-1\nevidence_reuse: true")
+        files["test-evidence-index.md"] = files["test-evidence-index.md"].replace(
+            "source: testing_runtime", "source: long_readiness_receipt"
+        ).replace("path: evidence/local-trace.zip", "path: ../long-runtime/long-readiness-receipt.json")
+        result = self.run_validator(
+            state(), extra_files=files, expect_final=True, sibling_long_runtime=True
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_testing_intake_requires_real_long_validation_evidence(self) -> None:
         result = self.run_validator(
@@ -1329,6 +1458,108 @@ EVIDENCE-STALE-CLOUD:
                 transition_allowed=testing_transition_allowed,
             )
             self.assertEqual(completed["current_stage"], "release_handoff")
+
+
+class TestingRecordFormatTests(unittest.TestCase):
+    def test_yaml_alias_list_items_are_rejected_but_quoted_literals_are_allowed(self) -> None:
+        for body in ("items:\n  - *record\n", "*record\n", "items: &record.name\n  - TEST-1\n"):
+            with self.subTest(body=body):
+                result = Result()
+                validate_yaml_subset(body, result, "matrix")
+                self.assertTrue(any("unsupported YAML" in error for error in result.errors))
+        result = Result()
+        validate_yaml_subset('description: "*literal"\nitems: ["*literal"]\n', result, "matrix")
+        self.assertEqual(result.errors, [])
+
+    def test_root_list_and_dictionary_records_are_all_recognized(self) -> None:
+        for body in (
+            "item_id: TEST-1\nstatus: verified\n",
+            "- item_id: TEST-1\n  status: verified\n",
+            "TEST-1:\n  item_id: TEST-1\n  status: verified\n",
+        ):
+            with self.subTest(body=body):
+                records = anchored_records(body, "item_id")
+                self.assertEqual(len(records), 1)
+
+    def test_dictionary_duplicates_and_unrecognized_results_fail(self) -> None:
+        for body, message in (
+            ("A:\n  item_id: TEST-1\nB:\n  item_id: TEST-1\n", "duplicate test result item_id"),
+            ("TEST-1:\n  status: verified\n", "unrecognized test result record"),
+            ("TEST-1:\n  item_id: TEST-1\nTEST-2:\n  status: failed\n", "unrecognized test result record"),
+        ):
+            with self.subTest(body=body):
+                result = Result()
+                testing_result_records(body, result)
+                self.assertTrue(any(message in error for error in result.errors), result.errors)
+
+    def test_long_evidence_exception_is_bound_to_the_frozen_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "testing-runtime"
+            runtime.mkdir()
+            long_runtime = root / "long-runtime"
+            long_runtime.mkdir()
+            frozen = long_runtime / "long-readiness-receipt.json"
+            frozen.write_text('{"frozen": true}', encoding="utf-8")
+            unrelated = long_runtime / "unrelated.json"
+            unrelated.write_text("{}", encoding="utf-8")
+            for source, path, trusted, accepted in (
+                ("long_readiness_receipt", frozen, frozen, True),
+                ("long_readiness_receipt", unrelated, frozen, False),
+                ("long_readiness_receipt", frozen, None, False),
+                ("testing_runtime", frozen, frozen, False),
+            ):
+                with self.subTest(source=source, path=path, trusted=trusted):
+                    parsed = entries(
+                        f"E:\n  source: {source}\n  path: {path}\n"
+                        f"  content_sha256: sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}\n"
+                    )
+                    result = Result()
+                    resolved = validate_evidence_content(
+                        runtime, "E", parsed, ("E",), result, long_receipt_path=trusted
+                    )
+                    self.assertEqual(not result.errors, accepted, result.errors)
+                    if accepted:
+                        self.assertEqual(resolved, frozen)
+
+    def test_external_long_receipt_still_requires_matching_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "testing-runtime"
+            runtime.mkdir()
+            receipt = root / "long-readiness-receipt.json"
+            receipt.write_text("{}", encoding="utf-8")
+            parsed = entries(
+                "E:\n  source: long_readiness_receipt\n"
+                f"  path: {receipt}\n  content_sha256: sha256:{'0' * 64}\n"
+            )
+            result = Result()
+            validate_evidence_content(
+                runtime, "E", parsed, ("E",), result, long_receipt_path=receipt
+            )
+            self.assertTrue(any("does not match content_sha256" in error for error in result.errors))
+
+    def test_long_receipt_exception_does_not_allow_symbolic_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "testing-runtime"
+            runtime.mkdir()
+            receipt = root / "long-readiness-receipt.json"
+            receipt.write_text("{}", encoding="utf-8")
+            link = root / "linked-receipt.json"
+            try:
+                link.symlink_to(receipt)
+            except OSError:
+                self.skipTest("symbolic links are unavailable")
+            parsed = entries(
+                "E:\n  source: long_readiness_receipt\n"
+                f"  path: {link}\n  content_sha256: sha256:{hashlib.sha256(receipt.read_bytes()).hexdigest()}\n"
+            )
+            result = Result()
+            validate_evidence_content(
+                runtime, "E", parsed, ("E",), result, long_receipt_path=receipt
+            )
+            self.assertTrue(any("symbolic link" in error for error in result.errors), result.errors)
 
 
 if __name__ == "__main__":
