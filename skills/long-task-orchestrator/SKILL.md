@@ -1,6 +1,6 @@
 ---
 name: long-task-orchestrator
-description: 当 Agent 必须接收已确认且 execution_ready 的初始或增量 planning handoff，按其中的基线 revision、增量执行队列、执行约束、稳定业务命名、实现合同、UI/UX 精确绑定和承接位置执行一个至少包含 4 个实现单元的完整功能或模块时使用；也可接收 `bugfix-case/v1`，在不要求活动 Planning Runtime 或四个实现单元的情况下完成精确补丁。负责从开发开始到经必要验证矩阵证明真实构建/装载/启动及最小行为可用的 ready_for_local_test，或在确认缺陷后 patch 到 ready_for_local_retest / ready_for_bug_verification：实现、重构、数据迁移、前端合同落实、自动化测试代码编写与执行、结果记录及交接；不负责补写 Planning 业务合同、自行重设计、人工测试、真实设备测试、云端验证、最终验收或上线放行。
+description: 执行已确认的 Planning handoff 或 `bugfix-case/v1`，完成实现、必要的自动化验证、结果记录和交接。用于功能、模块、重构、数据迁移和精确补丁；负责交付可供本地测试或 Bug 验证的结果，不负责规划合同、人工或云端测试、最终验收或上线。
 ---
 
 # 长任务编排器

@@ -50,10 +50,17 @@ Agent 必须扫描目标仓库实际存在的 Skill 目录，先读取每个候�
 2. 安装时同时复制 `SKILL.md`、`agents/` 元数据、references、Profiles、模板和必要 Runtime bootstrap 资产；不要只复制单个 `SKILL.md`。
 3. 多平台共用时，在同一次安装中传入全部目标 Skill 根目录。工具必须把所有副本绑定到同一锁文件和同一 Release。
 4. 不复制其他项目已经填写的环境事实或运行状态。`ai-code-inspection` 安装包中的 `assets/runtime-templates/` 只作为初始化源；首次使用时在目标项目根目录创建 `.runtime/ai-code-inspection/`，环境档案从 `uninitialized` 模板开始，运行状态从空闲模板开始。
-5. 目标项目已有 `AGENTS.md` 时合并适用规则，不得直接覆盖。
+5. 安装、更新和首次使用 Skill 都不自动创建 `AGENTS.md`、`CLAUDE.md` 或其子目录副本，也不复制本文件。已有指令文件且确需补充路由时，只选择当前平台实际读取的一个文件，保留项目原文，复用已有等价说明；仅由用户明确要求创建项目入口文件时才新建指令文件。
 6. 根据目标 Agent 平台和项目约定选择项目级 Skill 目录。可能的目录例如但不限于 `.skills/`、`.agents/skills/`、`.claude/skills/`、`.codex/skills/`。
 7. 实际路径由所使用的 Agent 平台和项目约定决定；不得把任一示例目录视为唯一安装方式。
-8. 平台没有固定 Skill 目录时，在目标项目的 `AGENTS.md` 中声明每个 Skill 的真实位置和发现方式。
+8. 平台没有固定 Skill 目录时，优先复用目标项目已有的指令文件声明 Skill 位置；没有现成指令文件时不要新增 `AGENTS.md`，由 Skill 目录和简短描述承担发现。
+
+### 入口说明的最小化与幂等
+
+- 路由说明最多一个块，使用 `<!-- runtime-skills:begin -->` 和 `<!-- runtime-skills:end -->` 标记，最多 10 个非空行、1200 字符；只说明同步入口、按任务选择已安装 Skill，以及读取其 `SKILL.md`。
+- 写入前检查目标文件及已生效的项目指令；已有等价说明且没有变化时不写入，已有标记块时只在原位置更新，不反复追加，不按 Skill 或安装目录分别创建入口。
+- 不复制 Skill 正文、references、完整生命周期、项目扫描结果或本仓库的维护与 GitHub 发布规则到入口文件。安装位置与版本以 `runtime-skills.lock.json` 为准，不另建清单事实源。
+- 日常调用、恢复会话和 Runtime 初始化不重新生成入口文件。发现历史重复文件或大段内容时先报告路径与差异，不自动删除或覆盖项目指令。
 
 ## 5. 首次项目初始化
 
@@ -178,7 +185,7 @@ Issue + ai-code-inspection 诊断/合同
 ## 11. 外部用户快速开始
 
 1. 使用同步工具安装所需 Skill，并把 `runtime-skills.lock.json` 提交到目标项目。
-2. 在项目顶层放置或合并本 `AGENTS.md` 的适用入口规则。
+2. 如果项目已有入口指令文件，只合并一次精简的适用路由；不要把本 `AGENTS.md` 整体复制到目标项目，也不要为安装单独创建 `AGENTS.md`。
 3. 运行 `verify`，确认所有 Agent 平台副本与锁文件一致。
 4. 让 Agent 扫描项目并初始化各已选 Skill 需要的环境档案或 Runtime 目录。
 5. 先运行只读检查验证适配结果。

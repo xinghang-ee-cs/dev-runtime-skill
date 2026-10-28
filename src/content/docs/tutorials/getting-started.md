@@ -7,7 +7,7 @@ sidebar:
 
 ## 准备条件
 
-目标项目应当能被所选 Agent 打开，并允许在项目根目录维护 Agent 指令、Skill 目录和 `runtime-skills.lock.json`。执行安装的 Agent 还需要读取本仓库并运行 Python 3 标准库脚本。
+目标项目应当能被所选 Agent 打开，并允许在项目根目录维护 Skill 目录和 `runtime-skills.lock.json`。已有 Agent 指令文件时可以更新；没有时不需要为了安装 Runtime Skills 创建 `AGENTS.md`。执行安装的 Agent 还需要读取本仓库并运行 Python 3 标准库脚本。
 
 ## 1. 运行受管安装
 
@@ -27,7 +27,6 @@ python scripts/runtime-skills.py install \
 
 ```text
 your-project/
-  AGENTS.md
   runtime-skills.lock.json
   .runtime-skills/
     runtime-skills.py
@@ -41,9 +40,9 @@ your-project/
     long-task-orchestrator/
 ```
 
-## 2. 添加项目路由
+## 2. 复用已有项目路由
 
-在目标项目的 `AGENTS.md` 中说明每个 Skill 的适用任务、进入条件和禁止边界。至少需要表达以下路由：
+如果目标项目已有 `AGENTS.md`、`CLAUDE.md` 或其他入口文件，先复用已有等价路由；确实缺失时，只在当前平台实际读取的一个文件中维护 `<!-- runtime-skills:begin -->` 与 `<!-- runtime-skills:end -->` 短块，最多 10 个非空行、1200 字符。原位置更新，内容相同则不写入；不要复制本仓库完整 `AGENTS.md`，不要按 Skill 或安装目录重复创建入口。没有入口文件时直接使用 Skill 的目录和描述，安装、更新、首次使用和 Runtime 初始化都不自动创建 `AGENTS.md` 或 `CLAUDE.md`。路由只需表达以下内容：
 
 | 任务意图 | 应读取的入口 |
 |---|---|
@@ -71,7 +70,6 @@ python .runtime-skills/runtime-skills.py verify --project .
 确认锁文件、同步工具和所选 Skill 的完整路径存在，例如：
 
 ```text
-AGENTS.md
 runtime-skills.lock.json
 .runtime-skills/runtime-skills.py
 .agents/skills/planning-layer-runtime/SKILL.md

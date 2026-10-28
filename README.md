@@ -16,7 +16,7 @@ Inspect the current execution platform, project instruction files, and existing 
 
 If the source repository is not local, obtain its latest stable Release in a temporary directory. From the source repository run:
 python scripts/runtime-skills.py install --release latest --project "<target-project-root>" --skill planning-layer-runtime --skill long-task-orchestrator --skill testing-layer-runtime --skill ai-code-inspection --destination "<automatically-detected Skill root>"
-Repeat --destination for every detected installation directory. Then merge the applicable AGENTS.md rules and, when Claude Code is detected, maintain the CLAUDE.md import of AGENTS.md. Finish with:
+Repeat --destination for every detected installation directory. Do not create AGENTS.md or CLAUDE.md for installation. Reuse equivalent existing instructions; if routing is missing, update only one existing instruction file used by the current platform, using the bounded, marker-delimited block described below. Never copy this repository's AGENTS.md or append duplicates. Finish with:
 python "<target-project-root>/.runtime-skills/runtime-skills.py" verify --project "<target-project-root>"
 Report the detected platforms, destinations, Release, Skill versions, and verify result. Do not modify business code, deploy, commit, or push.
 ```
@@ -31,7 +31,7 @@ After installation, send this in the target project:
 Use the Skills to start the first development phase for me.
 ```
 
-Only the selected directories under `skills/` are installable Skill packages. `AGENTS.md` is the reusable project-entry template. `src/`, `public/`, `package*.json`, `astro.config.mjs`, `tsconfig.json`, and the documentation deployment workflow belong to this repository's Astro/Starlight documentation site and must not be copied into a target project. The version in `package.json` belongs to the documentation site and is not a Skill version.
+Only the selected directories under `skills/` are installable Skill packages. This repository's `AGENTS.md` is its own governance source, not a file to copy into target projects. A target project may keep its existing instruction file; installation does not require creating one. `src/`, `public/`, `package*.json`, `astro.config.mjs`, `tsconfig.json`, and the documentation deployment workflow belong to this repository's Astro/Starlight documentation site and must not be copied into a target project. The version in `package.json` belongs to the documentation site and is not a Skill version.
 
 ## The four skills
 
@@ -127,7 +127,7 @@ Take responsibility for the workflow from inspection through verification. Treat
 2. If the lock file exists, treat this as a managed installation even when the project-local synchronization entry point or a managed copy is missing. When the entry point is healthy, first run verify and remote status, then run diff against the requested Release. When it is missing or verify reports drift, use a temporary trusted copy of the tool from the locked/requested Release to diagnose it; do not reclassify the project as an unmanaged installation or repair it without approval. Apply a compatible patch through sync. For a minor or major change, summarize the affected Release, Skill versions, added/modified/removed files, and compatibility impact, then wait for my explicit confirmation before running update with the required --allow level. Never silently bypass an active phase pin: normally defer the update; when the requested major update is specifically needed to migrate an unfinished legacy Runtime, offer one controlled transition for explicit confirmation—record the old lock/pin and Runtime sources, unpin with the tool, perform the approved update and steps 7–10, then pin the active phase to the new bundle again. If I do not approve that transition, leave everything pinned and unchanged.
 3. If Runtime Skill directories exist without a lock file, treat them as unmanaged legacy copies. Obtain the requested stable Release from the source repository in a temporary location. Infer the exact existing Skill names and destination roots without adding or removing Skills. Run the install command once without --overwrite-local-changes so the tool reports the incoming additions, modifications, and removals. Show that comparison and wait for my explicit approval before rerunning with --overwrite-local-changes to adopt the Release, create runtime-skills.lock.json, and install .runtime-skills/runtime-skills.py.
 4. If neither a managed installation nor legacy Runtime Skill copies exist, treat it as a first installation. Determine the Agent platform from the current execution platform, project instruction files, and existing platform directories; do not ask me to choose a platform. Ask only for a Skill selection that cannot be determined from the request or current project, then proceed directly with the repository's installation flow.
-5. Preserve all project-specific instructions. Merge only applicable routing and safety rules into AGENTS.md, and maintain the CLAUDE.md import when Claude Code is used. Never replace either file wholesale. Never silently overwrite local Skill changes, mix copies from different Releases, downgrade a Skill, expose credentials, modify business code, run database migrations, deploy, commit, or push.
+5. Preserve all project-specific instructions. Do not create instruction files solely for Runtime Skills. Reuse equivalent instructions; if routing is missing, update only one existing instruction file used by the current platform, using the bounded, marker-delimited block described below. Never copy this repository's full AGENTS.md, replace project instructions, or append duplicates. Never silently overwrite local Skill changes, mix copies from different Releases, downgrade a Skill, expose credentials, modify business code, run database migrations, deploy, commit, or push.
 6. After an approved Skill migration or update, run verify. Report the previous Release and Skill versions -> installed Release and Skill versions, the exact destinations, lock-file state, phase-pin state, merged instruction files, and any unresolved drift or decisions. If remote access is unavailable, say so and distinguish local verification from a successful latest-version check.
 7. After Skill verification, inspect only the current project's Planning, Long, and Testing state locations referenced by the project instructions, handoffs, and active phase. Classify each phase as: no Runtime state, closed historical state, unfinished legacy state, or already-current state. Never rewrite a closed historical phase merely to make it match the new schema.
 8. For every unfinished pre-1.0 legacy phase, preserve its confirmed source-of-truth documents, requirement pool, user profile, interaction/event history, task facts, findings, and evidence as read-only migration sources. Do not fabricate a forward-state history or mutate old failed/blocked evidence into passed. Use the newly installed Skill's recovery/entry procedure to create a fresh current-version Runtime epoch from those sources; only an already-current Runtime may resume or open a new forward cycle. Retain traceability to the legacy location, and ask only about facts that remain genuinely unknown; do not ask the user to repeat already recorded answers.
@@ -145,16 +145,14 @@ The user only needs to provide a target project name, local path, or repository 
 
 | Agent | Project skill location | Project instructions | Official documentation |
 | --- | --- | --- | --- |
-| OpenAI Codex | `.agents/skills/<skill-name>/` | Root `AGENTS.md` | [Codex Skills](https://developers.openai.com/codex/skills), [AGENTS.md](https://developers.openai.com/codex/guides/agents-md) |
-| Claude Code | `.claude/skills/<skill-name>/` | `CLAUDE.md`; import this repository's rules with `@AGENTS.md` | [Claude Code Skills](https://code.claude.com/docs/en/skills), [CLAUDE.md and AGENTS.md](https://code.claude.com/docs/en/memory#agents-md) |
-| GitHub Copilot | `.agents/skills/<skill-name>/` is recommended when sharing with Codex; `.github/skills/` and `.claude/skills/` are also supported | Root or nested `AGENTS.md` | [Copilot Agent Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills), [repository instructions](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions) |
+| OpenAI Codex | `.agents/skills/<skill-name>/` | Reuse an existing project instruction file when needed; installation does not create one | [Codex Skills](https://developers.openai.com/codex/skills), [AGENTS.md](https://developers.openai.com/codex/guides/agents-md) |
+| Claude Code | `.claude/skills/<skill-name>/` | Reuse an existing `CLAUDE.md` when needed; do not add an import of this repository's `AGENTS.md` | [Claude Code Skills](https://code.claude.com/docs/en/skills), [CLAUDE.md and AGENTS.md](https://code.claude.com/docs/en/memory#agents-md) |
+| GitHub Copilot | `.agents/skills/<skill-name>/` is recommended when sharing with Codex; `.github/skills/` and `.claude/skills/` are also supported | Reuse an existing project instruction file when needed; installation does not create one | [Copilot Agent Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills), [repository instructions](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions) |
 
 The installation created by the Agent can look like this when all three platforms are used:
 
 ```text
 your-project/
-├── AGENTS.md
-├── CLAUDE.md                   # only needed by Claude Code
 ├── runtime-skills.lock.json
 ├── .runtime-skills/
 │   └── runtime-skills.py
@@ -170,15 +168,23 @@ your-project/
     └── testing-layer-runtime/
 ```
 
-The Agent installs only the directories required by the automatically detected platforms; when evidence shows multiple platforms, it writes every corresponding destination in the same installation. If the target project already has `AGENTS.md` or `CLAUDE.md`, it merges the instructions instead of overwriting them. When only some Skills are installed, it removes unavailable Skills from the installed `AGENTS.md` inventory.
+The Agent installs only the directories required by the automatically detected platforms; when evidence shows multiple platforms, it writes every corresponding destination in the same installation. Existing project instructions are preserved. Reuse equivalent routing; if it is missing, update only one existing instruction file used by the current platform. Do not create instruction files during installation, updates, first use, or Runtime initialization unless the user explicitly requests them. Multiple Skill destinations do not require multiple instruction files.
 
-Claude Code does not read `AGENTS.md` directly. The Agent therefore creates or merges this minimal project file:
+Use at most one block between `<!-- runtime-skills:begin -->` and `<!-- runtime-skills:end -->`, limited to 10 nonempty lines and 1200 characters. Update it in place; when it already matches, make no edit. Omit uninstalled Skills from this example:
 
 ```markdown
-# CLAUDE.md
-
-@AGENTS.md
+<!-- runtime-skills:begin -->
+Use runtime-skills.lock.json for installed Skill paths and versions.
+Before first use in a session: python .runtime-skills/runtime-skills.py sync --project .
+Planning: planning-layer-runtime; implementation: long-task-orchestrator.
+Verification: testing-layer-runtime; review/diagnosis: ai-code-inspection.
+Read the selected SKILL.md and only its required references.
+<!-- runtime-skills:end -->
 ```
+
+Do not copy Skill bodies, lifecycle rules, scan results, or this repository's GitHub delivery rules into project instructions. Do not create per-Skill, per-destination, or nested copies. Report existing duplicate files before proposing cleanup; preserve project-owned content.
+
+Claude Code does not require a new `AGENTS.md` or `CLAUDE.md` for Skill installation. If the target already uses either file, keep it and add only a short routing note when needed.
 
 ## Install and initialize the target project
 
@@ -194,7 +200,7 @@ Use the supplied project name or address to search the workspaces and repositori
 Confirm internally that the source is this Skill repository and that the destination is the matched target project before writing.
 Inspect the current execution platform, the target project's AGENTS.md and CLAUDE.md, and existing .agents/skills/, .claude/skills/, and .github/skills/ directories. Determine the actual Agent platforms and installation destinations without asking me to choose a platform. Use .agents/skills for Codex; use .claude/skills for Claude Code; for GitHub Copilot, reuse an existing supported project directory and use .agents/skills when sharing with Codex. Use every corresponding destination when evidence shows multiple platforms.
 If the source repository is not local, obtain its latest stable Release in a temporary directory. From the source repository run `python scripts/runtime-skills.py install --release latest --project "<target-project-root>"`, repeating `--skill <name>` for every selected Skill and `--destination <directory>` for every automatically detected destination. This operation must also create runtime-skills.lock.json and the project-local synchronization entry point.
-Merge the applicable routing and safety rules from this repository's AGENTS.md into the target project's AGENTS.md; never overwrite existing project instructions. For Claude Code, also create or merge CLAUDE.md so it imports AGENTS.md.
+Do not create `AGENTS.md` or `CLAUDE.md` solely for this installation. Reuse equivalent instructions; if routing is missing, update only one existing instruction file used by the current platform with a block between `<!-- runtime-skills:begin -->` and `<!-- runtime-skills:end -->` (at most 10 nonempty lines and 1200 characters). Update it in place and leave matching content unchanged. Never copy this repository's full `AGENTS.md`, overwrite project instructions, or create duplicate or nested instruction files.
 Do not copy this repository's README files, src/, public/, package.json, package-lock.json, astro.config.mjs, tsconfig.json, .github/workflows/, or any other documentation-site files.
 Scan only the target project, list the installed Skills, and adapt their stable environment profiles or bootstrap files using facts from that project.
 Do not create task/phase Runtime state before its skill entry gate is satisfied.
