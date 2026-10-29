@@ -1,0 +1,29 @@
+{
+  "author": "xinghang-ee-cs",
+  "skills": {
+    "ai-code-inspection": {
+      "display_name": "代码诊断",
+      "display_name_en": "Code Inspection",
+      "description_zh": "诊断代码缺陷、检查变更并建立 Bugfix Case。",
+      "description_en": "Diagnose defects, inspect changes and create Bugfix Cases."
+    },
+    "planning-layer-runtime": {
+      "display_name": "开发规划",
+      "display_name_en": "Planning Runtime",
+      "description_zh": "交互式收集需求，维护规划、基线和开发交接。",
+      "description_en": "Gather requirements and maintain plans, baselines and implementation handoffs."
+    },
+    "long-task-orchestrator": {
+      "display_name": "开发执行",
+      "display_name_en": "Implementation Runtime",
+      "description_zh": "按规划合同执行开发，保存进度和恢复检查点。",
+      "description_en": "Implement approved contracts and preserve progress and recovery checkpoints."
+    },
+    "testing-layer-runtime": {
+      "display_name": "测试验收",
+      "display_name_en": "Testing Runtime",
+      "description_zh": "组织验收、Bugfix 验证与同类问题复验。",
+      "description_en": "Manage acceptance, Bugfix verification and similar-defect checks."
+    }
+  }
+}

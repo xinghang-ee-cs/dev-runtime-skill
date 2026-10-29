@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Iterator, Sequence
 
 
-TOOL_VERSION = "0.2.0"
+TOOL_VERSION = "1.0.0"
 SUPPORTED_SCHEMA_VERSION = 1
 MANIFEST_NAME = "skills-manifest.json"
 LOCK_NAME = "runtime-skills.lock.json"
@@ -615,7 +615,7 @@ def normalize_destination(skill_root: str, skill_name: str) -> str:
 
 # Only inspect known discovery roots and explicit managed roots. Never recurse through
 # application code, archives, other projects, or arbitrary user directories.
-DISCOVERY_ROOTS = (".agents/skills", ".claude/skills", ".github/skills", ".codex/skills", ".skills")
+DISCOVERY_ROOTS = (".agents/skills", ".claude/skills", ".github/skills", ".codex/skills", ".copilot/skills", ".dsh/skills", ".skills")
 DISCOVERY_LIMIT = 256
 REPORT_LIMIT = 20
 CONTEXT_LIMIT = 6000
@@ -627,6 +627,8 @@ def user_skill_roots() -> list[Path]:
     return list(dict.fromkeys([
         *(home / root for root in DISCOVERY_ROOTS),
         codex / "skills", codex / "skills/remote-skills",
+        Path(os.environ.get("DSH_HOME", str(home / ".dsh"))) / "skills",
+        Path(os.environ.get("DSH_AGENTS_HOME", str(home / ".agents"))) / "skills",
     ]))
 
 
@@ -793,6 +795,10 @@ def command_context(args: argparse.Namespace) -> int:
     if problems:
         raise RuntimeSkillsError("Resolve installation findings before reading rules: " + "; ".join(problems[:REPORT_LIMIT]))
     root = safe_project_path(project, lock["skills"][args.skill]["destinations"][0])
+    return print_context(args, root)
+
+
+def print_context(args: argparse.Namespace, root: Path) -> int:
     if not 1 <= args.limit <= CONTEXT_LIMIT or args.offset < 0:
         raise RuntimeSkillsError("Context limit must be 1..6000 characters and offset must be nonnegative")
     if args.file:
@@ -1240,6 +1246,415 @@ def command_unpin(args: argparse.Namespace) -> int:
     return 0
 
 
+# Global distribution keeps discovery routers separate from immutable rule bundles.
+GLOBAL_SCHEMA = 2
+AGENTS = ("codex", "claude", "copilot", "dsh")
+DEFAULT_REPOSITORY = "https://github.com/xinghang-ee-cs/dev-runtime-skill"
+
+
+def global_home() -> Path:
+    home = Path(os.environ.get("RUNTIME_SKILLS_HOME", str(Path.home() / ".runtime-skills"))).expanduser().absolute()
+    if home.is_symlink():
+        raise RuntimeSkillsError("Global store must not be a symlink")
+    resolved = home.resolve()
+    if resolved == Path.home().resolve() or any(resolved == root.resolve() or root.resolve() in resolved.parents for root in user_skill_roots()):
+        raise RuntimeSkillsError("Global cache must live outside Agent discovery roots")
+    return resolved
+
+
+@contextmanager
+def global_guard() -> Iterator[Path]:
+    home = global_home()
+    home.mkdir(parents=True, exist_ok=True)
+    guard = home / ".write-lock"
+    try:
+        guard.mkdir()
+    except FileExistsError as exc:
+        raise RuntimeSkillsError(f"Another installer is writing {home}; retry when finished. Inspect a stale .write-lock manually.") from exc
+    try:
+        yield home
+    finally:
+        guard.rmdir()
+
+
+def global_registry() -> dict[str, Any]:
+    path = global_home() / "registry.json"
+    if not path.exists():
+        return {"schema_version": 1, "defaults": {}, "routers": {}}
+    registry = read_json(path)
+    if registry.get("schema_version") != 1 or not isinstance(registry.get("defaults"), dict) or not isinstance(registry.get("routers"), dict):
+        raise RuntimeSkillsError("Invalid global registry; do not overwrite it")
+    return registry
+
+
+def agent_root(agent: str) -> Path:
+    # Codex, Copilot and DSH all support the shared personal .agents root.
+    # Reusing it avoids duplicate discovery when several of them are installed.
+    if agent == "claude":
+        return Path.home() / ".claude/skills"
+    if agent == "dsh":
+        return Path(os.environ.get("DSH_AGENTS_HOME", str(Path.home() / ".agents"))).expanduser() / "skills"
+    return Path.home() / ".agents/skills"
+
+
+def select_agent(requested: str) -> str:
+    if requested != "auto":
+        return requested
+    explicit = os.environ.get("RUNTIME_SKILLS_AGENT")
+    if explicit in AGENTS:
+        return explicit
+    candidates = [name for name, executable in (("codex", "codex"), ("claude", "claude"), ("copilot", "copilot"), ("dsh", "dsh")) if shutil.which(executable)]
+    if len(candidates) != 1:
+        raise RuntimeSkillsError("Cannot identify one current Agent; supply --agent codex|claude|copilot|dsh (or RUNTIME_SKILLS_AGENT). Installed directories alone are not evidence.")
+    return candidates[0]
+
+
+def cache_bundle(bundle: SourceBundle) -> tuple[str, Path]:
+    home = global_home()
+    with tempfile.TemporaryDirectory(prefix="bundle-", dir=home) as temporary:
+        payload = Path(temporary) / "payload"
+        payload.mkdir()
+        copy_to_stage(bundle.root / MANIFEST_NAME, payload / MANIFEST_NAME)
+        copy_to_stage(safe_project_path(bundle.root, bundle.manifest["tool"]["path"]), payload / "scripts/runtime-skills.py")
+        for name, record in bundle.manifest["skills"].items():
+            copy_to_stage(safe_project_path(bundle.root, record["path"]), safe_project_path(payload, record["path"]))
+        identity = content_hash(payload)
+        target = home / "bundles" / identity
+        if target.exists():
+            if content_hash(target) != identity:
+                raise RuntimeSkillsError(f"Immutable cache is corrupted: {target}; restore the exact bundle explicitly")
+        else:
+            target.parent.mkdir(exist_ok=True)
+            os.replace(payload, target)
+        return identity, target
+
+
+def global_records(bundle: SourceBundle, identity: str, names: Sequence[str]) -> dict[str, Any]:
+    return {name: {"cache_id": identity, "version": bundle.manifest["skills"][name]["version"],
+                   "content_sha256": content_hash(bundle.root / bundle.manifest["skills"][name]["path"]),
+                   "release": bundle.manifest["release_version"], "repository": bundle.manifest["repository"]["url"]}
+            for name in names}
+
+
+def cached_skill(name: str, record: dict[str, Any]) -> tuple[Path, Path]:
+    identity = record.get("cache_id", "")
+    if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
+        raise RuntimeSkillsError(f"Invalid cache identity for {name}")
+    bundle = global_home() / "bundles" / identity
+    if not bundle.is_dir() or content_hash(bundle) != identity:
+        raise RuntimeSkillsError(f"Missing/drifted exact bundle {identity} for {name}; use restore-cache with the exact source. Never fall back to latest.")
+    manifest = load_manifest(bundle)
+    entry = manifest["skills"].get(name)
+    if not entry or entry["version"] != record.get("version") or manifest["release_version"] != record.get("release"):
+        raise RuntimeSkillsError(f"Locked version metadata disagrees with cache for {name}")
+    root = safe_project_path(bundle, entry["path"])
+    if content_hash(root) != record.get("content_sha256"):
+        raise RuntimeSkillsError(f"Locked content disagrees with cache for {name}")
+    return root, bundle / "scripts/runtime-skills.py"
+
+
+def router_text(name: str, description: str) -> str:
+    return (f"---\nname: {name}\ndescription: {description}\n---\n\n"
+            f"# {name}\n\n"
+            "这是版本路由入口。先定位本 SKILL.md 的实际所在目录 `<skill-dir>`，不要把项目 cwd 当作 Skill 目录。\n"
+            f"从用户选定的真实项目运行 `python \"<skill-dir>/scripts/runtime-skills.py\" session --project \"<project-root>\" --skill {name}`。\n"
+            "命令返回项目锁定版本的实际规则目录、runtime-tool 和完整有界启动规则；只遵循返回的版本。"
+            "若失败则停止业务动作，报告具体缺失/冲突，不直接读取默认版本或重新安装。首次仅绑定版本，不扫描业务、不预建 Runtime。\n"
+            "所有相对资源按返回的规则目录解析，项目记忆/检查点仍写入选定项目。"
+            "后续使用返回的 runtime-tool 运行 context、verify、pin、unpin；禁止在导入包或全局目录写项目事实。"
+            "只需安装时，校验后停止。没有 Python 3.10+、文件读写权限或持久项目目录时报告能力缺口，不模拟成功。\n")
+
+
+def skill_description(root: Path) -> str:
+    text = (root / "SKILL.md").read_text(encoding="utf-8")
+    match = re.search(r"^description:\s*(.+)$", text.split("---", 2)[1], re.M)
+    if not match:
+        raise RuntimeSkillsError(f"Missing one-line description at {root}")
+    return match[1]
+
+
+def write_router(source: Path, name: str, target: Path) -> None:
+    target.mkdir(parents=True)
+    (target / "SKILL.md").write_text(router_text(name, skill_description(source / "skills" / name)), encoding="utf-8")
+    copy_to_stage(source / "scripts/runtime-skills.py", target / "scripts/runtime-skills.py")
+
+
+def global_expected(registry: dict[str, Any], names: Sequence[str]) -> list[Path]:
+    expected = []
+    for path, record in registry["routers"].items():
+        if record.get("skill") in names:
+            directory = Path(path)
+            if not directory.is_dir() or directory.is_symlink() or content_hash(directory) != record.get("content_sha256"):
+                raise RuntimeSkillsError(f"Managed router missing or modified: {directory}")
+            expected.append(directory)
+    return expected
+
+
+def check_global_scopes(project: Path, names: Sequence[str], registry: dict[str, Any], extra: Sequence[Path] = ()) -> list[dict[str, str]]:
+    return installation_findings(project, names, global_expected(registry, names) + list(extra), instructions=False)
+
+
+def command_install_agent(args: argparse.Namespace, script_path: Path) -> int:
+    agent = select_agent(args.agent)
+    if args.project:
+        project = Path(args.project).resolve()
+        validate_project_root(project)
+    else:
+        project = Path.cwd().resolve()
+    with source_bundle(source=args.source, release=args.release, repository=args.repository or DEFAULT_REPOSITORY,
+                       lock=None, script_path=script_path, default_remote=not bool(args.source)) as bundle:
+        names = list(dict.fromkeys(args.skill or bundle.manifest["skills"]))
+        source_versions(bundle, names)
+        with global_guard() as home:
+            registry = global_registry()
+            findings = check_global_scopes(project, names, registry)
+            if findings:
+                raise RuntimeSkillsError("Resolve existing discovery copies first: " + json.dumps(findings[:REPORT_LIMIT], ensure_ascii=False))
+            targets = {name: agent_root(agent).absolute() / name for name in names}
+            for target in targets.values():
+                if target.is_symlink() or target.parent.resolve() != target.parent.absolute():
+                    raise RuntimeSkillsError(f"Refusing symlink discovery destination: {target}")
+                if target.exists() and str(target) not in registry["routers"]:
+                    raise RuntimeSkillsError(f"Unmanaged destination: {target}")
+            identity, cached = cache_bundle(bundle)
+            incoming = global_records(bundle, identity, names)
+            for name in names:
+                previous = registry["defaults"].get(name)
+                if previous and previous["version"] == incoming[name]["version"] and previous["content_sha256"] != incoming[name]["content_sha256"]:
+                    raise RuntimeSkillsError(f"Same Skill version has different content: {name}; bump its version")
+                if previous and version_change(previous["version"], incoming[name]["version"]) == "downgrade":
+                    raise RuntimeSkillsError(f"Refusing default downgrade: {name}")
+            with tempfile.TemporaryDirectory(prefix="routers-", dir=home) as temporary:
+                operations = []
+                for name, target in targets.items():
+                    staged = Path(temporary) / name
+                    write_router(cached, name, staged)
+                    digest = content_hash(staged)
+                    if not target.exists() or content_hash(target) != digest:
+                        operations.append((staged, target))
+                    registry["routers"][str(target)] = {"skill": name, "content_sha256": digest}
+                registry["defaults"].update(incoming)
+                registry_file = Path(temporary) / "registry.json"
+                write_json_atomic(registry_file, registry)
+                current = home / "registry.json"
+                if not current.exists() or read_json(current) != registry:
+                    operations.append((registry_file, current))
+                deploy_transaction(home, operations)
+    print(f"Installed {len(names)} global router(s) for {agent} at {agent_root(agent)}. Project files unchanged; start a real task to bind its versions.")
+    return 0
+
+
+def global_lock(project: Path) -> dict[str, Any]:
+    lock = read_json(project / LOCK_NAME)
+    if lock.get("schema_version") != GLOBAL_SCHEMA or lock.get("storage") != "global" or not isinstance(lock.get("skills"), dict) or not lock["skills"]:
+        raise RuntimeSkillsError("Expected global project lock schema 2; use bind --migrate-project explicitly for legacy locks")
+    return lock
+
+
+def verify_global(project: Path, lock: dict[str, Any]) -> None:
+    for name, record in lock["skills"].items():
+        cached_skill(name, record)
+    findings = check_global_scopes(project, list(lock["skills"]), global_registry())
+    if findings:
+        raise RuntimeSkillsError("Resolve discovery conflicts: " + json.dumps(findings[:REPORT_LIMIT], ensure_ascii=False))
+
+
+def command_bind(args: argparse.Namespace, script_path: Path, *, imported: Path | None = None) -> int:
+    project = Path(args.project).resolve()
+    validate_project_root(project)
+    if global_home() == project or global_home() in project.parents:
+        raise RuntimeSkillsError("Project memory cannot live inside the global store")
+    package_root = imported.parent.parent if imported and imported.parent.name == "assets" else imported
+    if package_root and (package_root == project or package_root in project.parents):
+        raise RuntimeSkillsError("Select a project outside the imported Skill package")
+    if not project.is_dir():
+        raise RuntimeSkillsError("Select an existing persistent project directory")
+    with global_guard() as home:
+        registry = global_registry()
+        imported_records = {}
+        if imported:
+            bundle = local_source(imported)
+            identity, _ = cache_bundle(bundle)
+            imported_records = global_records(bundle, identity, list(bundle.manifest["skills"]))
+        old = read_json(project / LOCK_NAME) if (project / LOCK_NAME).exists() else None
+        legacy = bool(old and old.get("schema_version") == 1)
+        if legacy:
+            if not getattr(args, "migrate_project", False):
+                raise RuntimeSkillsError("Legacy project installation exists. Do not add another copy; use bind --migrate-project --allow <level> after closing its phase.")
+            if old.get("phase_pin", {}).get("active"):
+                raise RuntimeSkillsError("Close the active phase before migrating")
+            validate_operation_paths(project, {name: record["destinations"] for name, record in old["skills"].items()})
+            drift = lock_drift(project, old)
+            if drift:
+                raise RuntimeSkillsError("Legacy content has drift: " + "; ".join(drift))
+        lock = {"schema_version": GLOBAL_SCHEMA, "storage": "global", "skills": {}, "phase_pin": {"active": False}} if not old or legacy else global_lock(project)
+        names = list(dict.fromkeys(args.skill or (old or {}).get("skills", {}) or registry["defaults"]))
+        # Migration always archives every legacy copy; retain no mixed lock modes.
+        if legacy:
+            names = list(dict.fromkeys([*old["skills"], *names]))
+        if not names:
+            raise RuntimeSkillsError("Select at least one installed --skill")
+        expected_legacy = lock_expected_paths(project, old) if legacy else []
+        findings = check_global_scopes(project, names, registry, expected_legacy)
+        if findings:
+            raise RuntimeSkillsError("Resolve discovery conflicts before binding: " + json.dumps(findings[:REPORT_LIMIT], ensure_ascii=False))
+        for name in names:
+            if name in lock["skills"]:
+                cached_skill(name, lock["skills"][name])
+                continue
+            record = imported_records.get(name) or registry["defaults"].get(name)
+            if not record:
+                raise RuntimeSkillsError(f"No global default/import for {name}; install the current Agent package first")
+            cached_skill(name, record)
+            if lock["skills"] and not legacy:
+                releases = {(item["release"], item["repository"]) for item in lock["skills"].values()}
+                if releases != {(record["release"], record["repository"])}:
+                    raise RuntimeSkillsError("New Skill must match this project's locked Release; adopt the full project outside its phase first")
+            if legacy and name in old["skills"]:
+                enforce_adoption(old["skills"][name], record, args.allow)
+            lock["skills"][name] = record
+        if imported_records:
+            # Importing a newer platform package makes it available for explicit adoption;
+            # existing project records above still keep their exact old identities.
+            changed = False
+            for name, incoming in imported_records.items():
+                previous = registry["defaults"].get(name)
+                if previous and previous["version"] == incoming["version"] and previous["content_sha256"] != incoming["content_sha256"]:
+                    raise RuntimeSkillsError(f"Same imported version has different content: {name}")
+                if not previous or version_change(previous["version"], incoming["version"]) not in ("none", "downgrade"):
+                    registry["defaults"][name] = incoming
+                    changed = True
+            if changed:
+                write_json_atomic(home / "registry.json", registry)
+        if legacy:
+            archive = project / ".runtime-skills/retired" / uuid.uuid4().hex
+            with tempfile.TemporaryDirectory(prefix="migration-", dir=home) as temporary:
+                pending = Path(temporary) / LOCK_NAME
+                write_json_atomic(pending, lock)
+                operations = []
+                for index, path in enumerate(expected_legacy):
+                    operations.extend([(path, archive / str(index)), (None, path)])
+                tool = safe_project_path(project, old.get("tool", {}).get("path", INSTALLED_TOOL_PATH))
+                operations.extend([(tool, archive / "runtime-skills.py"), (None, tool), (pending, project / LOCK_NAME)])
+                deploy_transaction(project, operations)
+        elif old != lock:
+            write_json_atomic(project / LOCK_NAME, lock)
+    print(f"Bound {len(lock['skills'])} exact global version(s); project memory stays in {project}.")
+    return 0
+
+
+def enforce_adoption(old: dict[str, Any], new: dict[str, Any], allowed: str) -> None:
+    if old.get("repository") and old["repository"] != new.get("repository"):
+        raise RuntimeSkillsError("Refuse to change the project's source repository implicitly")
+    if old.get("release") and new.get("release"):
+        release_change = version_change(old["release"], new["release"])
+        if release_change == "downgrade" or {"none": 0, "patch": 1, "minor": 2, "major": 3}.get(release_change, 4) > {"patch": 1, "minor": 2, "major": 3}[allowed]:
+            raise RuntimeSkillsError(f"Bundle release change {release_change} needs explicit --allow")
+    change = version_change(old["version"], new["version"])
+    if change == "downgrade" or {"none": 0, "patch": 1, "minor": 2, "major": 3}.get(change, 4) > {"patch": 1, "minor": 2, "major": 3}[allowed]:
+        raise RuntimeSkillsError(f"Version change {change} needs explicit --allow; {old['version']} -> {new['version']}")
+    if change == "none" and old["content_sha256"] != new["content_sha256"]:
+        raise RuntimeSkillsError("Same version has different content; refuse adoption")
+
+
+def command_global_project(args: argparse.Namespace, script_path: Path) -> int:
+    project = Path(args.project).resolve()
+    lock = global_lock(project)
+    verify_global(project, lock)
+    if args.command in ("update", "sync") and (getattr(args, "source", None) or getattr(args, "release", None)):
+        raise RuntimeSkillsError("Global project commands do not fetch sources; install-agent updates defaults, then adopt explicitly")
+    if args.command == "context":
+        root, _ = cached_skill(args.skill, lock["skills"].get(args.skill, {}))
+        return print_context(args, root)
+    if args.command == "doctor":
+        findings = installation_findings(project, list(lock["skills"]), global_expected(global_registry(), list(lock["skills"])))
+        print(json.dumps({"findings": findings}, ensure_ascii=False) if args.json else f"Doctor: {len(findings)} instruction finding(s); locked bundles verified.")
+        return 2 if findings else 0
+    if args.command in ("verify", "sync", "status"):
+        print("Verified exact global bundles; no version changed. Use adopt --allow <level> outside an active phase to accept new defaults.")
+        if args.command == "status":
+            print(json.dumps({"locked": lock["skills"], "defaults": global_registry()["defaults"]}, ensure_ascii=False))
+        return 0
+    if args.command in ("pin", "unpin", "adopt", "update"):
+        validate_project_root(project)
+        with global_guard():
+            # Re-read under the same guard used by bind/install; no lost project updates.
+            lock = global_lock(project)
+            verify_global(project, lock)
+            if args.command == "pin":
+                existing = lock.get("phase_pin", {})
+                if existing.get("active") and existing.get("reason") != args.reason:
+                    raise RuntimeSkillsError("Another phase already owns this project lock")
+                if not existing.get("active"):
+                    lock["phase_pin"] = {"active": True, "reason": args.reason, "set_at": utc_now()}
+            elif args.command == "unpin":
+                lock["phase_pin"] = {"active": False}
+            else:
+                if lock.get("phase_pin", {}).get("active"):
+                    raise RuntimeSkillsError("Active phase keeps its exact rules; close it before adoption")
+                defaults = global_registry()["defaults"]
+                for name, old in lock["skills"].items():
+                    if name not in defaults:
+                        raise RuntimeSkillsError(f"No installed default for {name}")
+                    enforce_adoption(old, defaults[name], args.allow)
+                    cached_skill(name, defaults[name])
+                selected = {name: defaults[name] for name in lock["skills"]}
+                if len({(record["release"], record["repository"]) for record in selected.values()}) != 1:
+                    raise RuntimeSkillsError("Install/import one coherent Release for every project Skill before adoption")
+                lock["skills"] = selected
+            if read_json(project / LOCK_NAME) != lock:
+                write_json_atomic(project / LOCK_NAME, lock)
+        print(f"{args.command}: project lock updated; project memories unchanged.")
+        return 0
+    raise RuntimeSkillsError(f"{args.command} is a legacy project-copy operation; global projects use session/context/adopt")
+
+
+def command_session(args: argparse.Namespace, script_path: Path) -> int:
+    project = Path(args.project).resolve()
+    imported = script_path.parent.parent / "assets/runtime-source"
+    import_source = imported if (imported / MANIFEST_NAME).is_file() else None
+    command_bind(args, script_path, imported=import_source)
+    lock = global_lock(project)
+    verify_global(project, lock)
+    root, tool = cached_skill(args.skill[0], lock["skills"][args.skill[0]])
+    print(f"[skill-root={root}]\n[runtime-tool={tool}]\n[project-root={project}]\nUse these absolute paths; resource paths resolve under skill-root, memories under project-root.")
+    entry = (root / "SKILL.md").read_text(encoding="utf-8")
+    if len(entry) > CONTEXT_LIMIT:
+        raise RuntimeSkillsError("Canonical entry exceeds the startup budget; repair its source before use")
+    print(entry)
+    return 0
+
+
+def command_restore_cache(args: argparse.Namespace, script_path: Path) -> int:
+    # Cache restoration never edits a project lock or silently accepts a substitute.
+    lock = global_lock(Path(args.project).resolve())
+    identities = {record["cache_id"] for record in lock["skills"].values()}
+    with source_bundle(source=args.source, release=args.release, repository=args.repository or DEFAULT_REPOSITORY,
+                       lock=None, script_path=script_path, default_remote=not bool(args.source)) as bundle:
+        with global_guard():
+            # Build outside the live cache so a mismatched source has no side effects.
+            with tempfile.TemporaryDirectory(prefix="restore-") as temporary:
+                original = os.environ.get("RUNTIME_SKILLS_HOME")
+                try:
+                    os.environ["RUNTIME_SKILLS_HOME"] = str(Path(temporary) / "store")
+                    global_home().mkdir(parents=True)
+                    identity, payload = cache_bundle(bundle)
+                finally:
+                    if original is None:
+                        os.environ.pop("RUNTIME_SKILLS_HOME", None)
+                    else:
+                        os.environ["RUNTIME_SKILLS_HOME"] = original
+                if identity not in identities:
+                    raise RuntimeSkillsError("Source does not match any exact project cache identity")
+                target = global_home() / "bundles" / identity
+                if target.exists():
+                    raise RuntimeSkillsError("Cache path already exists; archive corrupt content explicitly before restoring")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                copy_to_stage(payload, target)
+    print("Restored exact cached bundle; lock unchanged.")
+    return 0
+
+
 def add_source_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--source", help="Local dev-runtime-skill checkout")
     parser.add_argument(
@@ -1255,6 +1670,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=TOOL_VERSION)
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    native = subparsers.add_parser("install-agent", help="Install current Agent's user-global routers; no project copies")
+    native.add_argument("--agent", choices=["auto", *AGENTS], default="auto")
+    native.add_argument("--project", help="Optional project to inspect for conflicting copies; never populated")
+    native.add_argument("--skill", action="append")
+    add_source_arguments(native)
+
+    bind = subparsers.add_parser("bind", help="Bind exact global rules to an existing project")
+    bind.add_argument("--project", default=".")
+    bind.add_argument("--skill", action="append")
+    bind.add_argument("--migrate-project", action="store_true")
+    bind.add_argument("--allow", choices=["patch", "minor", "major"], default="patch")
+
+    session = subparsers.add_parser("session", help="Resolve a project's exact rules and print the bounded entry")
+    session.add_argument("--project", required=True)
+    session.add_argument("--skill", action="append", required=True)
+
+    adopt = subparsers.add_parser("adopt", help="Explicitly adopt global defaults after a phase closes")
+    adopt.add_argument("--project", default=".")
+    adopt.add_argument("--allow", choices=["patch", "minor", "major"], default="patch")
+
+    restore = subparsers.add_parser("restore-cache", help="Restore a missing exact cache from verified source")
+    restore.add_argument("--project", default=".")
+    add_source_arguments(restore)
 
     install = subparsers.add_parser("install", help="Install or add managed Skills")
     install.add_argument("--project", required=True, help="Target project root")
@@ -1332,6 +1771,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     script_path = Path(__file__).resolve()
     try:
+        if args.command == "install-agent":
+            return command_install_agent(args, script_path)
+        if args.command == "bind":
+            return command_bind(args, script_path)
+        if args.command == "session":
+            if len(args.skill) != 1:
+                raise RuntimeSkillsError("session selects exactly one Skill")
+            return command_session(args, script_path)
+        if args.command == "restore-cache":
+            return command_restore_cache(args, script_path)
+        project = Path(getattr(args, "project", ".")).resolve()
+        if (project / LOCK_NAME).is_file() and read_json(project / LOCK_NAME).get("schema_version") == GLOBAL_SCHEMA:
+            return command_global_project(args, script_path)
+        if args.command == "adopt":
+            raise RuntimeSkillsError("adopt requires a global project lock")
         if args.command == "install":
             return command_install(args, script_path)
         if args.command == "doctor":

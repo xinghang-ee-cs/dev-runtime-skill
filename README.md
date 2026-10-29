@@ -1,83 +1,41 @@
-# AI Development Runtime Skills
+# Runtime Skills
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+One source tree generates user-global Agent installers and self-contained platform import packages. Static rules and tools live at user scope; project facts, progress, checkpoints and exact version locks stay in each project.
 
-Four independent skills for planning, implementation, testing, and code diagnosis. `skills-manifest.json` owns published versions; a project's `runtime-skills.lock.json` owns its actual installed copies. The documentation site's package version is unrelated.
+Ask your AI to read [INSTALL.md](INSTALL.md), identify its current Agent, inspect existing same-name copies and install only that Agent's global package. Stop after installation; do not initialize business state or create AGENTS.md/CLAUDE.md.
 
-## Install without starting a workflow
-
-Ask the Agent working in your target project:
-
-```text
-Install selected Runtime Skills from https://github.com/xinghang-ee-cs/dev-runtime-skill into this project only. Do not start planning, interview me, scan business source, or initialize all Runtime environments.
-Select the current actual platform, not every platform suggested by stale directories. Use .agents/skills for Codex, .claude/skills for Claude Code, or the project's supported Copilot location. Add multiple destinations only when explicitly requested or required by this task. Never install another global copy.
-Fetch the source Release into temporary storage outside Skill discovery paths. Do not copy the source AGENTS.md, README, docs site, or workflows.
-Use the trusted source tool's doctor --project <root>, repeating --skill for selected names on a new project. Resolve duplicate user/ancestor/project copies, incomplete inventories, and drift before installing. Report legacy oversized instructions without deleting or rewriting them. Inspect any platform-specific additional or nested discovery directories separately.
-Run scripts/runtime-skills.py install --release latest --project <root> with selected --skill names and the current --destination. For an existing lock, verify and review status/diff first. Additional platform copies require --add-destination; use relocate to move a copy. Do not silently override local changes or an active phase pin. Confirm minor/major updates.
-Do not create AGENTS.md or CLAUDE.md, prebuild Runtime state, edit business code, deploy, commit, or push. Run the installed tool's verify, report versions and exact paths, then stop.
-```
-
-Available names are `planning-layer-runtime`, `long-task-orchestrator`, `testing-layer-runtime`, and `ai-code-inspection`. Select only what you need. The managed installer is project-local and refuses Home/Codex user roots as projects; native personal/global installations remain the platform's responsibility.
-
-## Deployment and migration
+New stable download paths become available after this change is merged and released. Download and review [install.py](https://github.com/xinghang-ee-cs/dev-runtime-skill/releases/latest/download/install.py), then run:
 
 ```bash
-python scripts/runtime-skills.py doctor --project /path/to/project --skill planning-layer-runtime
-python scripts/runtime-skills.py install --release latest --project /path/to/project --skill planning-layer-runtime --destination .agents/skills
-python /path/to/project/.runtime-skills/runtime-skills.py verify --project /path/to/project
+python install.py --agent codex --project /path/to/project
 ```
 
-Identical repeated installation does not rewrite files or the lock. Complete selected packages, the project sync tool, and the lock are installed; business initialization is deferred until an actual task needs it.
+Choose `codex`, `claude`, `copilot` or DeepSeek Harness `dsh`. Repeat `--skill <name>` to select individual Skills. Auto selection requires RUNTIME_SKILLS_AGENT or exactly one supported CLI on PATH; ambiguous detection makes no installation. Do not infer active Agents from old directories.
 
-Add another intentionally used platform with `install ... --destination .claude/skills --add-destination`. Every previously unmanaged target requires review and explicit `--overwrite-local-changes` adoption, even if a lock already exists. This flag never bypasses duplicate-scope conflicts.
+| Target | Installation |
+| --- | --- |
+| Codex / Copilot / dsh | Shared personal `~/.agents/skills`; dsh honors DSH_AGENTS_HOME |
+| Claude Code | Personal `~/.claude/skills` |
+| Doubao Work | Import each `runtime-skills-doubao-<skill>.zip` through the supported upload UI |
+| WorkBuddy | Add Skill → Upload Skill, one `runtime-skills-workbuddy-<skill>.zip` per Skill |
 
-Move a managed copy instead of accumulating paths:
+Import packages include tools and canonical rule payloads. They require Python 3.10+, file permissions and a persistent selected project directory. Marketplace onboarding/review is separate; do not guess undocumented local application directories or simulate unsupported capabilities.
 
-```bash
-python .runtime-skills/runtime-skills.py relocate --project . --skill planning-layer-runtime --from .agents/skills --to .claude/skills
-```
+Four Skills: planning-layer-runtime (planning), long-task-orchestrator (implementation), testing-layer-runtime (acceptance), ai-code-inspection (diagnosis). Native discovery contains thin version routers. On first real use, session binds the selected Skill to an exact global cache and returns its actual rule/tool paths. Never resolve resources from the project's current working directory. Installation creates no project Skill copies.
 
-Relocation requires no active pin, no drift or discovery conflicts, and an absent destination. It atomically updates the lock, archives old content under `.runtime-skills/retired/`, and removes the old discovery path, with rollback on failure. It neither upgrades versions nor moves project Runtime data. Global/unmanaged copies require a separate explicit resolution.
+Global cache: `~/.runtime-skills/bundles/<sha256>` (override using RUNTIME_SKILLS_HOME). Project lock schema 2 stores exact content identities. Updating global defaults cannot mutate existing projects, including active phases. `sync` verifies only; close/unpin a phase before explicit `adopt --allow patch|minor|major`. Old caches are retained. A missing or modified cache stops execution; restore the exact source, never substitute latest. Keep exact source packages for migration between machines, particularly when old public patch tags are archived.
 
-## Diagnose legacy installations
+Legacy project-copy locks remain supported. Close the phase and verify before explicit `bind --migrate-project --allow major`. Managed copies are archived outside discovery transactionally; project memory stays put. Unmanaged copies and user instruction files require an explicit cleanup decision. See [INSTALL.md](INSTALL.md) and [中文说明](README.zh-CN.md).
 
-`doctor` reads bounded known project, Git-ancestor, and user discovery roots, Skill metadata, and instruction sizes. It does not recursively read application code or echo instruction bodies. It reports unregistered same-name skills, managed drift, incomplete/unreadable inventories, instruction files above 12 KB, and duplicate routing blocks. Instruction size findings require human review; they are not proof of corruption and never trigger automatic rewriting. Additional configured directories and nested monorepo skills must be inspected explicitly.
-
-Reuse existing instructions only if needed, in at most one marked routing block with at most 10 nonempty lines and 1200 characters. Never create a new instruction file merely for installation or first use. Each distributed SKILL.md carries sync/pin/unpin rules independently.
-
-## Start one selected skill
-
-After installation, make a separate request such as “Use planning-layer-runtime to start this phase's discovery.” Load one entrypoint and only the current stage's necessary sections. Planning hands off to Long, then Testing and the project's release process. Confirmed implementation defects with valid contracts use a Bugfix Case without rewriting original 00–15 documents. Production retest and similar-defect verification precede Case closure.
-
-Full governance remains in each `references/runtime-governance.md` and the existing topic references. Do not preload complete governance, all references, other skills, templates, or historical logs. Discover only missing project facts relevant to the current action.
-
-## Synchronize and pin
-
-Run doctor on the first use in a session. New phase: sync → pin → create phase state. Existing active phase: verify → pin the existing phase if missing → sync, which then verifies without updating. Do not repeat synchronization within a session unless the lock changes. Only unpin after closure or explicit controlled-migration approval.
+Maintainer validation of unpublished source:
 
 ```bash
-python .runtime-skills/runtime-skills.py sync --project .
-python .runtime-skills/runtime-skills.py pin --project . --reason phase-01
-# After phase closure:
-python .runtime-skills/runtime-skills.py unpin --project .
-```
-
-Sync automatically applies only compatible PATCH updates. MINOR/MAJOR updates need confirmation. Use stable `--release latest`; maintainers use `--source` only for unreleased validation. Review `status --check-remote` and `diff` before updating. Package updates do not automatically migrate all Runtime epochs or rerun whole-phase validation; actual schema migrations are separate scoped recovery tasks, and closed history stays read-only.
-
-## Read bounded rule sections
-
-```bash
-python .runtime-skills/runtime-skills.py context --project . --skill planning-layer-runtime --file references/07-planning-conversation-runtime.md --outline
-python .runtime-skills/runtime-skills.py context --project . --skill planning-layer-runtime --file references/07-planning-conversation-runtime.md --section 1
-```
-
-Rule bodies are limited to 6000 characters per call. Continue with the same arguments and `--offset <next_offset>` until `done`; child headings are separate sections and all applicable gate sections must be read before action. Target at most 12000 static-rule characters for initial routing, then expand by the current gate with a reason. This is not a guarantee about total session tokens, application documents, tool output, or client-injected instructions. Reuse unchanged already-read sections; restore compact checkpoints/current state before reading historical evidence.
-
-## Validate
-
-```bash
-python scripts/validate-skill-manifest.py
+python scripts/runtime-skills.py install-agent --source . --agent codex --project /path/to/project
+python scripts/build-install-packages.py --output /tmp/runtime-packages
 python -m unittest discover -s tests -p 'test_*.py'
+python scripts/validate-skill-manifest.py
 ```
 
-Tutorials live under `src/content/docs/`. The docs website files are not installed. Repository changes follow AGENTS.md: Issue → dedicated branch → PR → CI → merge through PR. Do not copy maintenance rules to target projects.
+Build output includes four native ZIPs, eight single-Skill import ZIPs, the installer, installation guide, install-manifest.json and SHA256SUMS. Platform metadata is generated from distribution/, with skills/ as the only rule source. CI preserves reviewable artifacts. Existing PR-based release governance applies.
+
+Context remains staged: load one Skill and only its current rules, at most 6,000 characters per context read. This is not a whole-session token guarantee.
