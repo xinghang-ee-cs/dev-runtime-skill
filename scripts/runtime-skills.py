@@ -51,6 +51,10 @@ class SourceBundle:
             shutil.rmtree(self.temporary_root, ignore_errors=True)
 
 
+def environment_path(name: str, default: Path) -> Path:
+    return Path(os.environ.get(name, "").strip() or str(default)).expanduser()
+
+
 def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
 
@@ -623,12 +627,12 @@ CONTEXT_LIMIT = 6000
 
 def user_skill_roots() -> list[Path]:
     home = Path.home()
-    codex = Path(os.environ.get("CODEX_HOME", str(home / ".codex")))
+    codex = environment_path("CODEX_HOME", home / ".codex")
     return list(dict.fromkeys([
         *(home / root for root in DISCOVERY_ROOTS),
         codex / "skills", codex / "skills/remote-skills",
-        Path(os.environ.get("DSH_HOME", str(home / ".dsh"))) / "skills",
-        Path(os.environ.get("DSH_AGENTS_HOME", str(home / ".agents"))) / "skills",
+        environment_path("DSH_HOME", home / ".dsh") / "skills",
+        environment_path("DSH_AGENTS_HOME", home / ".agents") / "skills",
     ]))
 
 
@@ -702,7 +706,7 @@ def installation_findings(
                 if parent == Path(boundary).resolve():
                     break
         instruction_roots.extend([
-            Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))),
+            environment_path("CODEX_HOME", Path.home() / ".codex"),
             Path.home() / ".claude",
         ])
         for directory in dict.fromkeys(instruction_roots):
@@ -841,7 +845,7 @@ def validate_operation_paths(project: Path, destinations: dict[str, list[str]]) 
 def validate_project_root(project: Path) -> None:
     home = Path.home().resolve()
     user_directories = [(home / name).resolve() for name in (".agents", ".claude", ".github", ".codex", ".skills")]
-    user_directories.append(Path(os.environ.get("CODEX_HOME", str(home / ".codex"))).resolve())
+    user_directories.append(environment_path("CODEX_HOME", home / ".codex").resolve())
     if project in {home, Path(project.anchor)} or any(
         project == root or root in project.parents for root in user_directories
     ):
@@ -1253,7 +1257,9 @@ DEFAULT_REPOSITORY = "https://github.com/xinghang-ee-cs/dev-runtime-skill"
 
 
 def global_home() -> Path:
-    home = Path(os.environ.get("RUNTIME_SKILLS_HOME", str(Path.home() / ".runtime-skills"))).expanduser().absolute()
+    home = environment_path("RUNTIME_SKILLS_HOME", Path.home() / ".runtime-skills")
+    if not home.is_absolute():
+        raise RuntimeSkillsError("RUNTIME_SKILLS_HOME must be an absolute user cache path")
     if home.is_symlink():
         raise RuntimeSkillsError("Global store must not be a symlink")
     resolved = home.resolve()
@@ -1293,7 +1299,10 @@ def agent_root(agent: str) -> Path:
     if agent == "claude":
         return Path.home() / ".claude/skills"
     if agent == "dsh":
-        return Path(os.environ.get("DSH_AGENTS_HOME", str(Path.home() / ".agents"))).expanduser() / "skills"
+        root = environment_path("DSH_AGENTS_HOME", Path.home() / ".agents")
+        if not root.is_absolute():
+            raise RuntimeSkillsError("DSH_AGENTS_HOME must be absolute for global installation")
+        return root / "skills"
     return Path.home() / ".agents/skills"
 
 

@@ -292,6 +292,18 @@ class GlobalDistributionTests(unittest.TestCase):
         self.run_cli('adopt', '--project', str(self.project), '--allow', 'major')
         self.assertEqual(self.lock()['skills'][self.name]['release'], '3.0.0')
 
+    def test_empty_environment_roots_keep_user_defaults_and_relative_roots_fail(self):
+        with patch.dict(os.environ, {'DSH_AGENTS_HOME': '  ', 'DSH_HOME': '', 'CODEX_HOME': '', 'RUNTIME_SKILLS_HOME': ''}):
+            self.install('dsh')
+            self.assertEqual(runtime.agent_root('dsh'), self.home / '.agents/skills')
+            self.assertEqual(runtime.global_home(), self.home / '.runtime-skills')
+            self.assertIn(self.home / '.dsh/skills', runtime.user_skill_roots())
+            self.assertEqual(list(self.project.iterdir()), [])
+        with patch.dict(os.environ, {'DSH_AGENTS_HOME': 'relative'}):
+            self.run_cli('install-agent', '--source', str(self.source), '--agent', 'dsh', success=False)
+        with patch.dict(os.environ, {'RUNTIME_SKILLS_HOME': 'relative'}):
+            self.run_cli('install-agent', '--source', str(self.source), '--agent', 'dsh', success=False)
+
     def test_unsafe_zip_member_refused(self):
         archive = self.root / 'unsafe.zip'
         with zipfile.ZipFile(archive, 'w') as zip_file:
