@@ -137,6 +137,40 @@ class InstallationContextTests(unittest.TestCase):
         self.assertFalse((self.project / '.claude/skills/example-skill').exists())
         self.assertEqual(self.run_tool('verify', '--project', str(self.project))[0], 0)
 
+    def test_relocate_cannot_nest_under_a_retained_copy_of_the_same_skill(self):
+        self.assertEqual(self.install()[0], 0)
+        self.assertEqual(self.install('.claude/skills', '--add-destination')[0], 0)
+        before = {str(path.relative_to(self.project)): path.read_bytes()
+                  for path in self.project.rglob('*') if path.is_file()}
+        code, output = self.run_tool(
+            'relocate', '--project', str(self.project), '--skill', self.name,
+            '--from', '.agents/skills',
+            '--to', '.claude/skills/example-skill/children',
+        )
+        self.assertEqual(code, 1, output)
+        self.assertIn('overlap', output)
+        after = {str(path.relative_to(self.project)): path.read_bytes()
+                 for path in self.project.rglob('*') if path.is_file()}
+        self.assertEqual(before, after)
+        self.assertEqual(self.run_tool('verify', '--project', str(self.project))[0], 0)
+
+    def test_relocate_preserves_nonoverlapping_retained_copy(self):
+        self.assertEqual(self.install()[0], 0)
+        self.assertEqual(self.install('.claude/skills', '--add-destination')[0], 0)
+        retained = self.project / '.claude/skills' / self.name
+        before = runtime.file_inventory(retained)
+        code, output = self.run_tool(
+            'relocate', '--project', str(self.project), '--skill', self.name,
+            '--from', '.agents/skills', '--to', '.github/skills',
+        )
+        self.assertEqual(code, 0, output)
+        self.assertEqual(before, runtime.file_inventory(retained))
+        self.assertFalse((self.project / '.agents/skills' / self.name).exists())
+        self.assertEqual(self.lock()['skills'][self.name]['destinations'], [
+            '.claude/skills/example-skill', '.github/skills/example-skill',
+        ])
+        self.assertEqual(self.run_tool('verify', '--project', str(self.project))[0], 0)
+
     def test_pinned_phase_blocks_relocation(self):
         self.assertEqual(self.install()[0], 0)
         self.assertEqual(self.run_tool('pin', '--project', str(self.project), '--reason', 'phase-01')[0], 0)

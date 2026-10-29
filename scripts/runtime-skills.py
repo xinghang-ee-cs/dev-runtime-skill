@@ -856,8 +856,8 @@ def command_relocate(args: argparse.Namespace) -> int:
     updated = json.loads(json.dumps(lock))
     archive = f".runtime-skills/retired/{uuid.uuid4().hex}"
     operations: list[tuple[Path | None, Path]] = []
-    source_paths: dict[str, list[str]] = {}
-    for name in dict.fromkeys(args.skill):
+    moved_names = list(dict.fromkeys(args.skill))
+    for name in moved_names:
         if name not in updated["skills"]:
             raise RuntimeSkillsError(f"Skill is not installed: {name}")
         old = normalize_destination(args.from_root, name)
@@ -870,18 +870,22 @@ def command_relocate(args: argparse.Namespace) -> int:
         old_path, new_path = safe_project_path(project, old), safe_project_path(project, new)
         if new_path.exists():
             raise RuntimeSkillsError(f"Relocation destination already exists; inspect/adopt it explicitly first: {new}")
-        source_paths[name] = [old, new]
         record["destinations"] = sorted((set(record["destinations"]) - {old}) | {new})
         operations.extend([(old_path, safe_project_path(project, f"{archive}/{old}")),
                            (old_path, new_path), (None, old_path)])
-    validate_operation_paths(project, {**{name: record["destinations"] for name, record in lock["skills"].items() if name not in source_paths}, **source_paths})
+    # Check every source and final path, including copies retained for another platform.
+    operation_destinations = {
+        name: sorted(set(record["destinations"]) | set(updated["skills"][name]["destinations"]))
+        for name, record in lock["skills"].items()
+    }
+    validate_operation_paths(project, operation_destinations)
     updated["updated_at"] = utc_now()
     with tempfile.TemporaryDirectory(prefix="runtime-relocate-lock-") as temp:
         staged_lock = Path(temp) / LOCK_NAME
         write_json_atomic(staged_lock, updated)
         operations.append((staged_lock, project / LOCK_NAME))
         deploy_transaction(project, operations)
-    print(f"Relocated {len(source_paths)} skill(s); old copies archived at {archive}; no project Runtime or instructions changed.")
+    print(f"Relocated {len(moved_names)} skill(s); old copies archived at {archive}; no project Runtime or instructions changed.")
     return 0
 
 
