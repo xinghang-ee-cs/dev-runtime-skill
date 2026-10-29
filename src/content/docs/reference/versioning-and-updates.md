@@ -1,138 +1,53 @@
 ---
 title: 版本与更新机制
-description: Runtime Skills 的版本事实、安装锁、使用前同步、期次锁定和发布规则。
+description: 用户全局规则、精确项目锁、期次隔离与生成包发布。
 sidebar:
   order: 2
 ---
 
-## 单一事实源
+## 版本与存储
 
-| 文件或对象 | 职责 | 禁止承担的职责 |
-|---|---|---|
-| `skills-manifest.json` | 当前仓库 Release 版本、同步工具版本、每个 Skill 的独立版本和路径 | 不记录某个目标项目装了什么 |
-| GitHub tag / Release | 固定一组仓库快照和人类可读更新记录；由 Release 的预发布标记区分验证版与稳定版 | 不表示目标项目已经升级 |
-| 目标项目 `runtime-skills.lock.json` | 记录实际安装 Release、commit、Skill 版本、全部目标位置和内容摘要 | 不定义最新版本 |
-| README 和教程 | 解释安装、更新与版本规则 | 不保存当前版本数字 |
-| `SKILL.md` | Skill 的触发条件、工作流和边界 | 不增加 `version` frontmatter |
+| 对象 | 职责 |
+| --- | --- |
+| skills-manifest.json | Release、工具和各 Skill 的唯一源码版本事实 |
+| skills/ | 规范规则、脚本、模板的唯一源码 |
+| distribution/ | 平台展示元数据，不复制规则 |
+| 用户发现目录 | 版本路由与启动工具 |
+| ~/.runtime-skills/bundles/&lt;sha256&gt; | 不可变精确规则缓存，位于发现目录外 |
+| 项目 runtime-skills.lock.json schema 2 | 各 Skill 的精确版本、Release 与内容/缓存摘要 |
+| 项目 Runtime | 项目事实、需求、进度、检查点和证据 |
 
-`package.json` 只属于 Astro/Starlight 文档站，它的版本不得用于判断 Skill 新旧。
+package.json 只用于文档站，不能推断 Skill 版本。安装产物由同一源码生成：四种全局 ZIP、豆包工作与 WorkBuddy 的八个独立导入 ZIP、安装器、安装合同、索引和校验清单。
 
-## 安装
+## 安装与更新
 
-从本仓库执行：
+按仓库 INSTALL.md 获取经过校验的稳定包。安装只写用户目录，真实任务才由 session 绑定项目。Codex/Copilot/dsh 共用受支持的 ~/.agents/skills；Claude Code 用 ~/.claude/skills。导入平台使用自包含单 Skill ZIP，不猜测用户目录。
 
-```bash
-python scripts/runtime-skills.py install \
-  --release latest \
-  --project /path/to/project \
-  --skill planning-layer-runtime \
-  --destination .agents/skills
-```
-
-需要同时支持 Claude Code 时，再传入 `--destination .claude/skills`。所有副本写入同一个锁文件；后续更新始终把已安装 Skill 作为一个 Release 快照共同处理，不允许只更新其中一个平台副本。
-
-`--release latest` 是普通用户的稳定入口，只解析 GitHub 标记为稳定的最新 Release，不会选中预发布或 Draft 版本。当前稳定版本以 GitHub 最新公开稳定 Release 为准，可通过 `latest` 获取。维护者需要验证尚未发布的本地内容时，才使用 `--source /path/to/dev-runtime-skill`，此时锁文件会记录实际分支和 commit，而不会伪装成 Release。
-
-### 迁移已有的无版本副本
-
-目标目录已经存在但没有 `runtime-skills.lock.json` 时，首次 `install` 不会直接覆盖。工具会列出发布版相对旧副本将新增、修改和删除的文件。用户确认愿意采用发布版后，再运行同一安装命令并增加：
+session 输出真实 skill-root 和 runtime-tool。下列命令中的路径必须替换为该实际绝对路径：
 
 ```bash
---overwrite-local-changes
+python "<runtime-tool>" verify --project /path/to/project
+python "<runtime-tool>" doctor --project /path/to/project
+python "<runtime-tool>" sync --project /path/to/project
+python "<runtime-tool>" pin --project /path/to/project --reason phase-01
+python "<runtime-tool>" unpin --project /path/to/project
+python "<runtime-tool>" adopt --project /path/to/project --allow minor
 ```
 
-工具随后统一替换所有目标副本、安装项目内同步入口并生成锁文件，不创建或改写 `AGENTS.md`、`CLAUDE.md`。Agent 复用已有等价路由；确实缺失时只在当前平台实际读取的一个已有指令文件中维护最多 10 个非空行、1200 字符的 `<!-- runtime-skills:begin -->` / `<!-- runtime-skills:end -->` 短块，原位置更新且相同内容不写入。不复制本仓库的完整入口规则，不重复创建、追加或覆盖项目原文；没有指令文件时，不为安装或更新自动创建。
+全局模式 sync 只验证。全局安装新默认不改变既有项目锁，也不回收旧缓存。恢复活动期次时先 verify，缺 pin 时先 pin 原期次；新期次在写状态前 pin。不同活动期次不能覆盖现有 pin。期次关闭或用户批准受控迁移后才能 unpin/adopt。
 
-## 使用前同步
+采用新版需要显式 adopt，默认只允许补丁，minor/major 必须相应参数。活动 pin 阻止 adoption；同版本内容不同、降级、漂移或缺失精确缓存都阻止。restore-cache 仅恢复与锁中完整摘要相同的源包，不改锁、不回退 latest。换机器应保留精确源包；旧补丁 Tag 可能归档，只有版本号不足以重建缓存。
 
-目标项目中的入口为：
+## 兼容与诊断
 
-```bash
-python .runtime-skills/runtime-skills.py sync --project .
-```
+旧 schema 1 项目锁仍由原命令校验/更新；旧流程不作为新安装默认。迁移必须关闭期次、验证无漂移，显式 bind --migrate-project --allow major，事务性归档所有旧受管发现副本和工具，再切换 schema 2。项目记忆保持原位；未受管文件和指令不自动删除。
 
-每个 Agent 会话第一次使用任一 Runtime Skill 前执行一次。同一会话中，锁文件没有变化时不重复执行。
+doctor 只检查有界已知项目/Git 祖先/用户根及指令元数据，不扫描业务或输出指令全文。大指令与重复路由属于人工审阅提示；副本冲突、读不全或漂移会阻断执行。平台自定义/企业目录需要依实际配置检查。context 每次最多 6000 字符，不能保证整会话 token 总量。
 
-`sync` 的判断顺序：
+## 版本与发布治理
 
-1. 校验所有安装目录和同步工具是否匹配锁文件摘要。
-2. 如果存在本地修改或平台间漂移，停止覆盖。
-3. 如果存在活动期次锁定，只验证当前版本，不远端更新。
-4. 查询最新稳定 GitHub Release。
-5. 自动安装兼容的补丁版本。
-6. 次版本或主版本只报告变化，等待明确确认。
-7. 更新成功后一次性替换全部受管副本和锁文件。
+PATCH 为兼容修复；MINOR 为向后兼容能力；MAJOR 用于安装布局、状态或跨 Skill 合同破坏性变化。新全局布局使用新的主版本。修改规范 Skill 或工具均需提升对应版本和 release_version；平台元数据/安装器/构建器修改也受 CI 版本门禁约束。
 
-远端不可用时，已安装副本全部通过本地校验即可继续使用锁定版本，但 Agent 必须说明没有完成最新版本检查。
+所有改动通过 Issue → 专用分支 → PR → CI → PR 合并。既有 Release workflow 基于 main 校验和测试，再生成确定性产物，打 Tag、创建 Release 并上传附件。已有同版本 Tag 指向不同代码时必须提升版本，不能覆盖；已有附件须逐字节相同才可重跑。公开市场提交另行通过官方平台，不属于自动 Release。
 
-## 活动期次锁定
-
-Planning、Long 和 Testing 会共同消费带 revision 的合同与 Runtime 状态。中途升级可能让新规则解释旧状态，因此新期次应先同步，再锁定：
-
-```bash
-python .runtime-skills/runtime-skills.py sync --project .
-python .runtime-skills/runtime-skills.py pin --project . --reason phase-01
-```
-
-保持该锁直到期次关闭：
-
-```bash
-python .runtime-skills/runtime-skills.py unpin --project .
-```
-
-如必须中途迁移，先让用户确认，再解除锁定、查看差异、升级，并重新验证受影响的 Planning Baseline、Handoff 和 Runtime 状态。
-
-## 手动检查和升级
-
-```bash
-# 只校验本地副本
-python .runtime-skills/runtime-skills.py verify --project .
-
-# 校验并检查最新 Release
-python .runtime-skills/runtime-skills.py status --project . --check-remote
-
-# 列出即将新增、修改和删除的文件
-python .runtime-skills/runtime-skills.py diff --project . --release latest
-
-# 明确接受次版本更新
-python .runtime-skills/runtime-skills.py update --project . --release latest --allow minor
-
-# 明确接受主版本更新
-python .runtime-skills/runtime-skills.py update --project . --release latest --allow major
-```
-
-检测到本地修改时，先执行 `diff`。只有用户明确决定放弃本地修改后，才可使用 `--overwrite-local-changes`；不得由 Agent 自行推断。
-
-常用返回码：
-
-| 返回码 | 含义 |
-|---|---|
-| `0` | 本地版本可用；也可能是远端暂时不可用但本地校验通过 |
-| `1` | 命令参数、版本门禁、期次锁定或来源校验失败 |
-| `2` | 检测到文件缺失、本地修改或多平台副本漂移 |
-| `10` | 检测到更新，但需要用户确认次版本或主版本变化 |
-
-## 版本升级口径
-
-| 级别 | 适用变化 |
-|---|---|
-| PATCH | 表达修正、缺陷修复，以及不改变持久化结构、输出合同、门禁或交接兼容性的调整 |
-| MINOR | 向后兼容的新能力、新可选字段或新工作流分支 |
-| MAJOR | Runtime 文件结构、状态枚举、门禁、安装布局或跨 Skill 交接合同的破坏性变化 |
-
-每次修改 `skills/<name>/`，必须同时提升清单中该 Skill 的版本和仓库 `release_version`。修改同步工具时必须提升工具版本和 `release_version`。CI 会阻止内容已变化但对应版本未提升的 PR。
-
-修订版本是同一 `主版本.次版本` 系列中的直接替代版本：用户侧 `sync` 检测到兼容的 PATCH 变化后自动更新。GitHub 只向用户公开每个系列最新的 PATCH Release 和 Tag；新的修订版本成功发布后，工作流把同系列旧 Release 转为 Draft 以保留记录，并删除其公开 Tag。主版本或次版本变化时保留旧系列，使不同系列可以并存并用于梯度灰度。
-
-## 发布
-
-1. 修改受影响的 Skill 或同步工具版本，并同步提升 `release_version`。
-2. 通过清单校验和同步工具测试。
-3. 合并发布变更到 `main`。
-4. Release workflow 重新校验 `main`，自动创建与 `skills-manifest.json` 中 `release_version` 一致的 tag。
-5. workflow 根据清单中的 `repository.channel` 创建稳定版或预发布版 GitHub Release，并生成 Release Notes；Release 已存在时，工作流仍会校正其预发布标记。
-6. 新 Release 成功发布后，workflow 把同一 `主版本.次版本` 系列中更旧的 Release 转为 Draft，并删除其公开 Tag；不同系列不受影响。
-
-不需要维护者在终端手工推送 tag。缺失 Release 时，可以在 GitHub Actions 中手动运行 `Release Runtime Skills` workflow；它仍以最新 `main` 和清单版本为准。
-
-稳定 Release 是普通用户的使用入口。预发布 Release 只供显式指定版本的验证者使用，不会被 `latest` 自动选中。Draft 仅保留维护记录，不提供给普通用户，同系列旧 PATCH 的公开 Tag 被删除后也不能再用于安装或回退；需要灰度保留时应提升 MINOR 或 MAJOR。`main` 可以包含尚未发布的下一版内容，但目标项目的自动同步只消费公开的 GitHub Release，不直接追随移动的 `main`。
+同一主次系列仅公开最新补丁，旧补丁 Release 转 Draft、公开 Tag 删除；不同主次系列保留。缓存不自动回收，既有项目不会因此漂移。预发布不作为稳定 latest；main 中尚未发布的内容只供维护者显式 --source 验证。

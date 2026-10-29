@@ -1,84 +1,36 @@
 ---
 title: 安装 Runtime Skills
-description: 使用版本锁和同步工具，把 Runtime Skills 部署到一个或多个 Agent 平台。
+description: 一套源码生成用户全局安装包与平台导入包，项目只保留版本锁和记忆。
 sidebar:
   order: 1
 ---
 
-## 准备条件
+## 安装入口
 
-目标项目应当能被所选 Agent 打开，并允许在项目根目录维护 Skill 目录和 `runtime-skills.lock.json`。已有 Agent 指令文件时可以更新；没有时不需要为了安装 Runtime Skills 创建 `AGENTS.md`。执行安装的 Agent 还需要读取本仓库并运行 Python 3 标准库脚本。
-
-## 1. 运行受管安装
-
-不要手工复制整个 `skills/`。从本仓库运行同步工具，明确选择 Skill 和每个 Agent 平台的目标根目录：
+让 AI 阅读仓库 [INSTALL.md](https://github.com/xinghang-ee-cs/dev-runtime-skill/blob/main/INSTALL.md)，识别当前 Agent 并安装对应的稳定用户包。不要向项目重复复制 Skill。正式下载入口在本次变更发布后提供：
 
 ```bash
-python scripts/runtime-skills.py install \
-  --release latest \
-  --project /path/to/your-project \
-  --skill planning-layer-runtime \
-  --skill long-task-orchestrator \
-  --destination .agents/skills \
-  --destination .claude/skills
+python install.py --agent codex --project /path/to/project
 ```
 
-同步工具复制完整 Skill 包，不会漏掉 references、模板和 agent 元数据。多次提供 `--skill` 和 `--destination` 即可安装多个 Skill 和平台。
+支持 codex、claude、copilot、dsh（DeepSeek Harness）。AI 已知平台时显式传参；auto 只接受 RUNTIME_SKILLS_AGENT 或 PATH 上唯一支持的 CLI，多平台不猜测。安装器下载对应 ZIP 并检查 SHA256SUMS；不要直接管道执行远程脚本。
 
-```text
-your-project/
-  runtime-skills.lock.json
-  .runtime-skills/
-    runtime-skills.py
-  .runtime/
-    ai-code-inspection/        # 首次使用时按需初始化，不从其他项目复制
-  .agents/skills/
-    planning-layer-runtime/
-    long-task-orchestrator/
-  .claude/skills/
-    planning-layer-runtime/
-    long-task-orchestrator/
-```
+| 平台 | 位置或导入方式 |
+| --- | --- |
+| Codex/Copilot/dsh | 用户 ~/.agents/skills 共用薄路由；dsh 支持 DSH_AGENTS_HOME |
+| Claude Code | 用户 ~/.claude/skills |
+| 豆包工作/WorkBuddy | 分别下载 doubao/workbuddy 的每个 Skill ZIP，通过官方上传入口导入 |
 
-## 2. 复用已有项目路由
+导入包自带工具与规范规则，需要 Python 3.10+、文件读写权限和持久项目目录。没有能力时报告限制，不模拟运行。市场审核另行进行；不猜测应用安装路径。
 
-如果目标项目已有 `AGENTS.md`、`CLAUDE.md` 或其他入口文件，先复用已有等价路由；确实缺失时，只在当前平台实际读取的一个文件中维护 `<!-- runtime-skills:begin -->` 与 `<!-- runtime-skills:end -->` 短块，最多 10 个非空行、1200 字符。原位置更新，内容相同则不写入；不要复制本仓库完整 `AGENTS.md`，不要按 Skill 或安装目录重复创建入口。没有入口文件时直接使用 Skill 的目录和描述，安装、更新、首次使用和 Runtime 初始化都不自动创建 `AGENTS.md` 或 `CLAUDE.md`。路由只需表达以下内容：
+## 首次真实任务
 
-| 任务意图 | 应读取的入口 |
-|---|---|
-| 开发前的需求和方案规划 | 已安装的 `planning-layer-runtime/SKILL.md` |
-| 执行已确认的完整开发任务 | 已安装的 `long-task-orchestrator/SKILL.md` |
-| 人工、设备、云端和最终验收 | 已安装的 `testing-layer-runtime/SKILL.md` |
-| 检查当前代码改动 | 已安装的 `ai-code-inspection/SKILL.md` |
+安装不扫描业务、不初始化 Runtime、不创建 AGENTS.md/CLAUDE.md。真实任务只选一个 Skill，通过其 session 命令绑定项目锁。它返回精确规则目录 skill-root 和工具路径 runtime-tool；相对资源按 skill-root 解析，事实、检查点、进度仍在项目。
 
-项目自己的命令、账号边界、环境事实和发布流程应继续写在项目文档中，不要回填进通用 Skill。
+默认缓存 ~/.runtime-skills/bundles/<sha256>，与 Agent 发现入口分开。项目只维护 runtime-skills.lock.json 及真实项目状态。全局默认升级不改变已绑定项目；缺失精确缓存时停止，不能回退最新。
 
-## 3. 让首次运行发现项目事实
+规则使用 context --outline/--section/--offset 按阶段读取，每次最多 6000 字符。选中 gate 的全部必要子节必须读完，但不提前整读其他阶段。详见[版本与更新机制](../../reference/versioning-and-updates/)。
 
-第一次运行 `ai-code-inspection` 时，Agent 从已安装的 `ai-code-inspection/assets/runtime-templates/` 初始化项目根目录 `.runtime/ai-code-inspection/`，再检查目标仓库的真实组件、语言、框架、包管理器、脚本、持久化、契约和 CI 配置，填写稳定环境事实。
+## 旧项目迁移
 
-只有无法从仓库可靠判断的信息才需要询问。不要从另一个项目复制环境结论。
-
-## 4. 验证部署与版本
-
-首先运行：
-
-```bash
-python .runtime-skills/runtime-skills.py verify --project .
-```
-
-确认锁文件、同步工具和所选 Skill 的完整路径存在，例如：
-
-```text
-runtime-skills.lock.json
-.runtime-skills/runtime-skills.py
-.agents/skills/planning-layer-runtime/SKILL.md
-```
-
-然后给 Codex 一个示例任务，让它只回答“应该使用哪个 Skill，以及为什么”。如果路由和边界正确，再进入真实任务。
-
-每个新会话第一次使用 Runtime Skill 前运行 `sync`。新期次开始前同步并执行 `pin --reason <期次标识>`；期次关闭后执行 `unpin`。详细规则见[版本与更新机制](../../reference/versioning-and-updates/)。
-
-## 下一步
-
-继续阅读[选择正确的 Skill](../choosing-a-skill/)，了解四个入口之间的区别。
+旧 schema 1 项目锁和命令保持兼容。关闭活动期次并 verify 后，显式 bind --migrate-project --allow major；受管 Skill 和旧工具归档到项目 .runtime-skills/retired，记忆不动。先在旧项目发现范围外安装全局包准备缓存，再迁移旧项目。未受管副本及用户指令不自动清理。

@@ -119,7 +119,7 @@ def validate_repository(root: Path, compare_ref: str | None, release_tag: str | 
                         f"{previous['release_version']} -> {manifest['release_version']}"
                     )
                 managed_content_changed = any(
-                    path.startswith("skills/") or path == "scripts/runtime-skills.py"
+                    path.startswith(("skills/", "distribution/")) or path in {"scripts/runtime-skills.py", "scripts/build-install-packages.py", "install.py", "INSTALL.md"}
                     for path in paths
                 )
                 if managed_content_changed and current_release <= previous_release:
@@ -146,7 +146,7 @@ def validate_repository(root: Path, compare_ref: str | None, release_tag: str | 
                 except runtime.RuntimeSkillsError as exc:
                     errors.append(str(exc))
 
-            if "scripts/runtime-skills.py" in paths:
+            if any(path in {"scripts/runtime-skills.py", "scripts/build-install-packages.py", "install.py"} or path.startswith("distribution/") for path in paths):
                 old = str(previous.get("tool", {}).get("version", ""))
                 new = str(manifest.get("tool", {}).get("version", ""))
                 try:
