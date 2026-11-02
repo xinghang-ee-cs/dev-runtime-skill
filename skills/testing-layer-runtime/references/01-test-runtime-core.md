@@ -185,6 +185,7 @@ Test Intake Gate 之后必须进入 Test Planning Phase。
 规划规则：
 
 - 从 planning 读取“测什么”。
+- 按 `07-system-risk-testing.md` 从真实项目特征识别系统风险，为证明已有合同补充联合、线上运行与部署检查。Planning 用例不是技术风险检查上限；不得据此新增业务需求、SLA 或资源阈值。
 - 从 long handoff 读取自动化事实。
 - UI/UX 适用时从 Planning Handoff 读取精确设计合同与资产 revision，并与 Long `frontend_contract_validation_summary` 交叉校验；`unresolved_mismatch` 非空时阻断受影响测试。
 - 对 `automated_passed` 直接写入 `reused_from_long`。
@@ -227,6 +228,8 @@ every in-scope P0/P1 FLOW mapped exactly once
 
 本 Gate 未通过时，Testing 最终结果不得为通过，也不得进入 release-ready handoff。
 
+Business Journey Coverage Gate 与 `07-system-risk-testing.md` 的 System Risk Coverage Gate 必须同时通过。后者复用同一矩阵、正式结果、证据索引、Change Triage 和粗粒度状态机，不建立第二份测试状态或要求整期重测。
+
 ## Environment Prerequisite Result Lifecycle
 
 Planning Handoff 中的 `before_cloud_test_dependency_refs` 与 `before_release_dependency_refs` 只是 DEP 引用和 Planning 截止快照，不代表 Testing 时已经就绪。Testing 必须按 `05-test-writeback.md#test-validation-resultsmd-格式` 为每个 DEP 创建唯一 `item_type: environment_prerequisite` 结果项：
@@ -259,7 +262,8 @@ change_decision:
 | finding_type | 判定 | disposition |
 | --- | --- | --- |
 | `implementation_defect` | 当前 Planning 合同仍有效，实现结果偏离合同 | `fix_in_execution` |
-| `test_defect` | 测试脚本、测试数据、环境、证据映射或 Testing Runtime 错误 | `fix_in_test` |
+| `test_defect` | 仅测试数据、临时执行配置、证据映射或 Testing Runtime 错误 | `fix_in_test` |
+| `test_defect` | 必须新增/修复仓库测试代码、测试入口或 CI 配置；现有业务合同仍有效 | `fix_in_execution`，Long test-only patch |
 | `planning_gap` | 当前 Planning 缺少执行或验收所需合同 | `reopen_current_planning` |
 | `requirement_change` | 用户接受的新需求、范围或验收变化 | `reopen_current_planning` |
 | `design_drift` | 需要改变架构、API、数据、权限、状态、UI/体验或验收合同 | `reopen_current_planning` |
@@ -269,6 +273,7 @@ change_decision:
 
 - `fix_in_execution`：写入 `<phase_testing_runtime_directory>/change-triage.md` 并形成 defect handoff，交由 long-task-orchestrator patch；Testing 不改业务代码。
 - `fix_in_test`：只在 Testing 获准的测试资产和 Runtime 范围修正，按 attempt 与证据规则重测。
+- `test_defect -> fix_in_execution` 的唯一准入：现有需求/验收合同有效，`affected_scope` 列出精确测试代码/测试入口/CI 配置 allowlist；handoff 附缺失断言、失败复现或覆盖缺口、合同来源、回归目标与当前 revision，明确禁止修改业务实现/数据/权限/状态/API。Long 按既有 patch TASK 和验证门禁承接，不把测试覆盖缺口伪装成业务 Bug，也不为此重开 Planning 或建立新一期。若修复必须改变业务实现，先重新 triage 为 `implementation_defect`；合同本身缺失则定向回 Planning，不能沿用 test-only allowlist 扩大范围。
 - `reopen_current_planning`：停止受影响测试，将 triage 证据交给 planning-layer-runtime；等待新的增量 Planning Handoff、Long 实现和 Long Testing Handoff。
 - `defer_to_next_phase` / `reject_change`：记录确认依据和对当前验收的影响，不得静默忽略。
 - 只失效 `affected_ids` 及依赖传播真实命中的测试；未受影响的测试、已完成证据和 Long 自动化继承结果保持有效，除非 revision 或依赖事实证明它们也受影响。

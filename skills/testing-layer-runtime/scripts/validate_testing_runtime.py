@@ -69,6 +69,21 @@ LONG_RECEIPT_REQUIRED_ARTIFACTS = {
     "long-workflow-state.json",
 }
 RELEASE_MUTABLE_FIELDS = {"snapshot_status", "invalidated_by", "invalidated_at"}
+SYSTEM_RISK_FEATURES = {
+    "multi_component": {"integration_contracts", "failure_recovery"},
+    "container": {"resource_bounds", "credential_isolation", "environment_binding"},
+    "plugin_execution": {"resource_bounds", "credential_isolation", "failure_recovery"},
+    "service_process": {"health_semantics", "failure_recovery"},
+    "external_io": {"external_io_bounds", "failure_recovery"},
+    "persistent_data": {"data_integrity", "failure_recovery"},
+    "deployment": {"environment_binding", "deployment_lifecycle"},
+}
+SYSTEM_RISK_CATEGORIES = set().union(*SYSTEM_RISK_FEATURES.values())
+DEPLOYED_PROOF_CATEGORIES = SYSTEM_RISK_CATEGORIES - {"integration_contracts"}
+GITLAB_RESERVED_KEYS = {
+    "after_script", "before_script", "cache", "default", "image", "include",
+    "services", "spec", "stages", "types", "variables", "workflow",
+}
 
 
 @dataclass
@@ -1077,6 +1092,361 @@ def validate_evidence_content(
     return durable_path
 
 
+def system_risk_digest(matrix: list[Entry]) -> str:
+    payload = sorted(
+        (list(entry.path), clean(entry.value))
+        for entry in matrix
+        if entry.path[:1] == ("system_risk_coverage",)
+    )
+    return "sha256:" + hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def ci_quoted_end(value: str, start: int = 0) -> int | None:
+    """Return the end of a YAML quoted token confined to this physical line."""
+    quote = value[start]
+    index = start + 1
+    while index < len(value):
+        if quote == '"' and value[index] == "\\":
+            index += 2
+            continue
+        if value[index] == quote:
+            if quote == "'" and value[index:index + 2] == "''":
+                index += 2
+                continue
+            return index + 1
+        index += 1
+    return None
+
+
+def ci_single_line_value(value: str) -> bool:
+    if not value or value.startswith("#"):
+        return True
+    if value[0] in "!&*":
+        return False  # Tags, anchors and aliases require resolved provider evidence.
+    if value[0] in "'\"":
+        end = ci_quoted_end(value)
+        return end is not None and (
+            not value[end:].strip() or value[end:].lstrip().startswith("#")
+        )
+    if value[0] not in "[{":
+        return True  # Quotes inside a plain shell command are not YAML quoting.
+    containers: list[str] = []
+    token_start = True
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char == "#" and (index == 0 or value[index - 1].isspace()):
+            break
+        if char in "'\"" and token_start:
+            end = ci_quoted_end(value, index)
+            if end is None:
+                return False
+            index = end
+            token_start = False
+            continue
+        if char in "[{":
+            containers.append(char)
+            token_start = True
+        elif char in "]}":
+            expected_open = {"]": "[", "}": "{"}[char]
+            if not containers or containers.pop() != expected_open:
+                return False
+            token_start = False
+        elif char in ",:":
+            token_start = True
+        elif not char.isspace():
+            token_start = False
+        index += 1
+    return not containers
+
+
+def ci_yaml_line_supported(raw: str) -> bool:
+    """Reject unsupported multiline scalars before looking for mapping keys."""
+    content = re.sub(r"^(?:-\s+)+", "", raw.strip())
+    if not content:
+        return True
+    if content[0] in "!&*" or content == "?" or content.startswith("? "):
+        return False
+    if content[0] in "'\"":
+        end = ci_quoted_end(content)
+        if end is None:
+            return False
+        tail = content[end:].lstrip()
+        return ci_single_line_value(tail[1:].lstrip() if tail.startswith(":") else content)
+    if content[0] in "[{":
+        return ci_single_line_value(content)
+    separator = re.search(r":(?:\s|$)", content)
+    return ci_single_line_value(content[separator.end():].lstrip()) if separator else True
+
+
+def ci_yaml_job_ids(body: str, provider: str, result: Result) -> set[str]:
+    """Read explicit block-mapping job definitions, never scalar text or comments.
+
+    Deliberately do not expand aliases, includes, or evaluate pipeline code.
+    Complex/dynamic definitions use a provider-export evidence record instead.
+    """
+    mapping = re.compile(
+        r'''^( *)("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[A-Za-z_][A-Za-z0-9_. /-]*):\s*(.*)$'''
+    )
+    stack: list[tuple[int, str]] = []
+    block_indent: int | None = None
+    jobs: set[str] = set()
+    github_jobs_mapping = False
+    seen_github_jobs = False
+    for raw in body.splitlines():
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if block_indent is not None:
+            if indent > block_indent:
+                continue
+            block_indent = None
+        if "\t" in raw[:len(raw) - len(raw.lstrip())]:
+            result.errors.append("CI YAML indentation contains tabs; use explicit mappings or provider_export")
+            continue
+        if not ci_yaml_line_supported(raw):
+            result.errors.append(
+                "unsupported CI YAML multiline/complex scalar; use provider_export evidence"
+            )
+            return set()  # Do not interpret continuation text as job definitions.
+        if re.search(r":\s*[|>](?:[+-]?[1-9]?|[1-9][+-]?)\s*(?:#.*)?$", raw):
+            block_indent = indent
+        match = mapping.match(raw)
+        if not match:
+            continue
+        _, key, value = match.groups()
+        if key.startswith('"'):
+            try:
+                key = json.loads(key)
+            except json.JSONDecodeError:
+                continue
+        elif key.startswith("'"):
+            key = key[1:-1].replace("''", "'")
+        else:
+            key = key.rstrip()
+        while stack and indent <= stack[-1][0]:
+            stack.pop()
+        path = tuple(name for _, name in stack) + (key,)
+        is_mapping = not value or value.startswith("#") or value.startswith("{")
+        if provider == "github_actions" and path == ("jobs",):
+            result.require(not seen_github_jobs, "duplicate CI jobs container")
+            seen_github_jobs = True
+            github_jobs_mapping = is_mapping
+        is_job = (
+            provider == "github_actions" and github_jobs_mapping
+            and len(path) == 2 and path[0] == "jobs"
+        ) or (
+            provider == "gitlab_ci" and len(path) == 1
+            and not key.startswith(".") and key not in GITLAB_RESERVED_KEYS
+        )
+        if is_mapping and is_job:
+            result.require(key not in jobs, f"duplicate CI job definition: {key}")
+            jobs.add(key)
+        # Preserve opaque scalar/anchor parents too: unsupported nested syntax
+        # must never promote a child into a real job definition.
+        stack.append((indent, key))
+    return jobs
+
+
+def validate_system_risk_coverage(
+    runtime_directory: Path,
+    matrix: list[Entry],
+    state_identity: dict[str, object],
+    planning: dict[str, object],
+    results: dict[str, tuple[list[Entry], tuple[str, ...]]],
+    evidence: dict[str, tuple[list[Entry], tuple[str, ...]]],
+    result: Result,
+) -> set[str]:
+    """Reconcile technical checks without making a second test status store."""
+    root = ("system_risk_coverage",)
+    result.require(value_at(matrix, root + ("schema_version",)) == "1", "system_risk_coverage schema_version: 1 is required before final closure")
+    result.require(value_at(matrix, root + ("scope_alignment",)) == "aligned", "system risk scope_alignment must be aligned; reconcile deployment exclusions first")
+    deployment = value_at(matrix, root + ("deployment_in_scope",))
+    result.require(deployment in {"true", "false"}, "system risk deployment_in_scope must be explicit")
+    result.require(
+        (deployment == "true" and state_identity["status"] == "known")
+        or (deployment == "false" and state_identity["status"] == "not_applicable"),
+        "system risk deployment scope does not match the current deployment identity",
+    )
+    features = list_at(matrix, root + ("features",))
+    result.require(path_present(matrix, root + ("features",)), "system risk features must be explicit")
+    result.require(len(features) == len(set(features)) and set(features) <= SYSTEM_RISK_FEATURES.keys(), "system risk features are duplicate or unsupported")
+    result.require(("deployment" in features) == (deployment == "true"), "system risk deployment feature must match deployment_in_scope")
+    triggered = set().union(*(SYSTEM_RISK_FEATURES.get(feature, set()) for feature in features))
+
+    def check_evidence(evidence_ref: str, item_ref: str | None, deployed: bool) -> None:
+        record = evidence.get(evidence_ref)
+        if record is None:
+            result.errors.append(f"system risk: unresolved evidence ref {evidence_ref}")
+            return
+        parsed, prefix = record
+        validate_evidence_content(runtime_directory, evidence_ref, parsed, prefix, result, long_receipt_path=planning.get("long_receipt_path"))
+        result.require(value_at(parsed, prefix + ("valid",)) == "true", f"{evidence_ref}: system risk evidence is not valid")
+        result.require(value_at(parsed, prefix + ("invalidated_by",)).lower() in {"null", "none"}, f"{evidence_ref}: system risk evidence has been invalidated")
+        if item_ref is not None:
+            result.require(value_at(parsed, prefix + ("item_id",)) == item_ref, f"{evidence_ref}: system risk evidence item_id mismatch")
+        if deployed:
+            for field_name, expected in (
+                ("target_environment", state_identity["target_environment"]),
+                ("revision_kind", state_identity["revision_kind"]),
+                ("revision", state_identity["revision"]),
+                ("deployment_identity_digest", state_identity["identity_digest"]),
+                ("deployment_identity_ref", "test-runtime-state.md#current_deployment_revision"),
+            ):
+                result.require(value_at(parsed, prefix + (field_name,)) == expected, f"{evidence_ref}: system risk deployment identity mismatch: {field_name}")
+            if state_identity.get("identity_mode") == "component_set":
+                component_refs = list_at(parsed, prefix + ("component_revision_refs",))
+                known_components = {str(component["component_id"]) for component in state_identity.get("component_revisions", [])}
+                result.require(bool(component_refs) and set(component_refs) <= known_components, f"{evidence_ref}: system risk component revision refs are missing or invalid")
+        else:
+            result.require(
+                value_at(parsed, prefix + ("revision",)) == planning.get("long_repository_revision")
+                and value_at(parsed, prefix + ("revision_kind",)) in LOCAL_REVISION_KINDS
+                and value_at(parsed, prefix + ("deployment_identity_ref",)) == "not_applicable",
+                f"{evidence_ref}: system risk local/CI evidence must bind the current Long repository revision",
+            )
+
+    facts = list_at(matrix, root + ("fact_evidence_refs",))
+    result.require(bool(facts), "system risk applicability requires fact_evidence_refs")
+    for evidence_ref in facts:
+        check_evidence(evidence_ref, None, False)
+
+    required_refs: set[str] = set()
+
+    def check_results(refs: list[str], check_id: str, deployed: bool) -> None:
+        result.require(bool(refs), f"{check_id}: required system risk result refs are missing")
+        required_refs.update(refs)
+        for item_ref in refs:
+            record = results.get(item_ref)
+            if record is None:
+                result.errors.append(f"{check_id}: unresolved system risk result ref {item_ref}")
+                continue
+            parsed, prefix = record
+            for name in ("attempt", "environment", "started_at", "completed_at", "expected_evidence", "result_summary", "evidence_reuse"):
+                result.require(has_concrete(value_at(parsed, prefix + (name,))), f"{item_ref}: system risk result requires {name}")
+            result.require(integer(value_at(parsed, prefix + ("attempt",)), f"{item_ref}.attempt", result) > 0, f"{item_ref}: system risk attempt must be positive")
+            result.require(value_at(parsed, prefix + ("item_type",)) in ITEM_TYPES, f"{item_ref}: invalid system risk item_type")
+            result.require(value_at(parsed, prefix + ("status",)) in PASS_STATUSES, f"{item_ref}: system risk result is not verified")
+            result.require(value_at(parsed, prefix + ("writeback_status",)) == "updated" and value_at(parsed, prefix + ("depends_on_check",)) == "passed", f"{item_ref}: system risk result is not durably completed")
+            result.require(check_id in list_at(parsed, prefix + ("covers",)), f"{item_ref}: system risk result does not cover {check_id}")
+            result.require(value_at(parsed, prefix + ("environment_revision_ref",)) == ("test-runtime-state.md#current_deployment_revision" if deployed else "not_applicable"), f"{item_ref}: system risk result environment identity mismatch")
+            if value_at(parsed, prefix + ("status",)) == "reused_from_long":
+                source_id = value_at(parsed, prefix + ("source_validation_id",))
+                result.require(not deployed and source_id in planning.get("long_compatible_validation_ids", set()) and source_id in planning.get("long_effective_validation_ids", set()) and value_at(parsed, prefix + ("evidence_reuse",)) == "true", f"{item_ref}: system risk reuse is not a current Long validation")
+            refs = list_at(parsed, prefix + ("evidence_refs",))
+            result.require(bool(refs), f"{item_ref}: system risk evidence refs are missing")
+            for evidence_ref in refs:
+                check_evidence(evidence_ref, item_ref, deployed)
+                if value_at(parsed, prefix + ("status",)) == "reused_from_long" and evidence_ref in evidence:
+                    evidence_parsed, evidence_prefix = evidence[evidence_ref]
+                    result.require(value_at(evidence_parsed, evidence_prefix + ("source",)) == "long_readiness_receipt", f"{evidence_ref}: reused system risk evidence must bind the frozen Long readiness receipt")
+
+    categories: list[str] = []
+    checks: set[str] = set()
+    for prefix in record_prefixes(matrix, root + ("categories",)):
+        category = value_at(matrix, prefix + ("category",))
+        categories.append(category)
+        result.require(has_concrete(category), "system risk category must be concrete")
+        applicability = value_at(matrix, prefix + ("applicability",))
+        result.require(applicability in {"required", "not_applicable"}, f"{category}: system risk applicability is invalid")
+        result.require(has_concrete(value_at(matrix, prefix + ("reason",))), f"{category}: system risk applicability requires a reason")
+        if category in triggered:
+            result.require(applicability == "required", f"{category}: detected system features require this risk category")
+        items = record_prefixes(matrix, prefix + ("checks",))
+        if applicability == "not_applicable":
+            result.require(value_at(matrix, prefix + ("checks",)) == "[]" and not items, f"{category}: not-applicable system risk checks must be empty")
+            continue
+        result.require(bool(items), f"{category}: required system risk checks are missing")
+        deployed_checks = 0
+        for check in items:
+            check_id = value_at(matrix, check + ("check_id",))
+            result.require(has_concrete(check_id) and check_id not in checks, "system risk check_id must be concrete and unique")
+            checks.add(check_id)
+            layer = value_at(matrix, check + ("test_layer",))
+            result.require(layer in {"integration", "online_runtime", "deployment"}, f"{check_id}: system risk test_layer is invalid")
+            result.require(has_concrete(value_at(matrix, check + ("assertion",))), f"{check_id}: system risk assertion is missing")
+            contracts = list_at(matrix, check + ("contract_refs",))
+            result.require(bool(contracts), f"{check_id}: system risk contract_refs are missing")
+            for contract in contracts:
+                resolve_source_ref(runtime_directory, contract, f"{check_id}.contract_refs", result)
+            kind = value_at(matrix, check + ("verification_kind",))
+            result.require(kind in {"behavioral_test", "configuration_check"}, f"{check_id}: system risk verification_kind is invalid")
+            deployed = layer in {"online_runtime", "deployment"}
+            deployed_checks += int(deployed)
+            result.require(not deployed or deployment == "true", f"{check_id}: deployed system check requires deployment in scope")
+            check_results(list_at(matrix, check + ("result_refs",)), check_id, deployed)
+            regression = check + ("regression",)
+            requirement = value_at(matrix, regression + ("requirement",))
+            result.require(requirement in {"required", "not_applicable"}, f"{check_id}: CI regression applicability is missing")
+            result.require(has_concrete(value_at(matrix, regression + ("reason",))), f"{check_id}: CI regression requires a reason or alternative retest arrangement")
+            if requirement == "required":
+                provider = value_at(matrix, regression + ("ci_provider",))
+                result.require(provider in {"github_actions", "gitlab_ci", "provider_export"}, f"{check_id}: CI provider must be explicit; unsupported definitions require provider_export evidence")
+                workflow = value_at(matrix, regression + ("workflow_job_ref",))
+                result.require("#" in workflow and has_concrete(workflow.split("#", 1)[-1]), f"{check_id}: CI mapping requires workflow#job")
+                workflow_path = resolve_source_ref(runtime_directory, workflow, f"{check_id}.workflow_job_ref", result)
+                if workflow_path is not None and "#" in workflow:
+                    try:
+                        workflow_body = workflow_path.read_text(encoding="utf-8")
+                    except (OSError, UnicodeDecodeError) as exc:
+                        result.errors.append(f"{check_id}: cannot read CI binding: {exc}")
+                    else:
+                        job_id = workflow.split("#", 1)[1]
+                        if provider in {"github_actions", "gitlab_ci"}:
+                            result.require(job_id in ci_yaml_job_ids(workflow_body, provider, result), f"{check_id}: CI job does not exist as an explicit definition; use provider_export for includes or dynamic syntax")
+                        elif provider == "provider_export":
+                            definition_ref = value_at(matrix, regression + ("definition_evidence_ref",))
+                            check_evidence(definition_ref, None, False)
+                            definition_record = evidence.get(definition_ref)
+                            if definition_record is not None:
+                                definition_parsed, definition_prefix = definition_record
+                                definition_path = validate_evidence_content(runtime_directory, definition_ref, definition_parsed, definition_prefix, result)
+                                if definition_path is not None and definition_path.is_file():
+                                    try:
+                                        exported = json.loads(definition_path.read_text(encoding="utf-8"))
+                                    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                                        result.errors.append(f"{check_id}: invalid CI definition export: {exc}")
+                                    else:
+                                        if not isinstance(exported, dict):
+                                            result.errors.append(f"{check_id}: CI definition export must be an object")
+                                        else:
+                                            for name, expected in (
+                                                ("schema_version", "ci-job-definition/v1"),
+                                                ("workflow_job_ref", workflow),
+                                                ("job_id", job_id),
+                                                ("configuration_sha256", "sha256:" + hashlib.sha256(workflow_path.read_bytes()).hexdigest()),
+                                            ):
+                                                result.require(exported.get(name) == expected, f"{check_id}: CI definition export mismatch: {name}")
+                                            result.require(all(isinstance(exported.get(name), str) and has_concrete(exported[name]) for name in ("provider", "source_ref")), f"{check_id}: CI definition export requires provider and source_ref")
+                                            result.require(isinstance(exported.get("definition"), dict) and bool(exported["definition"]), f"{check_id}: CI definition export requires the actual job definition")
+                result.require(has_concrete(value_at(matrix, regression + ("command_or_binding",))), f"{check_id}: CI test binding is missing")
+                result.require(value_at(matrix, regression + ("verification_kind",)) == kind, f"{check_id}: CI verification kind cannot replace the required behavioral/configuration proof")
+                ci_refs = list_at(matrix, regression + ("ci_result_refs",))
+                check_results(ci_refs, check_id, False)
+                for ci_ref in ci_refs:
+                    if ci_ref not in results:
+                        continue
+                    ci_parsed, ci_prefix = results[ci_ref]
+                    for evidence_ref in list_at(ci_parsed, ci_prefix + ("evidence_refs",)):
+                        if evidence_ref in evidence:
+                            evidence_parsed, evidence_prefix = evidence[evidence_ref]
+                            result.require(value_at(evidence_parsed, evidence_prefix + ("evidence_type",)) == "ci_job_run", f"{evidence_ref}: CI regression requires ci_job_run evidence, not a local test result")
+                            for name, expected in (
+                                ("ci_provider", provider),
+                                ("ci_job_ref", workflow),
+                                ("command_or_binding", value_at(matrix, regression + ("command_or_binding",))),
+                                ("verification_kind", kind),
+                            ):
+                                result.require(value_at(evidence_parsed, evidence_prefix + (name,)) == expected, f"{evidence_ref}: CI run evidence binding mismatch: {name}")
+        if deployment == "true" and category in DEPLOYED_PROOF_CATEGORIES:
+            result.require(deployed_checks > 0, f"{category}: requires current deployed proof; local integration evidence is supplementary")
+    result.require(len(categories) == len(set(categories)), "system risk categories must be unique")
+    result.require(SYSTEM_RISK_CATEGORIES <= set(categories), "system risk coverage omits required category decisions")
+    return required_refs
+
+
 def validate_final_closure(
     runtime_directory: Path,
     state_entries: list[Entry],
@@ -1268,6 +1638,9 @@ def validate_final_closure(
     result_records = testing_result_records(results_text, result) if results_text else {}
     evidence_text = read(runtime_directory / "test-evidence-index.md", result)
     evidence = evidence_records(evidence_text, result) if evidence_text else {}
+    required_result_refs.update(validate_system_risk_coverage(
+        runtime_directory, matrix, state_identity, planning, result_records, evidence, result
+    ))
     required_result_groups = [
         (flow_ref, refs, False) for flow_ref, refs in local_required.items()
     ] + [(flow_ref, refs, True) for flow_ref, refs in cloud_required.items()]
@@ -1486,6 +1859,10 @@ def validate_final_closure(
         if release_path is not None:
             release_text = read(release_path, result)
             release_entries = entries(release_text) if release_text else []
+            result.require(
+                value_at(release_entries, ("system_risk_coverage_digest",)) == system_risk_digest(matrix),
+                "current Release Handoff system risk coverage digest mismatch",
+            )
             result.require(
                 value_at(release_entries, ("business_journey_coverage_status",))
                 == "verified",
@@ -2115,6 +2492,7 @@ def main() -> int:
     parser.add_argument("runtime_directory", type=Path)
     parser.add_argument("--expect-final", action="store_true")
     parser.add_argument("--print-release-snapshot-digest", action="store_true")
+    parser.add_argument("--print-system-risk-digest", action="store_true")
     parser.add_argument(
         "--advance-workflow",
         choices=("intake", "local_testing", "cloud_testing", "release_handoff"),
@@ -2124,6 +2502,22 @@ def main() -> int:
     )
     parser.add_argument("--new-cycle", action="store_true")
     args = parser.parse_args()
+    if args.print_system_risk_digest:
+        result = Result()
+        state_text = read(args.runtime_directory / "test-runtime-state.md", result)
+        _, matrix = read_runtime_document(
+            args.runtime_directory.resolve(),
+            value_at(entries(state_text), ("business_journey_matrix_ref",)),
+            "business_journey_matrix_ref", result,
+        )
+        if not path_present(matrix, ("system_risk_coverage",)):
+            result.errors.append("system_risk_coverage is missing")
+        if result.errors:
+            for error in result.errors:
+                print(f"ERROR: {error}", file=sys.stderr)
+            return 1
+        print(system_risk_digest(matrix))
+        return 0
     if args.print_release_snapshot_digest:
         result = Result()
         state_text = read(args.runtime_directory / "test-runtime-state.md", result)

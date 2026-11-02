@@ -1,6 +1,6 @@
 ---
 name: testing-layer-runtime
-description: 通用测试治理 Skill。用于在 Long 交接后管理期次验收，或验证 `bugfix-case/v1` 的原 Bug、受影响路径、相邻风险、生产复验和上线后同类型问题。负责测试证据与 Case 收尾，不负责业务实现、规划合同或直接发布。
+description: 通用测试治理 Skill。用于 Long 交接后的联合测试、线上运行测试、部署验证、系统风险覆盖与 CI 回归对账，以及 Bugfix 定向验证、生产复验和同类型问题闭环。负责测试设计、证据与验收，不负责业务实现、改写需求合同或直接部署发布。
 ---
 
 # Testing Layer Runtime
@@ -19,6 +19,8 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 
 `testing-layer-runtime` 截止到 release handoff，负责核对 Required Validation Gate、按 FLOW 建立业务旅程覆盖矩阵、汇总与继承本地自动化证据、管理必要人工/真实设备验证、对部署完成的精确版本执行云端业务/E2E 复验、闭环测试发现、最终验收和上线前验证移交。禁止无环境变化地重新执行 long 已完成且通过的自动化测试。
 
+Testing 同时主导联合测试、线上运行测试与部署验证的系统风险识别。Planning 明确需求、边界和验收合同，不必预先穷举技术测试项；Testing 可以为证明现有合同补充专项检查，不新增业务需求或擅定产品阈值。Long 负责单测、必要开发自动化及 Testing 交回的测试代码、CI 配置和实现修复。具体检查归属取决于验证目标与环境，不按 `integration`、`playwright` 等工具名称分工。
+
 ## 必读文件
 
 每次执行前按需读取：
@@ -33,6 +35,8 @@ planning-layer-runtime -> long-task-orchestrator -> testing-layer-runtime -> rel
 - `references/04-destructive-boundaries.md`：破坏性测试、服务器测试、上线测试和安全告警边界。
 - `references/05-test-writeback.md`：状态、阶段报告、证据索引、`test-execution-order.md` 和阻塞项回写规则。
 - `references/06-bugfix-verification.md`：Bugfix Case 定向测试、发布/生产复验、同类型问题验证、突出提醒和跨会话恢复。
+- `references/07-system-risk-testing.md`：Test Planning、环境/部署范围变化、最终结论前必读；定义系统风险覆盖、线上运行/部署验证和 CI 回归对账。只按该文件路由加载匹配的 `references/profiles/`，不批量读取 Profile。
+- `references/profiles/isolated-runtime.md`：仅容器、插件或子进程隔离执行适用时读；`references/profiles/external-io-and-health.md`：仅外部 I/O、流式消费或服务健康探针适用时读。
 
 ## Project Path Binding
 
@@ -123,6 +127,7 @@ Testing 必须核对 Long Handoff 的 `runtime_epoch`、`planning_handoff_ref`�
 - 每个测试项结束后，必须完成 Per-Test Durable Writeback Rule 的完成检查点回写；回写成功后方可推进到下一个测试项。
 - Test Planning Phase 必须生成或更新 `test-execution-order.md`。
 - Test Planning Phase 必须生成或更新 `business-journey-test-matrix.md`，把每个适用 FLOW 的本地业务/E2E 证据，以及本期部署适用时全部 P0 正向旅程、部署敏感或受变更影响 P1 FLOW 的云端 E2E 证据映射到正式测试结果；该文件只维护覆盖关系，不成为第二个测试状态源。
+- 在同一矩阵维护 `system_risk_coverage`：逐类记录适用性、依据、专项检查和 CI 绑定；正式状态仍只写 `test-validation-results.md`。最终结论与 release handoff 必须通过 System Risk Coverage Gate，不能仅凭 FLOW 全绿放行。
 - 每次用户回传自然语言、截图或简短反馈后，AI 必须结构化判断并回写验证状态。
 - 推进到下一个测试项前，必须通过 Test Progression Gate（`references/01-test-runtime-core.md`）。
 - 只通过脚本按 `intake -> local_testing -> cloud_testing（适用时）-> release_handoff` 推进粗粒度前向状态。状态机不拆单条命令、截图或人工动作；Long 已允许的独立任务并行不受影响，Testing 同一自动化项内部可使用测试运行器的安全并行，跨测试项仍遵守既有 Test Progression Gate。同一 Testing Runtime 的阶段迁移只由主 Runtime owner 串行调用。使用 `--advance-workflow <stage>`；部署 revision 变化完成 reconciliation 后使用 `--cycle-kind deployment_revision --new-cycle`，Release 后本地复测使用 `--cycle-kind retest --new-cycle`，都只新增 cycle、不倒拨旧 cycle。
@@ -157,7 +162,7 @@ change_decision:
 分流规则：
 
 - 当前 Planning 合同仍有效、实现未满足合同：`implementation_defect -> fix_in_execution`，为 long-task-orchestrator 形成可追溯 defect handoff；只阻断受影响测试。
-- 测试脚本、测试数据、环境准备、证据映射或 Testing Runtime 自身错误：`test_defect -> fix_in_test`；只能修改测试层获准资产和 Runtime，不得借此改业务代码或 Planning SoT。
+- `test_defect` 按修改资产分流：仅测试数据、临时执行配置、证据映射或 Testing Runtime 错误使用 `fix_in_test`；需要修改仓库测试代码或 CI 配置时使用 `fix_in_execution`，交 Long 的 test-only patch。两者都不得改变业务实现或 Planning 合同；详细准入见 `references/01-test-runtime-core.md`。
 - Planning 缺少必要合同：`planning_gap -> reopen_current_planning`。
 - 用户接受的新需求或验收变化：`requirement_change -> reopen_current_planning`。
 - 架构、API、数据、权限、状态、UI/体验或验收合同需要改变：`design_drift -> reopen_current_planning`。

@@ -153,6 +153,8 @@ long-task-orchestrator 不负责：
 - release gate
 - create or write formal acceptance record
 
+Testing 主导联合、线上运行与部署测试的风险识别和验收；Long 负责单测、必要开发自动化，以及 Testing 经既有 Change Triage 交回、可追溯至现有合同的测试代码、CI 配置与实现修复。不得要求 Planning 先穷举技术检查才承接，也不得自行确定新的业务阈值。合同仍有效的测试/CI 覆盖补齐不新开一期；使用既有 patch 门禁返回新证据。按验证目标和执行环境分工，不因测试工具名为 integration/api-test/playwright 就把真实环境验收移回 Long。
+
 以上 testing / acceptance / release 工作由 testing skill 或 release gate skill 显式接管。
 
 “manual local testing”不包含可自动执行的构建、产物/装载、进程启动、配置绑定、依赖就绪或最小行为 smoke；这些是 Long 的完成证明，禁止移交 Testing 后把当前 Runtime 标记为 ready。
@@ -297,13 +299,14 @@ Fast Lane 只豁免活动期次和最少四单元要求，不豁免精确 allowl
 
 ## Testing Feedback Patch Runtime
 
-当 testing-layer-runtime、人工本地测试或用户截图反馈确认存在开发缺陷时，long-task-orchestrator 可以重新进入 patch runtime。
+当 testing-layer-runtime、人工本地测试或用户反馈确认存在实现缺陷，或已明确交接仓库测试代码/测试入口/CI 配置的测试缺陷时，long-task-orchestrator 可以按下述准入重新进入 patch runtime。
 
 进入 Patch Runtime 前必须先消费上游的 Execution/Test Change Triage 结果，或按同一分类协议形成可审计判定：
 
 ```text
 implementation_defect + current Planning contract remains valid -> fix_in_execution
-test_defect -> return_to_testing
+test_defect + repository test/CI change + current contract valid -> fix_in_execution (test-only patch)
+test_defect limited to test data/transient config/evidence/Testing Runtime -> return_to_testing
 planning_gap -> reopen_current_planning
 requirement_change -> reopen_current_planning
 design_drift changing architecture/API/data/permission/state/UI/acceptance contract -> reopen_current_planning
@@ -311,6 +314,8 @@ deferred_improvement -> defer_or_reject_per_confirmed_disposition
 ```
 
 只有 `fix_in_execution` 可以进入 Patch Runtime。需要 `reopen_current_planning` 时必须停止实现，交回 planning-layer-runtime 生成新的增量 Handoff；不得用 Patch 掩盖 Planning 缺口、需求变化或合同变化。
+
+`test_defect -> fix_in_execution` 只承接 Testing 明确列出的仓库测试代码、测试入口与 CI 配置 allowlist；handoff 必须包含现有合同来源、缺失/失败断言、回归目标和当前 revision。沿用完整 Patch TASK、依赖治理、受影响验证、Long Handoff 和 `ready_for_local_retest`，禁止改业务实现或默认为 `implementation_defect`。必须改业务代码或正式合同时先停止并重新 triage；不能用 test-only patch 扩权。Testing 数据/临时配置/证据/Runtime 修正仍返回 Testing。
 
 触发条件：
 

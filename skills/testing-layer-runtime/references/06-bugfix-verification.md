@@ -15,6 +15,8 @@
 
 Long 已完成且仍有效的自动化标为 `reused_from_long`，不得为形式完整重复执行。把步骤、环境、revision、结果、证据、失败与残余风险写入 `02-test-verification.md`。通过后进入项目发布流程；Testing 不替代 release/security gate。
 
+按 `07-system-risk-testing.md` 和匹配 Profile，只补充根因、补丁直接影响或 Bug 合同相邻风险命中的线上运行/部署检查与 CI 回归对账，记录在同一 `02-test-verification.md`，发布返回证据记录在 `03-release-verification.md`。不要求建立整期矩阵或扫描全部类别；适用项未验证、CI 必需回归未落实或部署范围存在冲突时，不得宣告对应验证完成。Case 校验器通过只证明既有 Case 合同字段闭合，不证明这些专项运行检查已经执行。
+
 ## 发布与生产复验
 
 `03-release-verification.md` 记录分支、PR、Issue 引用方式、CI、合并 commit、部署 revision、版本、回滚点和生产复验。产品 Bug PR 必须使用 `Refs #N`；Issue 保持 open。

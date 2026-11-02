@@ -75,18 +75,7 @@ Issue + ai-code-inspection Bug Contract
 
 仓库采用两个版本层级：GitHub Release 表示一组 Skill 快照，每个 Skill 在 [`skills-manifest.json`](skills-manifest.json) 中拥有独立 SemVer。清单中的发布渠道用于区分“供验证的预发布包”和“经过共同验证的稳定包”。README 和 `SKILL.md` 都不是版本事实源。
 
-当前清单声明的版本如下：
-
-| 组件 | 版本 |
-| --- | --- |
-| 仓库 Release | `v1.1.2`（稳定版） |
-| `planning-layer-runtime` | `1.1.0` |
-| `long-task-orchestrator` | `1.1.0` |
-| `testing-layer-runtime` | `1.1.0` |
-| `ai-code-inspection` | `0.2.0` |
-| 同步工具 | `0.1.1` |
-
-本表仅用于方便阅读，[`skills-manifest.json`](skills-manifest.json) 仍是唯一版本事实源。
+当前包、各 Skill 版本与发布渠道统一读取 [`skills-manifest.json`](skills-manifest.json)。本次系统风险测试增强先作为预发布候选，`latest` 仍只选择已发布稳定版。Testing 主导联合测试、线上运行与部署验证，Long 承接测试代码、CI 绑定和实现修复；检查门禁及旧 Runtime 补齐方式见[系统风险测试规则](skills/testing-layer-runtime/references/07-system-risk-testing.md)。
 
 安装后，目标项目会得到：
 
@@ -109,7 +98,7 @@ python .runtime-skills/runtime-skills.py sync --project .
 
 ### Release Tag 与可直接使用的 Skill + Runtime 迁移 Prompt
 
-GitHub Release 的 Tag 采用 `v主版本.次版本.修订版本`，也就是 `vMAJOR.MINOR.PATCH`；当前清单声明的是稳定版 `v1.1.2`。快照内每个 Skill 的具体版本仍以 [`skills-manifest.json`](skills-manifest.json) 为准。使用 `latest` 跟随最新稳定 Release。新的修订版本发布后，工作流会把同一 `主版本.次版本` 系列中更旧的 Release 转为 Draft 并删除其公开 Tag，因此用户只会拿到修复后的 `v1.1.2`，不会再拿到 `v1.1.0` 或 `v1.1.1`；不同 `主版本.次版本` 系列的 Release 会继续公开保留，用于梯度灰度。安装完成后，以目标项目的 `runtime-skills.lock.json` 为实际安装记录。
+GitHub Release 的 Tag 采用 `vMAJOR.MINOR.PATCH`；具体版本与发布渠道以 manifest 为准。使用 `latest` 跟随最新公开稳定版，预发布候选需显式选择。新的修订版发布后，同一主/次版本系列的旧修订版 Release 转为 Draft 并删除公开 Tag，不同系列继续保留用于梯度灰度。目标项目实际采用的版本以 `runtime-skills.lock.json` 为准。
 
 只更新 Skill 文件，并不会自动升级目标项目中已经生成的 Runtime 状态。`v1.0.0` 的前向账本与验证 receipt 仍是未完成 pre-1.0 期次的兼容边界。v1.1 通过在来源期次旁追加 `bugfix-case/v1` 来管理新缺陷，不重写已关闭历史期次，也不改变原 00–15。
 

@@ -1313,7 +1313,7 @@ deferred_improvement
 处理：
 
 - `implementation_defect`：当前规划仍正确，`fix_in_execution`；不重新打开 01–13。按 `14-bugfix-case-governance.md` 在来源期次 `bugfixes/` 追加 `bugfix-case/v1`，由 Long 修复、Testing 定向验证；实际修复、测试和发布事实只进入 Case，不进入原 14/15。
-- `test_defect`：`fix_in_test`；修复测试脚本、数据、环境或证据，不修改业务规划。
+- `test_defect`：仅测试数据、临时执行配置、证据或 Testing Runtime 修正为 `fix_in_test`；仓库测试代码/测试入口/CI 配置的新增或修复为 `fix_in_execution`，交 Long test-only patch，并按 Testing 规则绑定现有合同、精确测试资产 allowlist 与回归目标，禁止修改业务实现。不因纯测试/CI 实现缺口重开业务规划；需要改变业务实现或合同时重新 triage。
 - `planning_gap`：`reopen_current_planning`；只回到真正拥有该事实的上游 SoT，再调用 08 传播受影响范围。
 - `requirement_change`：先按 `02-planning-change-levels.md` 做范围准入，决定本期吸收、增量、下一期或替换本期范围；不得先改 13。
 - `design_drift`：规划仍正确时优先 `fix_in_execution`；设计合同确实需要改变时才回到 05/09/11/13。只有用户路径或业务流程改变时才继续回到 03/01/02。
