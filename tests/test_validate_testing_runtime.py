@@ -23,7 +23,9 @@ from validate_testing_runtime import (  # noqa: E402
     TESTING_WORKFLOW,
     anchored_records,
     canonical_release_snapshot_digest,
+    ci_yaml_job_ids,
     entries,
+    system_risk_digest,
     testing_result_records,
     testing_transition_allowed,
     validate_evidence_content,
@@ -32,6 +34,61 @@ from validate_testing_runtime import (  # noqa: E402
 
 
 LONG_REPOSITORY_REVISION = "sha256:" + "1" * 64
+
+
+def multiline_ci_config(provider: str, quote: str) -> str:
+    if provider == "github_actions":
+        return (
+            "name: build\non: push\njobs:\n  build:\n"
+            "    runs-on: ubuntu-latest\n    env:\n"
+            f"      EXAMPLE: {quote}sample\n  runtime-tests:\n    steps: []\n{quote}\n"
+            "    steps:\n      - run: cargo check\n"
+        )
+    return (
+        f"variables:\n  EXAMPLE: {quote}sample\nruntime-tests:\n"
+        f"  script: echo fake\n{quote}\nbuild:\n  script: cargo check\n"
+    )
+
+
+def system_risks(deployed: bool = False) -> str:
+    categories = (
+        "integration_contracts", "resource_bounds", "credential_isolation",
+        "health_semantics", "external_io_bounds", "failure_recovery",
+        "data_integrity", "environment_binding", "deployment_lifecycle",
+    )
+    body = (
+        "system_risk_coverage:\n"
+        "  schema_version: 1\n"
+        f"  deployment_in_scope: {'true' if deployed else 'false'}\n"
+        "  scope_alignment: aligned\n"
+        "  fact_evidence_refs: [EVIDENCE-LOCAL-1]\n"
+        f"  features: {'[deployment]' if deployed else '[]'}\n"
+        "  categories:\n"
+    )
+    for category in categories:
+        body += f"    - category: {category}\n"
+        if deployed and category in {"environment_binding", "deployment_lifecycle"}:
+            body += (
+                "      applicability: required\n"
+                "      reason: deployment target requires runtime verification\n"
+                "      checks:\n"
+                f"        - check_id: SYS-{category}\n"
+                "          test_layer: deployment\n"
+                "          contract_refs: [requirement-and-scope.md]\n"
+                "          assertion: approved deployment behavior is effective\n"
+                "          verification_kind: configuration_check\n"
+                "          result_refs: [TEST-CLOUD-1]\n"
+                "          regression:\n"
+                "            requirement: not_applicable\n"
+                "            reason: release owner rechecks target bindings after each deployment change\n"
+            )
+        else:
+            body += (
+                "      applicability: not_applicable\n"
+                "      reason: inspected fixture has no relevant runtime mechanism\n"
+                "      checks: []\n"
+            )
+    return body
 
 
 def identity_digest(deployment: str, configuration: str) -> str:
@@ -233,6 +290,7 @@ def release_handoff(
             evidence_ref: config-evidence.md
             secret_values_included: false
         business_journey_coverage_status: verified
+        system_risk_coverage_digest: {system_risk_digest(entries(system_risks(True)))}
         release_readiness_status: ready
         required_result_refs: [TEST-LOCAL-1, TEST-CLOUD-1]
         open_finding_refs: []
@@ -397,6 +455,7 @@ class TestingRuntimeValidatorTests(unittest.TestCase):
         tamper_release_after_seal: bool = False,
         advance_stage: str | None = None,
         sibling_long_runtime: bool = False,
+        print_system_risk: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary)
@@ -532,6 +591,7 @@ evidence: [machine-execution-receipts/VALIDATION-1.json]
             for name, body in (extra_files or {}).items():
                 if sibling_long_runtime and name == "business-journey-test-matrix.md":
                     body = body.replace("testing-handoff.md", "../long-runtime/testing-handoff.md")
+                fixture_path(name).parent.mkdir(parents=True, exist_ok=True)
                 fixture_path(name).write_text(body, encoding="utf-8")
             write_long_readiness_receipt(long_runtime, planning_handoff_path)
             if long_receipt_schema is not None:
@@ -558,9 +618,10 @@ evidence: [machine-execution-receipts/VALIDATION-1.json]
                     ):
                         evidence_path = runtime / evidence_ref
                         evidence_path.parent.mkdir(parents=True, exist_ok=True)
-                        evidence_path.write_text(
-                            f"durable evidence for {evidence_ref}\n", encoding="utf-8"
-                        )
+                        if not evidence_path.is_file():
+                            evidence_path.write_text(
+                                f"durable evidence for {evidence_ref}\n", encoding="utf-8"
+                            )
                 evidence_index = runtime / "test-evidence-index.md"
                 if evidence_index.is_file():
                     evidence_body = evidence_index.read_text(encoding="utf-8")
@@ -616,6 +677,8 @@ evidence: [machine-execution-receipts/VALIDATION-1.json]
                 command.extend(["--advance-workflow", advance_stage])
             if expect_final:
                 command.append("--expect-final")
+            if print_system_risk:
+                command.append("--print-system-risk-digest")
             return subprocess.run(
                 command,
                 capture_output=True,
@@ -677,7 +740,7 @@ EVIDENCE-CLOUD-1:
             if cloud_required
             else ""
         )
-        return {
+        files = {
             "planning-test-plan.md": f"""### TEST-PLAN-1：核心业务旅程测试
 
 关联 FLOW：FLOW-1
@@ -754,10 +817,304 @@ EVIDENCE-LOCAL-1:
 """,
             "change-triage.md": "# Change Triage\n",
         }
+        files["business-journey-test-matrix.md"] += system_risks(cloud_required)
+        if cloud_required:
+            files["test-validation-results.md"] = files["test-validation-results.md"].replace(
+                "covers: [TEST-PLAN-1]",
+                "covers: [TEST-PLAN-1, SYS-environment_binding, SYS-deployment_lifecycle]",
+            )
+            files["test-evidence-index.md"] = files["test-evidence-index.md"].replace(
+                "  revision: deploy-1\n",
+                f"  revision: deploy-1\n  deployment_identity_digest: {identity_digest('deploy-1', 'config-1')}\n",
+            )
+        return files
+
+    def risk_check_files(self, ci: bool = False) -> dict[str, str]:
+        files = self.final_files()
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace(
+            "    - category: integration_contracts\n"
+            "      applicability: not_applicable\n"
+            "      reason: inspected fixture has no relevant runtime mechanism\n"
+            "      checks: []\n",
+            "    - category: integration_contracts\n"
+            "      applicability: required\n"
+            "      reason: approved boundary has a behavioral contract\n"
+            "      checks:\n"
+            "        - check_id: SYS-INTEGRATION-1\n"
+            "          test_layer: integration\n"
+            "          contract_refs: [requirement-and-scope.md]\n"
+            "          assertion: expected boundary behavior\n"
+            "          verification_kind: behavioral_test\n"
+            "          result_refs: [TEST-LOCAL-1]\n"
+            "          regression:\n"
+            f"            requirement: {'required' if ci else 'not_applicable'}\n"
+            "            reason: maintained in CI or release owner checks every environment change\n"
+            + ("            ci_provider: github_actions\n"
+               "            workflow_job_ref: ci.yml#runtime-tests\n"
+               "            command_or_binding: python -m unittest\n"
+               "            verification_kind: behavioral_test\n"
+               "            ci_result_refs: [TEST-CI-1]\n" if ci else ""),
+        )
+        files["test-validation-results.md"] = files["test-validation-results.md"].replace(
+            "covers: [TEST-PLAN-1]", "covers: [TEST-PLAN-1, SYS-INTEGRATION-1]"
+        )
+        if ci:
+            files["ci.yml"] = "jobs:\n  runtime-tests:\n    steps:\n      - run: python -m unittest\n"
+            files["test-validation-results.md"] += files["test-validation-results.md"].replace(
+                "TEST-LOCAL-1", "TEST-CI-1"
+            ).replace("EVIDENCE-LOCAL-1", "EVIDENCE-CI-1")
+            files["test-evidence-index.md"] += files["test-evidence-index.md"].replace(
+                "EVIDENCE-LOCAL-1", "EVIDENCE-CI-1"
+            ).replace("TEST-LOCAL-1", "TEST-CI-1").replace(
+                "evidence_type: local_e2e_trace",
+                "evidence_type: ci_job_run\n  ci_provider: github_actions\n  ci_job_ref: ci.yml#runtime-tests\n  command_or_binding: python -m unittest\n  verification_kind: behavioral_test"
+            ).replace("local-trace.zip", "ci-run.txt")
+        return files
 
     def test_local_runtime_without_deployment_passes(self) -> None:
         result = self.run_validator(state())
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_system_risk_and_ci_behavioral_regression_pass(self) -> None:
+        result = self.run_validator(state(), extra_files=self.risk_check_files(ci=True), expect_final=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_final_closure_cannot_omit_system_risk_coverage(self) -> None:
+        files = self.final_files()
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].split("system_risk_coverage:")[0]
+        result = self.run_validator(state(), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("system_risk_coverage schema_version", result.stderr)
+
+    def test_system_risk_cannot_omit_a_category_or_na_reason(self) -> None:
+        for omitted in ("    - category: resource_bounds\n      applicability: not_applicable\n      reason: inspected fixture has no relevant runtime mechanism\n      checks: []\n", "      reason: inspected fixture has no relevant runtime mechanism\n"):
+            with self.subTest(omitted=omitted):
+                files = self.final_files()
+                files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace(omitted, "", 1)
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("system risk", result.stderr)
+
+    def test_detected_container_cannot_skip_resource_isolation(self) -> None:
+        files = self.final_files()
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace("  features: []", "  features: [container]")
+        result = self.run_validator(state(), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("resource_bounds: detected system features", result.stderr)
+        self.assertIn("credential_isolation: detected system features", result.stderr)
+
+    def test_system_risk_rejects_missing_or_unrelated_check_result(self) -> None:
+        for mutation in ("missing_ref", "unrelated"):
+            with self.subTest(mutation=mutation):
+                files = self.risk_check_files()
+                if mutation == "missing_ref":
+                    files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace("result_refs: [TEST-LOCAL-1]", "result_refs: [MISSING]")
+                else:
+                    files["test-validation-results.md"] = files["test-validation-results.md"].replace(
+                        "covers: [TEST-PLAN-1, SYS-INTEGRATION-1]", "covers: [TEST-PLAN-1]"
+                    )
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("system risk", result.stderr)
+
+    def test_ci_static_check_cannot_replace_behavioral_regression(self) -> None:
+        files = self.risk_check_files(ci=True)
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace(
+            "            verification_kind: behavioral_test", "            verification_kind: static_check"
+        )
+        result = self.run_validator(state(), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("CI verification kind cannot replace", result.stderr)
+
+    def test_ci_mapping_requires_existing_job_and_actual_run_evidence(self) -> None:
+        for mutation in ("job_missing", "no_run", "local_only", "stale_revision", "failed_run", "wrong_binding"):
+            with self.subTest(mutation=mutation):
+                files = self.risk_check_files(ci=True)
+                if mutation == "job_missing":
+                    files["ci.yml"] = "jobs:\n  different-job:\n    steps: []\n"
+                elif mutation == "no_run":
+                    files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace("ci_result_refs: [TEST-CI-1]", "ci_result_refs: []")
+                elif mutation == "local_only":
+                    files["test-evidence-index.md"] = files["test-evidence-index.md"].replace("evidence_type: ci_job_run", "evidence_type: local_e2e_trace")
+                elif mutation == "stale_revision":
+                    files["test-evidence-index.md"] = files["test-evidence-index.md"].replace(LONG_REPOSITORY_REVISION, "old-revision")
+                elif mutation == "failed_run":
+                    before, after = files["test-validation-results.md"].rsplit("status: verified", 1)
+                    files["test-validation-results.md"] = before + "status: failed" + after
+                else:
+                    files["test-evidence-index.md"] = files["test-evidence-index.md"].replace("ci_job_ref: ci.yml#runtime-tests", "ci_job_ref: ci.yml#different-job")
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertEqual(result.returncode, 1)
+
+    def test_system_risk_digest_command_matches_release_binding(self) -> None:
+        files = self.final_files()
+        result = self.run_validator(state(), extra_files=files, print_system_risk=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), system_risk_digest(entries(files["business-journey-test-matrix.md"])))
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].split("system_risk_coverage:")[0]
+        missing = self.run_validator(state(), extra_files=files, print_system_risk=True)
+        self.assertEqual(missing.returncode, 1)
+        self.assertIn("system_risk_coverage is missing", missing.stderr)
+
+    def test_deployment_scope_conflict_blocks_final_closure(self) -> None:
+        files = self.final_files(cloud_required=True)
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace("scope_alignment: aligned", "scope_alignment: reconfirmation_required")
+        result = self.run_validator(state("known", "deploy-1", "config-1"), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("reconcile deployment exclusions", result.stderr)
+
+    def test_review_deployed_risk_cannot_close_using_only_local_integration(self) -> None:
+        files = self.final_files(cloud_required=True)
+        head, risk = files["business-journey-test-matrix.md"].split("system_risk_coverage:", 1)
+        risk = risk.replace("test_layer: deployment", "test_layer: integration").replace(
+            "result_refs: [TEST-CLOUD-1]", "result_refs: [TEST-LOCAL-1]"
+        )
+        files["business-journey-test-matrix.md"] = head + "system_risk_coverage:" + risk
+        result = self.run_validator(state("known", "deploy-1", "config-1"), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("requires current deployed proof", result.stderr)
+
+    def test_review_ci_job_name_in_comment_or_string_is_not_a_definition(self) -> None:
+        for body in (
+            "jobs:\n  build-only:\n    steps:\n      - run: cargo check\n# runtime-tests was removed\n",
+            "name: runtime-tests\njobs:\n  build-only:\n    steps: []\n",
+            "jobs:\n  build-only:\n    steps:\n      - run: |\n          runtime-tests:\n            steps: []\n",
+        ):
+            with self.subTest(body=body):
+                files = self.risk_check_files(ci=True)
+                files["ci.yml"] = body
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("CI job does not exist", result.stderr)
+
+    def test_deployed_category_can_combine_local_fault_and_target_binding_proofs(self) -> None:
+        files = self.final_files(cloud_required=True)
+        matrix = files["business-journey-test-matrix.md"]
+        marker = "    - category: deployment_lifecycle\n"
+        before, after = matrix.split(marker, 1)
+        # Add a local assertion alongside the existing target-environment check.
+        before += (
+            "        - check_id: SYS-LOCAL-SUPPLEMENT\n"
+            "          test_layer: integration\n"
+            "          contract_refs: [requirement-and-scope.md]\n"
+            "          assertion: isolated fault behavior is correct\n"
+            "          verification_kind: behavioral_test\n"
+            "          result_refs: [TEST-LOCAL-1]\n"
+            "          regression:\n"
+            "            requirement: not_applicable\n"
+            "            reason: release owner reruns this isolated scenario on binding changes\n"
+        )
+        files["business-journey-test-matrix.md"] = before + marker + after
+        files["test-validation-results.md"] = files["test-validation-results.md"].replace(
+            "SYS-environment_binding, SYS-deployment_lifecycle]",
+            "SYS-environment_binding, SYS-deployment_lifecycle, SYS-LOCAL-SUPPLEMENT]"
+        )
+        result = self.run_validator(state("known", "deploy-1", "config-1"), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_ci_job_definition_supports_github_quotes_and_gitlab_jobs(self) -> None:
+        for provider, body in (
+            ("github_actions", "jobs:\n  'runtime-tests':\n    steps:\n      - run: python -m unittest\n"),
+            ("gitlab_ci", "stages: [test]\n'runtime-tests':\n  stage: test\n  script: python -m unittest\n"),
+        ):
+            with self.subTest(provider=provider):
+                files = self.risk_check_files(ci=True)
+                files["ci.yml"] = body
+                for name in ("business-journey-test-matrix.md", "test-evidence-index.md"):
+                    files[name] = files[name].replace("ci_provider: github_actions", "ci_provider: " + provider)
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_ci_provider_cannot_be_guessed(self) -> None:
+        files = self.risk_check_files(ci=True)
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace("            ci_provider: github_actions\n", "")
+        result = self.run_validator(state(), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("CI provider must be explicit", result.stderr)
+
+    def test_multiline_quoted_yaml_cannot_create_a_ci_job(self) -> None:
+        for provider in ("github_actions", "gitlab_ci"):
+            for quote in ("'", '"'):
+                with self.subTest(provider=provider, quote=quote):
+                    files = self.risk_check_files(ci=True)
+                    files["ci.yml"] = multiline_ci_config(provider, quote)
+                    for name in ("business-journey-test-matrix.md", "test-evidence-index.md"):
+                        files[name] = files[name].replace("ci_provider: github_actions", "ci_provider: " + provider)
+                    result = self.run_validator(state(), extra_files=files, expect_final=True)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn("unsupported CI YAML", result.stderr)
+                    self.assertIn("provider_export", result.stderr)
+
+    def test_dynamic_ci_requires_matching_definition_export_and_run(self) -> None:
+        for mutation in (None, "multiline_yaml", "missing_export", "wrong_digest", "wrong_job", "missing_run", "empty_definition"):
+            with self.subTest(mutation=mutation):
+                files = self.risk_check_files(ci=True)
+                workflow = "pipeline { stages { loadGeneratedStages() } }\n"
+                if mutation == "multiline_yaml":
+                    workflow = multiline_ci_config("github_actions", '"').replace(
+                        "  build:\n", "  runtime-tests:\n", 1
+                    )
+                files["ci.yml"] = workflow
+                for name in ("business-journey-test-matrix.md", "test-evidence-index.md"):
+                    files[name] = files[name].replace("ci_provider: github_actions", "ci_provider: provider_export")
+                files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace(
+                    "ci_provider: provider_export\n", "ci_provider: provider_export\n            definition_evidence_ref: EVIDENCE-DEFINITION-1\n"
+                )
+                definition = {
+                    "schema_version": "ci-job-definition/v1",
+                    "provider": "github_actions" if mutation == "multiline_yaml" else "jenkins",
+                    "source_ref": "https://ci.example.invalid/job/runtime-tests/api/json",
+                    "workflow_job_ref": "ci.yml#runtime-tests",
+                    "job_id": "runtime-tests",
+                    "configuration_sha256": "sha256:" + hashlib.sha256(workflow.encode()).hexdigest(),
+                    "definition": {"name": "runtime-tests", "steps": ["python -m unittest"]},
+                }
+                if mutation == "wrong_digest":
+                    definition["configuration_sha256"] = "sha256:" + "0" * 64
+                elif mutation == "wrong_job":
+                    definition["job_id"] = "build-only"
+                elif mutation == "empty_definition":
+                    definition["definition"] = {}
+                if mutation != "missing_export":
+                    files["evidence/ci-definition.json"] = json.dumps(definition)
+                    files["test-evidence-index.md"] += (
+                        "\n```yaml\nEVIDENCE-DEFINITION-1:\n"
+                        "  item_id: TEST-CI-1\n"
+                        "  evidence_type: ci_job_definition\n"
+                        "  source: provider_export\n"
+                        "  path: evidence/ci-definition.json\n"
+                        "  revision_kind: workspace_snapshot\n"
+                        f"  revision: {LONG_REPOSITORY_REVISION}\n"
+                        "  deployment_identity_ref: not_applicable\n"
+                        "  valid: true\n"
+                        "  invalidated_by: null\n```\n"
+                    )
+                if mutation == "missing_run":
+                    files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace("ci_result_refs: [TEST-CI-1]", "ci_result_refs: []")
+                result = self.run_validator(state(), extra_files=files, expect_final=True)
+                self.assertEqual(result.returncode, 0 if mutation in {None, "multiline_yaml"} else 1, result.stderr)
+
+    def test_online_risk_evidence_binds_full_configuration_identity(self) -> None:
+        files = self.final_files(cloud_required=True)
+        files["test-evidence-index.md"] = files["test-evidence-index.md"].replace(
+            f"deployment_identity_digest: {identity_digest('deploy-1', 'config-1')}",
+            f"deployment_identity_digest: {identity_digest('deploy-1', 'old-config')}",
+        )
+        result = self.run_validator(state("known", "deploy-1", "config-1"), extra_files=files, expect_final=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("system risk deployment identity mismatch", result.stderr)
+
+    def test_release_snapshot_freezes_system_risk_coverage(self) -> None:
+        files = self.final_files(cloud_required=True)
+        files["business-journey-test-matrix.md"] = files["business-journey-test-matrix.md"].replace(
+            "reason: deployment target requires runtime verification", "reason: changed coverage decision"
+        )
+        result = self.run_validator(
+            state("known", "deploy-1", "config-1", "current", identity_digest("deploy-1", "config-1")),
+            release_handoff("deploy-1", "config-1"), extra_files=files,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("system risk coverage digest mismatch", result.stderr)
 
     def test_intake_stage_does_not_require_future_business_matrix(self) -> None:
         result = self.run_validator(state(), advance_stage="intake")
@@ -1458,6 +1815,71 @@ EVIDENCE-STALE-CLOUD:
                 transition_allowed=testing_transition_allowed,
             )
             self.assertEqual(completed["current_stage"], "release_handoff")
+
+
+class CIJobDefinitionTests(unittest.TestCase):
+    def test_only_actual_yaml_job_definitions_are_selected(self) -> None:
+        cases = (
+            ("github_actions", 'jobs:\n  "runtime-tests":\n    runs-on: ubuntu-latest\n    steps: []\n', {"runtime-tests"}),
+            ("github_actions", 'jobs :\n  runtime-tests :\n    steps: []\n', {"runtime-tests"}),
+            ("github_actions", "name: runtime-tests\njobs:\n  build:\n    name: runtime-tests\n", {"build"}),
+            ("github_actions", "jobs:\n  build:\n    steps:\n      - run: |\n          runtime-tests:\n            steps: []\n", {"build"}),
+            ("github_actions", "jobs: |\n  runtime-tests:\n    steps: []\n", set()),
+            ("gitlab_ci", "stages: [test]\nvariables:\n  runtime-tests: ignored\n.hidden:\n  script: echo template\n'runtime-tests':\n  script: echo test\n", {"runtime-tests"}),
+            ("gitlab_ci", "build:\n  script: >\n    runtime-tests:\n      script: echo fake\n# runtime-tests:\n", {"build"}),
+        )
+        for provider, body, expected in cases:
+            with self.subTest(provider=provider, body=body):
+                result = Result()
+                self.assertEqual(ci_yaml_job_ids(body, provider, result), expected)
+                self.assertEqual(result.errors, [])
+
+    def test_duplicate_job_definitions_are_rejected(self) -> None:
+        result = Result()
+        ci_yaml_job_ids("jobs:\n  runtime-tests:\n    steps: []\n  runtime-tests:\n    steps: []\n", "github_actions", result)
+        self.assertTrue(any("duplicate CI job" in error for error in result.errors))
+
+    def test_unsupported_quoted_or_complex_scalars_stop_job_discovery(self) -> None:
+        bodies = [
+            multiline_ci_config(provider, quote)
+            for provider in ("github_actions", "gitlab_ci")
+            for quote in ("'", '"')
+        ] + [
+            'jobs:\n  build:\n    name: "sample\n  runtime-tests:\n    steps: []\n"\n',
+            'jobs:\n  build:\n    env: {EXAMPLE: "sample\n  runtime-tests:\n    steps: []\n"}\n',
+            'jobs:\n  "runtime-tests\n  continued":\n    steps: []\n',
+            'jobs:\n  build:\n    steps:\n      - "sample\n  runtime-tests:\n    steps: []\n"\n',
+            'jobs:\n  build:\n    env: [\n      "sample"\n    ]\n',
+            'jobs:\n  build: &shared\n    runtime-tests:\n      steps: []\n',
+            'jobs:\n  build:\n    name: !!str "sample\n  runtime-tests:\n    steps: []\n"\n',
+            '? "sample\njobs:\n  runtime-tests:\n    steps: []\n"\n: value\n',
+            '!custom "sample\njobs:\n  runtime-tests:\n    steps: []\n"\n',
+        ]
+        for body in bodies:
+            with self.subTest(body=body):
+                result = Result()
+                self.assertEqual(ci_yaml_job_ids(body, "github_actions", result), set())
+                self.assertTrue(any("unsupported CI YAML" in error and "provider_export" in error for error in result.errors))
+
+    def test_single_line_quoting_does_not_change_shell_or_block_scalar_handling(self) -> None:
+        values = (
+            'name: "say \\"hello\\""',
+            r'name: "ends with a backslash \\"',
+            r'name: "escaped backslash and quote \\\" remain inside"',
+            "name: 'it''s a job'",
+            'name: plain # comment with an unmatched "',
+            'run: printf "%s" "don\'t"',
+            'env: {KEY: "can\'t", MORE: \'it\'\'s fine\'}',
+            'runs-on: ["ubuntu-latest", self-hosted]',
+            'run: |\n      text with unclosed " and \' is literal',
+            'run: >-\n      runtime-tests: "literal only',
+        )
+        for value in values:
+            with self.subTest(value=value):
+                result = Result()
+                body = "jobs:\n  build:\n    " + value + "\n"
+                self.assertEqual(ci_yaml_job_ids(body, "github_actions", result), {"build"})
+                self.assertEqual(result.errors, [])
 
 
 class TestingRecordFormatTests(unittest.TestCase):

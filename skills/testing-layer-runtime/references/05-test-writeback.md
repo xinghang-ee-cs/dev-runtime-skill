@@ -35,6 +35,7 @@ Testing Runtime 只写本期 Runtime 输出目录；不得修改 planning SoT �
 - `manual-test-queue.md`：待人工执行、待补证据、已确认/未确认的人工测试操作；不是 case 清单，而是用户实际操作队列。同一用户操作只能出现一次；多个 case 可以挂载到同一个操作项下。
 - `test-execution-order.md`：测试顺序、依赖、阻塞关系。
 - `business-journey-test-matrix.md`：Planning FLOW 到本地业务/E2E、部署后云端业务/E2E 和正式结果引用的覆盖索引；不保存测试项正式状态。
+- 同一矩阵的 `system_risk_coverage` 保存系统风险适用性、检查定义和 CI 映射；唯一格式与门禁见 `07-system-risk-testing.md`。它不保存执行状态，不新增 Runtime 文件或阶段。
 - `change-triage.md`：测试发现的分类、影响范围、当前合同是否仍有效和下游 disposition；不替代 Planning Change Set 或业务 SoT。
 - `release-handoff.md`：仅在进入 Release Handoff Mode 时生成；保存发布前 DEP、测试结果和证据的只读移交快照，不承担发布后的持续状态。
 
@@ -181,7 +182,7 @@ closure_evidence_refs: []
 
 规则：
 
-- `implementation_defect` 交给 Long 后为 `handed_to_long`；收到 patch Handoff 且 `required_validation_gate: passed` 后转 `retest_required`，需要云端复验时先转 `waiting_redeploy`。
+- `implementation_defect`，以及按 `01-test-runtime-core.md` 准入的 `test_defect -> fix_in_execution` test-only patch，交给 Long 后均为 `handed_to_long`；收到 patch Handoff 且 `required_validation_gate: passed` 后转 `retest_required`，需要云端复验时先转 `waiting_redeploy`。仅数据/临时执行配置/证据/Testing Runtime 的 `fix_in_test` 不交给 Long。
 - `planning_gap | requirement_change | design_drift` 需要规划重入时为 `waiting_planning`；只有新的 Planning Handoff、Long Handoff 和受影响复测证据齐全后才能关闭。
 - `closed` 必须有 `retest_result_refs` 和 `closure_evidence_refs`，并且业务旅程矩阵中受影响 required gap 已消失。只记录“代码已改”“已重新部署”或“用户说应该好了”不得关闭。
 - 历史失败与被替代证据保留，通过 `superseded_evidence_refs` 精确失效；未受影响结果不得无条件失效。
@@ -623,6 +624,7 @@ deployment_identity_snapshot:
     evidence_ref:
     secret_values_included: false
 business_journey_coverage_status: <verified | not_verified>
+system_risk_coverage_digest: <sha256 digest from --print-system-risk-digest>
 release_readiness_status: <ready | blocked>
 required_result_refs: []
 open_finding_refs: []
@@ -640,6 +642,7 @@ unresolved_dependency_refs: []
 规则：
 
 - `snapshot_id` 必须唯一；`snapshot_status: current` 时，`test-runtime-state.md.active_release_handoff` 必须以同一 ID、路径、`snapshot_digest` 和完整部署身份摘要指向本文件。先运行 `--print-release-snapshot-digest` 获取冻结载荷摘要并同步写入快照与 active pointer；校验器会重算。只有 `snapshot_status: current` 且冻结载荷与当前 Testing Runtime 完全一致时，下游才可把它解释为当前移交。
+- 生成快照前先运行 `--print-system-risk-digest`，把结果写入 `system_risk_coverage_digest`，再计算上述 snapshot digest。`required_result_refs` 必须同时包含业务旅程和系统风险/必需 CI 检查的结果引用；系统风险决策改变也必须失效旧快照。
 - `deployment_identity_snapshot` 是生成时冻结的完整值，不是对可变指针的替代名称；它必须与当时 `current_deployment_revision` 完全一致并包含 `runtime_configuration_identity`。`current_deployment_revision_ref` 只用于回查来源，不能让旧快照自动继承后续部署身份。
 - `planning_baseline_revision`、可选 `active_change_revision`、Long Handoff、Required Validation Gate、业务旅程矩阵 revision、`required_result_refs` 和 `open_finding_refs` 共同冻结本次测试结论。任一来源变化时必须通过对应失效流程把快照标为 `invalidated`，不得原地改写冻结载荷使旧结论看似仍然成立。
 - `dependencies` 必须与 Planning Handoff `before_release_dependency_refs` 精确对账，并解析每个 `testing_result_ref` 和有效 evidence；`unresolved_dependency_refs` 必须等于机器计算出的未解除集合。集合为空时 `release_readiness_status: ready`，否则只能为 `blocked`；当前快照不等于发布通过。

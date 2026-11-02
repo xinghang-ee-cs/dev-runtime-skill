@@ -75,18 +75,7 @@ The originating 00–15 documents stay read-only. `deployed` and `original_bug_p
 
 The repository has two version levels: a GitHub Release identifies one bundle snapshot, while each Skill has its own SemVer in [`skills-manifest.json`](skills-manifest.json). The manifest's release channel distinguishes prerelease evaluation bundles from jointly validated stable bundles. Neither the README nor `SKILL.md` is a version source.
 
-The current bundle declared by the manifest is:
-
-| Component | Version |
-| --- | --- |
-| Repository Release | `v1.1.2` (stable) |
-| `planning-layer-runtime` | `1.1.0` |
-| `long-task-orchestrator` | `1.1.0` |
-| `testing-layer-runtime` | `1.1.0` |
-| `ai-code-inspection` | `0.2.0` |
-| Synchronization tool | `0.1.1` |
-
-This table is a human-readable snapshot only. [`skills-manifest.json`](skills-manifest.json) remains the authoritative version source.
+Use [`skills-manifest.json`](skills-manifest.json) for the current bundle, per-Skill versions, and release channel. The system-risk testing update is a prerelease candidate; `latest` continues to select a published stable Release. Testing owns integration, online runtime and deployment verification, while Long implements the requested tests, CI bindings and fixes. See [system risk testing](skills/testing-layer-runtime/references/07-system-risk-testing.md) for the coverage gate and existing-Runtime migration.
 
 An installed target project receives:
 
@@ -109,7 +98,7 @@ See [Versioning and updates](src/content/docs/reference/versioning-and-updates.m
 
 ### Release tags and a copy-ready Skill + Runtime migration prompt
 
-GitHub Release tags use `vMAJOR.MINOR.PATCH`; the current manifest declares the stable `v1.1.2` Release. The versions of the individual Skills inside that bundle still come from [`skills-manifest.json`](skills-manifest.json). Use `latest` to follow the latest stable Release. When a new patch is published, the release workflow archives older patch Releases from the same `MAJOR.MINOR` series as drafts and removes their public tags, so users receive `v1.1.2` instead of the unfixed `v1.1.0` or `v1.1.1`. Releases from a different `MAJOR.MINOR` series remain public for staged rollout. After installation, `runtime-skills.lock.json` records what that project actually uses.
+GitHub Release tags use `vMAJOR.MINOR.PATCH`; the manifest records versions and the release channel. Use `latest` to follow the latest published stable Release; prerelease candidates require explicit selection. On a new patch, the release workflow archives older patch Releases in the same `MAJOR.MINOR` series as drafts and removes their public tags. Different series remain available for staged rollout. The target project lock records its actual installation.
 
 Updating Skill files does not upgrade Runtime state already created inside a project. The `v1.0.0` forward ledgers and validation receipts remain the compatibility boundary for unfinished pre-1.0 phases. v1.1 adds Bugfix Cases without rewriting closed historical phases: new confirmed defects create `bugfix-case/v1` alongside the originating phase, while existing 00–15 files remain untouched.
 

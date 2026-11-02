@@ -33,6 +33,12 @@ python scripts/runtime-skills.py install \
 
 `--release latest` 是普通用户的稳定入口，只解析 GitHub 标记为稳定的最新 Release，不会选中预发布或 Draft 版本。当前稳定版本以 GitHub 最新公开稳定 Release 为准，可通过 `latest` 获取。维护者需要验证尚未发布的本地内容时，才使用 `--source /path/to/dev-runtime-skill`，此时锁文件会记录实际分支和 commit，而不会伪装成 Release。
 
+### 系统风险测试预发布版
+
+系统风险覆盖、线上运行/部署验证与 CI 回归对账的增强版先走 `prerelease`，不通过 `latest` 自动替换用户稳定安装。测试职责仍由 Testing 主导，Long 只增加承接测试代码/CI 配置和实现修复的说明，Planning 合同不扩写专项清单。
+
+升级该候选版后，旧 Testing Runtime 仍能恢复；但最终通过或 current Release Handoff 前，必须按 Testing `references/07-system-risk-testing.md` 在现有矩阵补齐 `system_risk_coverage`、对应正式结果/证据和快照摘要。旧有效证据可复用，不重写 Planning 00–15，不倒拨阶段或把未验证项改为通过。活动期次的 pin 和显式升级确认规则保持不变。
+
 ### 迁移已有的无版本副本
 
 目标目录已经存在但没有 `runtime-skills.lock.json` 时，首次 `install` 不会直接覆盖。工具会列出发布版相对旧副本将新增、修改和删除的文件。用户确认愿意采用发布版后，再运行同一安装命令并增加：

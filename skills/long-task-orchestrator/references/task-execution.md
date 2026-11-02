@@ -74,6 +74,8 @@ cancelled -> NEVER_EXECUTE
 
 Patch 分支：
 
+`fix_in_execution` 可以是实现缺陷，也可以是 Testing 已确认的 `test_defect` test-only patch；后者仅允许 handoff 精确列出的仓库测试代码/测试入口/CI 配置，复用同一完整 Patch TASK 和验证门禁。需要业务实现或合同变化时重新 triage，不沿用该测试资产 allowlist 扩权。
+
 ```text
 if testing_feedback_patch_confirmed:
   enter_patch_runtime

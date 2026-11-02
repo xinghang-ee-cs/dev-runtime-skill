@@ -92,6 +92,8 @@ evidence_refs:
 
 ## 3. 部署后云端业务与端到端测试
 
+联合测试、线上运行测试与部署验证的专项风险按 `07-system-risk-testing.md` 识别。首次增加部署、改变部署方式或发现原合同排除云端验证时，先核对旧 `not_applicable`/排除项；确需改变验收范围时按 Change Triage 回 Planning，不能用已知部署身份代替范围确认。只有部署 revision 变化且合同未变时，复用现有 reconciliation gate，不机械重开 Planning。
+
 目标：
 
 - 在部署完成后，对精确部署 revision 验证本地无法证明或可能因部署差异改变结果的完整业务旅程。
@@ -125,6 +127,7 @@ before_cloud_test 依赖状态：
 - 先执行安全、只读、低侵入的入口与依赖 smoke；smoke 失败时停止依赖它的业务旅程并记录明确阻断。
 - 本期包含云端部署时，执行 `business-journey-test-matrix.md` 中全部 P0 正向业务旅程，以及标记为部署敏感、受当前 revision 影响或本地证据无法证明的 P1 云端业务/E2E；不把整套本地单测、集成测试、api-test、Playwright 或普通交互测试机械搬到云端。
 - CI/CD 已针对同一精确部署 revision 产生完整业务/E2E 证据时可以继承；只有 smoke、零散接口结果或其他 revision 的结果时不能冒充业务旅程通过。
+- FLOW 复验之外必须闭合适用的资源边界、凭据隔离、健康探针语义、外部 I/O 上限、故障恢复和部署生命周期检查；按需读取 Profile。静态配置存在不等于实际生效；生产压测、故障注入和回滚操作仍服从既有授权边界，未获授权时保留未验证项并移交，不标记通过。
 - 优先使用隔离测试租户、测试账号和可清理测试数据。人工验证与安全自动化都必须遵守相同 FLOW、前置、断言和证据要求。
 - 云端发现失败后先执行 Change Triage；implementation defect 回 Long patch，test/environment defect 在 Testing 获准范围修正，planning gap/requirement change/design drift 回 Planning。修复版本重新部署后，本地证据按真实影响精确失效；云端 required 旅程按下一条规则处理。
 - 部署身份改变时必须完整执行 `05-test-writeback.md#deployment-revision-reconciliation-gate`；本文件只触发该 Gate，不复制证据失效、矩阵重算或恢复顺序。
